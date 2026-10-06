@@ -326,6 +326,21 @@ button.sigil{padding:0;cursor:pointer;color:var(--gold2)}
 .tier.has b{color:#9fd0c8}
 .room .gt{display:flex;flex-direction:column;min-width:0;flex:1;gap:2px}
 .statl span.dim{color:var(--dim)}
+/* ===== v4.1 ===== */
+.doll{grid-template-columns:1fr 1fr 1.15fr 1fr 1fr;grid-template-rows:repeat(8,30px);grid-template-areas:none}
+.seg2{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
+.seg2 button{grid-column:span 2;background:var(--panel);border:1px solid var(--line);padding:8px 4px;font:700 13px var(--ff-d);color:var(--muted);min-height:40px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seg2 button:nth-child(n+4){grid-column:span 3}
+.seg2 button.on{color:var(--gold2);border-color:var(--gold)}
+.treebox{height:calc(var(--vh) - 260px)}
+.tinfo{position:absolute;left:6px;right:52px;bottom:6px;max-height:52%;overflow:auto;background:#1c1612f2;border:1px solid var(--gold);padding:8px 30px 10px 10px;box-shadow:0 6px 20px #000a;z-index:2;touch-action:pan-y}
+.tinfo .tt{font:700 16px var(--ff-d);display:block;margin:2px 0 4px}
+.tinfo .tx{position:absolute;top:2px;right:2px;width:30px;height:30px;background:none;border:0;color:var(--muted);font-size:16px}
+.tinfo .seg button{padding:6px 10px;min-height:34px;font-size:13px}
+.ascbox{height:auto;aspect-ratio:1/1;max-height:calc(var(--vh) - 230px);margin-inline:auto;width:100%}
+.ascbox .tinfo{right:6px}
+.ascbox g{cursor:pointer}
+.ascbox .tinfo{max-height:44%}
 
 </style>
 </head><body>
@@ -1000,8 +1015,8 @@ const lbl=(k,v)=>LBL[k]?LBL[k](v):`${k}: ${v}`;
 
 /* =========================================================
    ВОЗВЫШЕНИЯ И ЛАБИРИНТ ИЗАРО
-   Каждый лабиринт даёт 2 очка возвышения. Значимое умение возвышения стоит 2 очка:
-   за 4 лабиринта можно взять 4 из 6 умений.
+   Каждый лабиринт даёт 2 очка возвышения. У возвышения 7 значимых умений, перед каждым — малое.
+   Каждый узел стоит 1 очко: за 4 лабиринта (8 очков) можно взять 4 значимых умения из 7.
    ========================================================= */
 const A_=(n,s)=>({n,s});
 const ASC={
@@ -1083,8 +1098,29 @@ const ASC={
       A_('Удачливая',{ex_dbl:10}),A_('Засада',{ex_ambush:40}),A_('Выживальщица',{ex_lowDR:12,regen:1})]},
   ],
 };
+/* седьмое значимое умение каждого возвышения */
+const ASC_EXTRA={jugg:A_('Неукротимость',{lifeP:12,regen:1}),bers:A_('Кровавый пир',{leech:1.5,ex_killLife:4}),chief:A_('Тотем предков',{resF:25,armourP:25}),
+  glad:A_('Мастер щита',{block:6,ex_counter:15}),champ:A_('Слава арены',{ex_onslaught:30,lifeP:8}),slayer:A_('Кровавый след',{ex_hitLife:8,meleeP:20}),
+  deadeye:A_('Попутный ветер',{kite:30,ex_ambush:25}),raider:A_('Неистовый бег',{stepFree:30,ex_rampage:20}),path:A_('Тропа бури',{elemAtkP:25,ex_flaskWave:8}),
+  assn:A_('Отравленный клинок',{poisonC:25,ex_dbl:8}),sabo:A_('Чистая работа',{ex_multi:8,dmgTaken:-5}),trick:A_('Призрак',{evadeFlat:8,ex_killEs:6}),
+  elem:A_('Шторм стихий',{ex_multi:6,elemP:25}),necro:A_('Порча',{ex_curseEff:20,ex_vsCurse:15}),occ:A_('Ледяная кровь',{ex_chillEff:15,ex_lowDR:10}),
+  hiero:A_('Тотем веры',{resAll:12,ex_waveHeal:8}),inq:A_('Каратель',{ex_vsCurse:15,critM:25}),guard:A_('Радужный щит',{block:6,es:50}),
+  ascd:A_('Путь Наследницы',{dmgP:15,resAll:8}),regent:A_('Вассалы',{ex_flaskWave:10,flaskEff:20}),adv:A_('Неуёмная жажда',{ex_rampage:25,goldP:25})};
+/* малый узел перед значимым: треть первого числового свойства значимого */
+const BOOL_EX=new Set(['ex_fortify','ex_ignSpread','ex_chillAtk','ex_firstCrit','ex_evadeCrit','ex_rage','plusProj','ex_ignDur','ex_poiDur','curseDur']);
+function ascSmall(s){
+  for(const k in s){if(BOOL_EX.has(k))continue;const v=s[k];if(typeof v!=='number')continue;
+    const sv=k==='regen'||k==='leech'?R(v/3*10)/10:(v<0?Math.min(-1,R(v/3)):Math.max(1,R(v/3)));return {[k]:sv};}
+  return {lifeP:4};
+}
+/* граф возвышения: старт в центре, 7 ветвей «малый → значимый», как в PoE */
+const ASC_POS=(()=>{const P={start:[0,0]};for(let i=0;i<7;i++){const a=(-90+i*360/7)*Math.PI/180;
+  P['s'+i]=[R(Math.cos(a)*92),R(Math.sin(a)*92)];P['n'+i]=[R(Math.cos(a)*172),R(Math.sin(a)*172)];}return P;})();
+for(const c in ASC)ASC[c].forEach(a=>{if(a.nodes.length<7)a.nodes.push(ASC_EXTRA[a.id]);a.smalls=a.nodes.map(n=>ascSmall(n.s));});
 const ascDef=id=>{for(const c in ASC){const a=ASC[c].find(x=>x.id===id);if(a)return a;}return null;};
-const ASC_NODE_COST=2;
+const ascNodeStats=(a,id)=>id[0]==='n'?a.nodes[+id.slice(1)].s:a.smalls[+id.slice(1)];
+const ascNodeName=(a,id)=>id[0]==='n'?a.nodes[+id.slice(1)].n:'Малое умение';
+const ASC_NODE_COST=1;
 
 /* ---------- лабиринт ---------- */
 const LABS=[
@@ -1110,7 +1146,7 @@ const TRAPS=[
   {n:'Ядовитый туман',d:'Комнату заполняет зелёный пар.',o:[['dex','Пробежать на одном вдохе'],['str','Перетерпеть'],['int','Развеять туман']]},
   {n:'Стрелковые щели',d:'Из стен летят болты.',o:[['dex','Уклониться'],['str','Принять на доспех'],['int','Обмануть нажимные плиты']]},
 ];
-const PUZZLE_SYM=['☀','☾','✶','♁'];
+const PUZZLE_SYM=['☀','☾','✶','♁','♆','⚚'];
 const SHRINES=[
   {n:'Святилище гнева',s:{dmgMore:20}},{n:'Святилище стойкости',s:{resAll:20,armourP:30}},{n:'Святилище жизни',s:{regen:3}},
   {n:'Святилище ветра',s:{evaP:40,evadeFlat:5}},{n:'Святилище алхимика',s:{flaskEff:40,flaskGain:50}},{n:'Святилище разума',s:{mreg:15,manaP:25}},
@@ -1290,6 +1326,7 @@ function newAcc(){return {v:4,u:0,t:Date.now(),chars:[],cur:null,stash:{items:[]
 function fixChar(c){
   c.maps=c.maps||{};c.offer=c.offer||0;c.labs=c.labs||[0,0,0,0];c.asc=c.asc||null;c.ascAlloc=c.ascAlloc||[];c.hex=c.hex||null;
   c.mapBest=c.mapBest||0;c.bonus=c.bonus||0;c.cur=c.cur||{};c.inv=c.inv||[];
+  if(c.ascAlloc.some(x=>typeof x==='number'))c.ascAlloc=c.ascAlloc.flatMap(i=>typeof i==='number'?['s'+i,'n'+i]:[i]);
   for(const id in c.attrPick)if(!NODES[id]||NODES[id].t!=='attr')delete c.attrPick[id];
   c.alloc=c.alloc.filter(id=>NODES[id]);
   return c;
@@ -1374,7 +1411,7 @@ function calc(){
   const add=s=>{for(const k in s){const v=s[k];if(Array.isArray(v)){t[k+'Min']=(t[k+'Min']||0)+v[0];t[k+'Max']=(t[k+'Max']||0)+v[1];}else t[k]=(t[k]||0)+v;}};
   S.alloc.forEach(id=>{const n=NODES[id];if(!n)return;
     if(n.t==='attr'){const a=S.attrPick[id]||n.def;t[a]=(t[a]||0)+ATTR_NODE;}else add(n.s);if(n.key)keys.add(n.key);});
-  const AD=S.asc&&ascDef(S.asc);if(AD)S.ascAlloc.forEach(i=>{if(AD.nodes[i])add(AD.nodes[i].s);});
+  const AD=S.asc&&ascDef(S.asc);if(AD)S.ascAlloc.forEach(id=>add(ascNodeStats(AD,id)));
   const P={t,keys,U,cls:S.cls};
   /* оружие и левая рука */
   const main=S.equip.weapon&&itemOk(S.equip.weapon)?S.equip.weapon:null,off=S.equip.offhand&&itemOk(S.equip.offhand)?S.equip.offhand:null;
@@ -1697,7 +1734,7 @@ function battleInfo(B){
   if(B.type==='camp'){const b=BATTLES[B.g],A=ACTS[b.act],l=A.locs[b.loc];
     return {lvl:b.lvl,boss:b.boss,pool:b.pool,name:l[0],sub:`${A.n} · бой ${b.ix+1}/${A.total}`,act:b.act,waves:4};}
   if(B.type==='lab'){const L=S.labRun,LD=LABS[L.n];
-    return {lvl:LD.lvl,boss:B.boss?'izaro':null,pool:LAB_MOBS,name:B.boss?'Тронный зал Изаро':ROOMS.fight.n,sub:`${LD.n} · ${B.boss?'финал':'комната '+(L.step+1)+'/'+L.steps.length}`,act:4,lab:L.n,waves:B.boss?1:2};}
+    return {lvl:LD.lvl,boss:B.boss?'izaro':null,pool:LAB_MOBS,name:B.boss?'Тронный зал Изаро':ROOMS.fight.n,sub:`${LD.n} · ${B.boss?'финал':'комната '+(L.step+1)+'/'+L.steps.length}`,act:4,lab:L.n,waves:B.boss?1:(L.n>=2?3:2)};}
   const m=S.mapRun,lvl=67+m.tier;
   return {lvl,boss:B.step===3?m.boss:null,pool:m.pool,name:m.name,sub:`Карта ${m.tier} · бой ${B.step+1}/4`,act:5,map:1,mt:m.tier,waves:3};
 }
@@ -1720,6 +1757,10 @@ function spawnWave(){
   const rareC=I.map?10+I.mt:I.lab!=null?7+I.lab*3:3+I.act*1.5,magC=I.map?28:I.lab!=null?22:14+I.act*3;
   const roll3=()=>{const r=Math.random()*100;return r<rareC?'rare':r<rareC+magC?'magic':'normal';};
   if(I.boss&&C.wave===C.waves){const b=mkEnemy(I.boss,I.lvl+1,{map:I.mt});C.enemies.push(b);
+    if(I.lab!=null&&I.boss==='izaro'){const n=I.lab;b.maxHp=b.hp=R(b.hp*(1+.15*n));b.dmg*=1+.1*n;b.boss={...b.boss,spec:[...b.boss.spec]};
+      if(n>=1)b.boss.spec.push({every:6,name:'Идолы трона',type:'summon',mon:'idol',n:2});
+      if(n>=2)b.boss.spec.push({every:7,name:'Цепи императора',type:'pull',m:1.5});
+      if(n>=3){b.boss.spec.push({every:8,name:'Гнев Изаро',type:'nuke',m:2.6,el:'light'});b.res.fire+=10;b.res.cold+=10;b.res.light+=10;}}
     for(let i=0;i<(I.act===0?1:2);i++)C.enemies.push(mkEnemy(pick(I.pool),I.lvl,{map:I.mt}));
     logC(`<span class="boss-t">${b.n}</span> преграждает путь!`);}
   else for(let i=0;i<n;i++)C.enemies.push(mkEnemy(pick(I.pool),I.lvl+(Math.random()<.25?1:0),{rar:roll3(),map:I.mt}));
@@ -2285,7 +2326,7 @@ function labUnlock(n){
 }
 const anyLabOpen=()=>[0,1,2,3].some(n=>!labUnlock(n));
 function genLab(n){
-  const R_=LABS[n].rooms,W={fight:3,trap:2.2,puzzle:1.6,shrine:1.1,font:.8,vault:1.2},steps=[];
+  const R_=LABS[n].rooms,W={fight:3,trap:2.2+.2*n,puzzle:1.6+.2*n,shrine:1.1,font:.8-.15*n,vault:1.2},steps=[];
   for(let i=0;i<R_;i++){
     const k=i%3===1?3:2,pool=Object.keys(W).filter(t=>!(i===0&&t==='vault')&&!(i===0&&t==='font')),opts=[];
     if(i===R_-1)opts.push('font');
@@ -2302,7 +2343,10 @@ function enterLab(n){
 }
 function labLog(t){const L=S.labRun;if(L){L.log.push(t);if(L.log.length>12)L.log.shift();}}
 function labRoomDone(){const L=S.labRun;L.step++;L.room=null;}
-function trapNeed(){return R(20+LABS[S.labRun.n].lvl*1.1);}
+/* сложность испытаний растёт от лабиринта к лабиринту */
+const LAB_DIFF=[{traps:3,need:0,hurt:0,syms:4,len:3,tries:5},{traps:3,need:8,hurt:.03,syms:5,len:3,tries:5},{traps:4,need:16,hurt:.05,syms:5,len:4,tries:6},{traps:4,need:26,hurt:.07,syms:6,len:4,tries:6}];
+const labDiff=()=>LAB_DIFF[S.labRun.n];
+function trapNeed(){return R(20+LABS[S.labRun.n].lvl*1.1+labDiff().need);}
 function trapChance(a){const P=calc();return clamp(R(40+(P.attr[a]-trapNeed())*1.5),10,95);}
 function labHurt(f){const L=S.labRun;L.hp=Math.max(0,L.hp-f);if(L.hp<=0){labFail();return true;}return false;}
 let labFailNote=null;
@@ -2310,8 +2354,8 @@ function labFail(){S.labRun=null;S.deaths++;labFailNote='Вы пали в лаб
 function labChoose(i){
   const L=S.labRun;if(!L||L.room)return;const type=L.steps[L.step][i];
   if(type==='fight'){L.room={type};save();startBattle({type:'lab'});return;}
-  if(type==='trap'){L.room={type,traps:shuffle(TRAPS).slice(0,3),i:0,res:[]};}
-  if(type==='puzzle'){L.room={type,secret:shuffle([0,1,2,3]).slice(0,3),tries:[],cur:[],max:5,state:'play'};}
+  if(type==='trap'){L.room={type,traps:shuffle(TRAPS).slice(0,labDiff().traps),i:0,res:[]};}
+  if(type==='puzzle'){const D=labDiff();L.room={type,k:D.syms,secret:shuffle([...Array(D.syms).keys()]).slice(0,D.len),tries:[],cur:[],max:D.tries,state:'play'};}
   if(type==='shrine'){L.room={type,opts:shuffle(SHRINES.map((_,j)=>j).filter(j=>!L.buffs.includes(j))).slice(0,2)};}
   if(type==='font'){L.hp=1;L.fl=null;labLog('Фонтан исцелил вас и наполнил флаконы');L.room={type,done:1};}
   if(type==='vault'){if(L.keys>0){L.keys--;const P=calc(),got=[];
@@ -2327,16 +2371,17 @@ function labTrap(j){
   const t=R0.traps[R0.i],a=t.o[j][0],ch=trapChance(a),ok=roll(ch);
   let note;
   if(ok){note=`${t.n}: успех (${ATTR[a].toLowerCase()}, ${ch}%)`;if(roll(25)){L.keys++;note+=' · найден золотой ключ';}}
-  else{const f=rnd(.12,.2);note=`${t.n}: провал — −${R(f*100)}% здоровья`;R0.res.push({ok,note});R0.i++;labLog(note);if(labHurt(f))return;save();return;}
+  else{const f=rnd(.12,.2)+labDiff().hurt;note=`${t.n}: провал — −${R(f*100)}% здоровья`;R0.res.push({ok,note});R0.i++;labLog(note);if(labHurt(f))return;save();return;}
   R0.res.push({ok,note});R0.i++;labLog(note);save();
 }
 function labPz(sym){
   const R0=S.labRun.room;if(!R0||R0.type!=='puzzle'||R0.state!=='play')return;
   if(R0.cur.includes(sym))return;R0.cur.push(sym);
-  if(R0.cur.length===3){const g=R0.cur;let ex=0,pa=0;g.forEach((s,i)=>{if(R0.secret[i]===s)ex++;else if(R0.secret.includes(s))pa++;});
+  const len=R0.secret.length;
+  if(R0.cur.length===len){const g=R0.cur;let ex=0,pa=0;g.forEach((s,i)=>{if(R0.secret[i]===s)ex++;else if(R0.secret.includes(s))pa++;});
     R0.tries.push({g,ex,pa});R0.cur=[];
-    if(ex===3){R0.state='win';S.labRun.keys++;const gold=R(40+LABS[S.labRun.n].lvl*6);S.gold+=gold;labLog(`Механизм поддался: золотой ключ и ${gold} зол.`);}
-    else{if(labHurt(.05))return;if(R0.tries.length>=R0.max){R0.state='lose';labLog('Механизм заклинило: шипы ранят вас');if(labHurt(.12))return;}}}
+    if(ex===len){R0.state='win';S.labRun.keys++;const gold=R(40+LABS[S.labRun.n].lvl*6);S.gold+=gold;labLog(`Механизм поддался: золотой ключ и ${gold} зол.`);}
+    else{if(labHurt(.05+labDiff().hurt/2))return;if(R0.tries.length>=R0.max){R0.state='lose';labLog('Механизм заклинило: шипы ранят вас');if(labHurt(.12+labDiff().hurt))return;}}}
   save();
 }
 function labShrine(k){const L=S.labRun,R0=L.room;if(!R0||R0.type!=='shrine')return;L.buffs.push(k);labLog(`Благословение: ${SHRINES[k].n}`);R0.done=1;save();}
@@ -2354,7 +2399,10 @@ function finishLab(){
   C.over=true;showLabWin();
 }
 function chooseAsc(id){if(S.asc)return;S.asc=id;S.ascAlloc=[];save();}
-function ascAlloc(i){if(!S.asc||S.ascAlloc.includes(i)||ascFree()<ASC_NODE_COST)return false;S.ascAlloc.push(i);save();return true;}
+/* путь к узлу возвышения: значимому нужен свой малый узел */
+function ascPath(id){if(!S.asc||S.ascAlloc.includes(id))return [];const p=[];if(id[0]==='n'){const sm='s'+id.slice(1);if(!S.ascAlloc.includes(sm))p.push(sm);}p.push(id);return p;}
+function ascAlloc(id){const p=ascPath(id);if(!p.length||ascFree()<p.length)return false;S.ascAlloc.push(...p);save();return true;}
+function ascRefund(id){if(!S.ascAlloc.includes(id))return false;if(id[0]==='s'&&S.ascAlloc.includes('n'+id.slice(1)))return false;S.ascAlloc=S.ascAlloc.filter(x=>x!==id);save();return true;}
 const ascResetCost=()=>R(100+S.lvl*25);
 
 /* ---------- верстак ---------- */
@@ -2418,8 +2466,8 @@ function expandStash(){const c=stashCost();if(!c||S.gold<c)return false;S.gold-=
 /* ---------- аукцион ----------
    Без сервера: лоты хранятся в аккаунте и видны всем вашим персонажам (один выставляет, другой покупает).
    С сервером (AUCTION_URL): лоты общие для всех игроков; продавец определяется по Telegram-аккаунту,
-   поэтому удаление персонажа не трогает выставленные и проданные вещи. Налог аукциона — 5%. */
-const AUC_TAX=.05;
+   поэтому удаление персонажа не трогает выставленные и проданные вещи. Комиссии нет. */
+const AUC_TAX=0;
 const AUC={
   mode(){return AUCTION_URL&&tg&&tg.initData?'server':'local';},
   async req(path,opt={}){
@@ -2490,7 +2538,7 @@ const ICONS={
   map:'<svg viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg>',
   char:'<svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.5"/><path d="M5 21c0-4 3-7 7-7s7 3 7 7"/></svg>',
   tree:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.5"/><circle cx="5" cy="5" r="1.8"/><circle cx="19" cy="5" r="1.8"/><circle cx="5" cy="19" r="1.8"/><circle cx="19" cy="19" r="1.8"/><path d="M6.3 6.3l3.9 3.9M17.7 6.3l-3.9 3.9M6.3 17.7l3.9-3.9M17.7 17.7l-3.9-3.9"/></svg>',
-  gems:'<svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M2 9h20M9 3l3 18M15 3l-3 18"/></svg>',
+  gems:'<svg viewBox="0 0 24 24"><path d="M6.6 19.8L4.6 13.6 10.6 4.8 18.6 3.6 19.6 10.4Z"/><path d="M4.6 13.6L12.8 11 19.6 10.4M12.8 11L10.6 4.8M12.8 11L6.6 19.8"/><ellipse cx="12" cy="12.2" rx="11" ry="3.4" transform="rotate(-24 12 12.2)"/></svg>',
   items:'<svg viewBox="0 0 24 24"><path d="M8.5 3L4 5.5l1.6 5.2L7.5 10v10.5h9V10l1.9.7L20 5.5 15.5 3c-.6 1.7-1.9 2.6-3.5 2.6S9.1 4.7 8.5 3z"/><path d="M9 14h6M12 6v14.5"/></svg>',
 };
 const KIND={melee:'<svg class="kind" viewBox="0 0 16 16"><path d="M3 13L12 4M10 3h3v3M2 11l3 3"/></svg>',
@@ -2509,14 +2557,14 @@ function topBar(){
   return `<div class="top"><button class="sigil" data-a="roster" aria-label="Персонажи">${CLASSES[S.cls].n[0]}</button>
     <div class="who"><b>${esc(S.name)}</b><span class="muted small">${ascName()||CLASSES[S.cls].n} · уровень <span class="num">${S.lvl}</span></span>
       <div class="xpbar"><i style="width:${S.lvl>=MAXLVL?100:clamp(S.xp/xpNeed(S.lvl)*100,0,100)}%"></i></div></div>
-    ${pf>0||af>=2?`<button class="pts" data-a="tab" data-t="tree">+${pf}${af>=2?' ✦':''}</button>`:''}
+    ${pf>0||af>=1?`<button class="pts" data-a="tab" data-t="tree">+${pf}${af>=1?' ✦':''}</button>`:''}
     <div class="gold num">${fmt(S.gold)} зол.</div></div>`;
 }
 function renderTabs(){
   if(!S||screen==='select'||screen==='roster'||screen==='combat'){tabsEl.innerHTML='';return;}
   const T=[['map',S.done?'Убежище':'Карта'],['char','Герой'],['tree','Древо'],['gems','Камни'],['items','Вещи']];
   const newItems=S.inv.some(x=>x.isNew);
-  tabsEl.innerHTML=`<nav class="tabs"><div class="in">${T.map(([k,n])=>`<button class="${tab===k&&screen==='main'?'on':''}" data-a="tab" data-t="${k}">${ICONS[k]}${n}${(k==='tree'&&(pointsFree()>0||(S.asc&&ascFree()>=2)))||(k==='items'&&newItems)?'<span class="dot"></span>':''}</button>`).join('')}</div></nav>`;
+  tabsEl.innerHTML=`<nav class="tabs"><div class="in">${T.map(([k,n])=>`<button class="${tab===k&&screen==='main'?'on':''}" data-a="tab" data-t="${k}">${ICONS[k]}${n}${(k==='tree'&&(pointsFree()>0||(S.asc&&ascFree()>=1)))||(k==='items'&&newItems)?'<span class="dot"></span>':''}</button>`).join('')}</div></nav>`;
 }
 function render(){
   if(!S&&screen!=='select')screen=ACC&&ACC.chars.length?'roster':'select';
@@ -2675,7 +2723,7 @@ function vCombat(){
     return `<button class="fl r-${it.rar} ${act?'on':''}" data-a="flask" data-k="${k}" ${uses<1||C.busy?'disabled':''} aria-label="${esc(it.name)}"><b>${it.rar==='unique'?it.name.split(' ')[0]:FSHORT[it.fk]}</b><small class="num">${uses}×</small><i style="width:${clamp(f.ch/st.max*100,0,100)}%"></i></button>`;}).join('');
   const h=P.hex,hexBtn=h?`<button class="hexb" data-a="hex" ${C.busy||!h.ok||!affordable({},P,h.cost)?'disabled':''}><b>${h.kind==='mark'?'◎':'☍'} ${h.n}</b><small>${!h.ok?'мало атрибута':`${h.cost} маны · ${h.kind==='mark'?'метка на цель, не тратит ход':'цель и соседние ряды, '+(h.dur>50?'бессрочно':h.dur+' хода')}`}</small></button>`:'';
   return `<div class="cb-head"><div class="sp"><div class="eyebrow">${I.sub} · ур. ${I.lvl} · волна ${C.wave}/${C.waves}</div><h2>${I.name}</h2></div>
-      <button class="btn sm ghost" data-a="journal">Журнал</button><button class="btn sm toggle ${C.auto?'on':''}" data-a="auto">Авто</button><button class="btn sm ghost" data-a="fleeAsk" ${C.busy&&!C.auto?'disabled':''}>Уйти</button></div>
+      <button class="btn sm ghost" data-a="journal">Журнал</button><button class="btn sm ghost" data-a="fleeAsk" ${C.busy?'disabled':''}>Уйти</button></div>
   <div class="field">${lanes}</div>
   <button class="log" data-a="journal" aria-label="Открыть журнал боя">${C.log.slice(-3).map(l=>`<div>${l}</div>`).join('')}</button>
   <div class="me" id="mebox">
@@ -2721,9 +2769,9 @@ function showLabWin(){
 }
 function showAscChoice(){
   modal(`<div class="eyebrow">Возвышение · ${CLASSES[S.cls].n}</div><h2>Выберите путь</h2>
-    <p class="muted" style="margin:0">Выбор окончательный. Каждое умение возвышения стоит 2 очка; за 4 лабиринта можно взять 4 из 6.</p>
+    <p class="muted" style="margin:0">Выбор окончательный. 7 значимых умений, перед каждым — малое; узел стоит 1 очко. За 4 лабиринта (8 очков) можно взять 4 значимых из 7.</p>
     <div class="choice">${ASC[S.cls].map(a=>`<div class="panel"><div class="row"><b class="sp" style="font-family:var(--ff-d);font-size:18px;color:var(--gold2)">${a.n}</b><button class="btn sm pri" data-a="ascChoose" data-id="${a.id}">Выбрать</button></div>
-      <p class="muted small" style="margin:4px 0 6px">${a.d}</p><div class="statl small">${a.nodes.map(n=>`<span><b style="color:var(--fg)">${n.n}:</b> ${Object.entries(n.s).map(([k,v])=>lbl(k,v)).join('; ')}</span>`).join('')}</div></div>`).join('')}</div>`,true);
+      <p class="muted small" style="margin:4px 0 6px">${a.d}</p><div class="statl small">${ascList(a)}</div></div>`).join('')}</div>`,true);
 }
 function showDeath(loss){
   const map=C.B.type==='map',lab=C.B.type==='lab';
@@ -2819,47 +2867,67 @@ function treeSvg(){
   return edges+nodes;
 }
 function attrPicker(cur,act){return `<div class="seg" style="margin-top:8px">${ATTR_K.map(k=>`<button class="${cur===k?'on':''}" data-a="${act}" data-k="${k}" style="color:var(--${k})">${ATTR[k]}</button>`).join('')}</div>`;}
+function ascTabOpen(){return !!S.asc||!labUnlock(0);}
+let selAsc=null;
+function nodeInfo(n){
+  const pf=pointsFree(),st=nodeState(n.id),p=pathTo(n.id),canRef=st==='on'&&n.t!=='start';
+  const title=n.t==='small'?'Малое умение':n.t==='attr'?'Атрибут':n.n,kind={small:'',attr:'Магистраль атрибутов',notable:'Значимое умение',key:'Ключевое умение',start:'Начальная точка'}[n.t];
+  const stats=Object.entries(nodeStats(n)).map(([k,v])=>`<span class="${k.startsWith('ex_')||k==='dotMore'?'exs':''}">${lbl(k,v)}</span>`).join('');
+  let act='';
+  if(st==='foreign')act='<span class="dim small">Старт другого класса: через него пройти нельзя</span>';
+  else if(p&&p.length){const cost=p.length,na=p.filter(x=>NODES[x].t==='attr').length;
+    act=`<button class="btn sm pri sp" data-a="alloc" ${pf>=cost?'':'disabled'}>${pf>=cost?(cost>1?`Изучить путь · ${cost} очк.`:'Изучить'):`Нужно ${cost} очк., есть ${pf}`}</button>`;
+    if(na)act+=`<div style="width:100%"><div class="eyebrow" style="margin-top:4px">Атрибут для ${na} узл. на пути</div>${attrPicker(S.attrDef,'attrDef')}</div>`;}
+  if(canRef)act+=`<button class="btn sm" data-a="refund">Забыть · ${refundCost()} зол.</button>`;
+  if(st==='on'&&n.t==='attr')act+=`<div style="width:100%"><div class="eyebrow" style="margin-top:4px">Сменить атрибут (бесплатно)</div>${attrPicker(S.attrPick[n.id]||n.def,'attrSet')}</div>`;
+  return `<div class="tinfo"><button class="tx" data-a="tclose" aria-label="Закрыть">✕</button><div class="eyebrow">${kind||'&nbsp;'}</div><b class="tt" style="color:${n.t==='key'?'var(--gold2)':'var(--fg)'}">${title}</b>
+    <div class="statl small">${n.text?`<span style="color:var(--fg)">${n.text}</span>`:''}${stats}</div>${act?`<div class="row" style="margin-top:6px">${act}</div>`:''}</div>`;
+}
 function vTree(){
-  const seg=`<div class="seg"><button class="${treeTab==='tree'?'on':''}" data-a="treeTab" data-t="tree">Древо · ${pointsFree()}</button><button class="${treeTab==='asc'?'on':''}" data-a="treeTab" data-t="asc">Возвышение${S.asc?' · '+ascFree():''}</button></div>`;
+  if(treeTab==='asc'&&!ascTabOpen())treeTab='tree';
+  const seg=ascTabOpen()?`<div class="seg"><button class="${treeTab==='tree'?'on':''}" data-a="treeTab" data-t="tree">Древо · ${pointsFree()}</button><button class="${treeTab==='asc'?'on':''}" data-a="treeTab" data-t="asc">Возвышение${S.asc?' · '+ascFree():''}</button></div>`:'';
   if(treeTab==='asc')return `<div class="stack">${seg}${vAsc()}</div>`;
   const pf=pointsFree(),n=selNode&&NODES[selNode];
-  let info=`<p class="muted" style="margin:0">Перетаскивайте древо пальцем, сводите два пальца для масштаба. Квадратные узлы — магистрали атрибутов: вы сами выбираете +${ATTR_NODE} к силе, ловкости или интеллекту. Круглые узлы — умения классов, крупные — значимые с особыми эффектами, ромбы — ключевые.</p>`;
-  if(n){const st=nodeState(n.id),p=pathTo(n.id),canRef=st==='on'&&n.t!=='start';
-    const title=n.t==='small'?'Малое умение':n.t==='attr'?'Атрибут':n.n,kind={small:'',attr:'Магистраль атрибутов',notable:'Значимое умение',key:'Ключевое умение',start:'Начальная точка'}[n.t];
-    const stats=Object.entries(nodeStats(n)).map(([k,v])=>`<span class="${k.startsWith('ex_')||k==='dotMore'?'exs':''}">${lbl(k,v)}</span>`).join('');
-    let act='';
-    if(st==='foreign')act='<span class="dim">Старт другого класса: через него пройти нельзя</span>';
-    else if(p&&p.length){const cost=p.length,na=p.filter(x=>NODES[x].t==='attr').length;
-      act=`<button class="btn pri sp" data-a="alloc" ${pf>=cost?'':'disabled'}>${pf>=cost?(cost>1?`Изучить путь · ${cost} очк.`:'Изучить'):`Нужно очков: ${cost}, есть ${pf}`}</button>`;
-      if(na)act+=`<div style="width:100%"><div class="eyebrow" style="margin-top:6px">Атрибут для ${na} узл. магистрали на пути</div>${attrPicker(S.attrDef,'attrDef')}</div>`;}
-    if(canRef)act+=`<button class="btn sm" data-a="refund">Забыть · ${refundCost()} зол.</button>`;
-    if(st==='on'&&n.t==='attr')act+=`<div style="width:100%"><div class="eyebrow" style="margin-top:6px">Сменить атрибут (бесплатно)</div>${attrPicker(S.attrPick[n.id]||n.def,'attrSet')}</div>`;
-    info=`<div class="eyebrow">${kind}</div><h3 style="font-size:18px;margin:2px 0 8px;color:${n.t==='key'?'var(--gold2)':'var(--fg)'}">${title}</h3>
-      <div class="statl">${n.text?`<span style="color:var(--fg)">${n.text}</span>`:''}${stats}</div><div class="row" style="margin-top:12px">${act}</div>`;}
   const sum={};S.alloc.forEach(id=>{const s=nodeStats(NODES[id]);for(const k in s)sum[k]=(sum[k]||0)+s[k];});
   return `<div class="stack">${seg}<div class="row"><div class="sp"><div class="eyebrow">Пассивные умения · ${S.alloc.length-1} изучено</div><b style="font-family:var(--ff-d);font-size:18px">Свободных очков: <span class="num" style="color:var(--gold2)">${pf}</span></b></div>
       <button class="btn sm ghost" data-a="treeHome">К старту</button></div>
     <div class="treebox" id="treebox"><svg id="treesvg"><g id="treeg">${treeSvg()}</g></svg>
-      <div class="tzoom"><button data-a="tz" data-z="1.3" aria-label="Увеличить">+</button><button data-a="tz" data-z="0.77" aria-label="Уменьшить">−</button></div></div>
-    <div class="panel" style="min-height:120px">${info}</div>
+      <div class="tzoom"><button data-a="tz" data-z="1.3" aria-label="Увеличить">+</button><button data-a="tz" data-z="0.77" aria-label="Уменьшить">−</button></div>${n?nodeInfo(n):''}</div>
+    <p class="dim small" style="margin:0">Коснитесь узла, чтобы увидеть описание. Квадраты — атрибуты (+${ATTR_NODE} на выбор), круги — умения класса, крупные — значимые с особыми эффектами, ромбы — ключевые.</p>
     <div class="panel"><button class="btn sm ghost full" data-a="treeSum">${showTreeSum?'Скрыть':'Показать'} итог древа</button>
       ${showTreeSum?`<div class="statl" style="margin-top:10px">${Object.keys(sum).length?Object.entries(sum).map(([k,v])=>`<span>${lbl(k,R(v*10)/10)}</span>`).join(''):'<span class="dim">Ничего не изучено</span>'}</div>`:''}</div></div>`;
+}
+function ascList(a){return a.nodes.map((n,i)=>`<span><b style="color:var(--fg)">${n.n}:</b> ${Object.entries(n.s).map(([k,v])=>lbl(k,v)).join('; ')}</span>`).join('');}
+function ascSvg(AD){
+  const al=new Set(S.alloc&&S.ascAlloc),P=ASC_POS,path=selAsc?new Set(ascPath(selAsc)):new Set();
+  const st=id=>id==='start'||al.has(id)?'on':(id[0]==='s'||al.has('s'+id.slice(1)))?'avail':'off';
+  let e='',nd='';
+  for(let i=0;i<7;i++){[['start','s'+i],['s'+i,'n'+i]].forEach(([x,y])=>{const on=st(x)==='on'&&st(y)==='on',pp=path.has(y)&&(st(x)==='on'||path.has(x));
+    e+=`<line x1="${P[x][0]}" y1="${P[x][1]}" x2="${P[y][0]}" y2="${P[y][1]}" stroke="${on?'#c9a24a':pp?'#e6c57a':'#4a3c30'}" stroke-width="${on?5:pp?4:3}" ${pp?'stroke-dasharray="7 5"':''}/>`;});}
+  Object.keys(P).forEach(id=>{const [x,y]=P[id],s_=st(id),r=id==='start'?26:id[0]==='n'?17:8;
+    const fill=s_==='on'?(id==='start'?'#3a2b1a':'#c9a24a'):path.has(id)?'#4a3a22':'#1c1612',stroke=s_==='on'?'#f3dca0':s_==='avail'?'#e6c57a':'#5a4a3c';
+    const ring=selAsc===id?`<circle cx="${x}" cy="${y}" r="${r+7}" fill="none" stroke="#f3dca0" stroke-width="2" stroke-dasharray="4 3"/>`:'';
+    const lab=id[0]==='n'?`<text x="${x}" y="${y+r+13}" text-anchor="middle" fill="${s_==='on'?'#e6c57a':'#a8977f'}" font-family="Alegreya SC, serif" font-size="11" font-weight="700">${AD.nodes[+id.slice(1)].n}</text>`
+      :id==='start'?`<text x="0" y="5" text-anchor="middle" fill="#e6c57a" font-family="Alegreya SC, serif" font-size="10" font-weight="700">✦</text>`:'';
+    nd+=`<g data-a="ascSel" data-id="${id}">${ring}<circle cx="${x}" cy="${y}" r="${r+10}" fill="transparent"/>${id[0]==='n'?`<rect x="${x-r}" y="${y-r}" width="${2*r}" height="${2*r}" rx="6" transform="rotate(45 ${x} ${y})" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>`:`<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>`}${lab}</g>`;});
+  return e+nd;
 }
 function vAsc(){
   if(!S.asc){
     const done=S.labs.filter(Boolean).length;
     return `<div class="panel framed"><div class="eyebrow">Возвышения класса</div><h2 style="font-size:20px;margin:4px 0 6px">${CLASSES[S.cls].n}</h2>
-      <p class="muted" style="margin:0 0 10px">${done?'Вы прошли лабиринт — выберите возвышение.':'Возвышение открывается после первого лабиринта Изаро (после III акта). Каждый из 4 лабиринтов даёт 2 очка.'}</p>
-      ${done?'<button class="btn pri full" data-a="ascPick">Выбрать возвышение</button>':''}</div>
-      ${ASC[S.cls].map(a=>`<div class="panel"><b style="font-family:var(--ff-d);font-size:17px;color:var(--gold2)">${a.n}</b><p class="muted small" style="margin:4px 0 6px">${a.d}</p>
-        <div class="statl small">${a.nodes.map(n=>`<span><b style="color:var(--fg)">${n.n}:</b> ${Object.entries(n.s).map(([k,v])=>lbl(k,v)).join('; ')}</span>`).join('')}</div></div>`).join('')}`;}
+      <p class="muted" style="margin:0 0 10px">${done?'Вы прошли лабиринт — выберите возвышение.':'Возвышение выбирается после первого лабиринта Изаро. У каждого возвышения 7 значимых умений, перед каждым — малое. Узел стоит 1 очко, каждый из 4 лабиринтов даёт 2 очка.'}</p>
+      ${done?'<button class="btn pri full" data-a="ascPick">Выбрать возвышение</button>':'<button class="btn full" data-a="sub" data-s="lab">К лабиринту</button>'}</div>
+      ${ASC[S.cls].map(a=>`<div class="panel"><b style="font-family:var(--ff-d);font-size:17px;color:var(--gold2)">${a.n}</b><p class="muted small" style="margin:4px 0 6px">${a.d}</p><div class="statl small">${ascList(a)}</div></div>`).join('')}`;}
   const AD=ascDef(S.asc),free=ascFree();
-  return `<div class="panel framed"><div class="eyebrow">Возвышение</div><h2 style="font-size:22px;margin:4px 0">${AD.n}</h2><p class="muted small" style="margin:0">${AD.d}</p>
-      <div class="sheet" style="margin-top:10px"><div><span>Очков</span><span>${ascPoints()}/8</span></div><div><span>Свободно</span><span>${free}</span></div></div>
-      <p class="dim small" style="margin:8px 0 0">Каждое умение стоит ${ASC_NODE_COST} очка. Очки дают лабиринты: пройдено ${S.labs.filter(Boolean).length} из 4. Сбросить можно у торговца.</p></div>
-    <div class="ascgrid">${AD.nodes.map((n,i)=>{const on=S.ascAlloc.includes(i);
-      return `<div class="ascn ${on?'on':''}"><b>${n.n}</b><div class="statl small">${Object.entries(n.s).map(([k,v])=>`<span>${lbl(k,v)}</span>`).join('')}</div>
-        ${on?'<span class="tag ok">Изучено</span>':`<button class="btn sm ${free>=ASC_NODE_COST?'pri':''}" data-a="ascAlloc" data-i="${i}" ${free>=ASC_NODE_COST?'':'disabled'}>Изучить · ${ASC_NODE_COST}</button>`}</div>`;}).join('')}</div>`;
+  let info='';
+  if(selAsc){const id=selAsc,on=S.ascAlloc.includes(id),p=ascPath(id),stats=id==='start'?{}:ascNodeStats(AD,id);
+    info=`<div class="tinfo"><button class="tx" data-a="tclose" aria-label="Закрыть">✕</button><div class="eyebrow">${id==='start'?'Возвышение':id[0]==='n'?'Значимое умение':'Малое умение'}</div>
+      <b class="tt">${id==='start'?AD.n:ascNodeName(AD,id)}</b><div class="statl small">${id==='start'?`<span style="color:var(--fg)">${AD.d}</span>`:Object.entries(stats).map(([k,v])=>`<span class="${k.startsWith('ex_')?'exs':''}">${lbl(k,v)}</span>`).join('')}</div>
+      ${id==='start'?'':on?'<div class="row" style="margin-top:6px"><span class="tag ok">Изучено</span></div>':`<div class="row" style="margin-top:6px"><button class="btn sm pri sp" data-a="ascAlloc" ${free>=p.length?'':'disabled'}>${free>=p.length?(p.length>1?`Изучить путь · ${p.length} очк.`:'Изучить · 1 очко'):`Нужно ${p.length} очк., есть ${free}`}</button></div>`}</div>`;}
+  return `<div class="row"><div class="sp"><div class="eyebrow">Возвышение · ${S.labs.filter(Boolean).length}/4 лабиринтов</div><b style="font-family:var(--ff-d);font-size:18px">${AD.n} · свободно <span class="num" style="color:var(--gold2)">${free}</span> из ${ascPoints()}</b></div></div>
+    <div class="treebox ascbox"><svg viewBox="-250 -228 500 470" preserveAspectRatio="xMidYMid meet">${ascSvg(AD)}</svg>${info}</div>
+    <p class="dim small" style="margin:0">Каждый узел стоит 1 очко, значимому нужен малый узел перед ним. Лабиринт даёт 2 очка: всего 8 — хватит на 4 значимых умения из 7. Сбросить очки можно у торговца.</p>`;
 }
 function applyTV(){const g=document.getElementById('treeg');if(g)g.setAttribute('transform',`translate(${TV.x} ${TV.y}) scale(${TV.k})`);}
 function centerOn(id){const box=document.getElementById('treebox');if(!box)return;const N=NODES[id];TV.x=box.clientWidth/2-N.x*TV.k;TV.y=box.clientHeight/2-N.y*TV.k;applyTV();}
@@ -2868,7 +2936,7 @@ function bindTree(){
   const box=document.getElementById('treebox');if(!box)return;
   if(!TV.init){TV.k=.45;centerOn(startNode(S.cls));TV.init=true;}else applyTV();
   const pts=new Map();let moved=0,pinch=null;
-  box.onpointerdown=e=>{if(e.target.closest('.tzoom'))return;box.setPointerCapture(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  box.onpointerdown=e=>{if(e.target.closest('.tzoom')||e.target.closest('.tinfo'))return;box.setPointerCapture(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(pts.size===1)moved=0;
     if(pts.size===2){const [a,b]=[...pts.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y),k:TV.k};moved=99;}};
   box.onpointermove=e=>{if(!pts.has(e.pointerId))return;const p=pts.get(e.pointerId),dx=e.clientX-p.x,dy=e.clientY-p.y;
@@ -3023,7 +3091,7 @@ function dollCell(slot,area){
 const sortInv=a=>a.slice().sort((x,y)=>(y.fav?1:0)-(x.fav?1:0));
 function irow(x,act,extra=''){return `<button class="irow ${isUpgrade(x)?'up':''} ${!itemOk(x)?'req':''} ${x.fav?'fav':''}" data-a="${act}" data-u="${x.uid}"><span class="sl">${x.fav?'<b class="gold-t">★</b> ':''}${SLOTN[x.slot]}${x.wk?' · '+WEAP[x.wk].n.toLowerCase():''} · ${x.ilvl}${x.isNew?' · <b class="gold-t">новое</b>':''}${extra}</span><span class="in r-${x.rar}">${esc(x.name)}</span></button>`;}
 function vItems(){
-  const doll=`<div class="doll">${dollCell('weapon','w')}${dollCell('helm','h')}${dollCell('amulet','a')}${dollCell('offhand','o')}${dollCell('ring1','r1')}${dollCell('body','b')}${dollCell('ring2','r2')}${dollCell('gloves','g')}${dollCell('belt','be')}${dollCell('boots','bo')}</div>
+  const doll=`<div class="doll">${dollCell('weapon','1/1/7/2')}${dollCell('helm','1/3/3/4')}${dollCell('amulet','2/4/4/5')}${dollCell('offhand','1/5/7/6')}${dollCell('ring1','4/2/6/3')}${dollCell('body','3/3/7/4')}${dollCell('ring2','4/4/6/5')}${dollCell('gloves','7/2/9/3')}${dollCell('belt','7/3/9/4')}${dollCell('boots','7/4/9/5')}</div>
     <div class="flrow">${FLASK_SLOTS.map((s,i)=>{const it=S.equip[s];return `<button class="cell fcell ${it?'r-'+it.rar:'empty'}" data-a="slot" data-s="${s}"><small>${i+1}</small><span>${it?(it.rar==='unique'?it.name.split(' ')[0]:FSHORT[it.fk]):'—'}</span></button>`;}).join('')}</div>`;
   const tabs=[...INV_TABS,['cur','Сферы']];
   const cnt=k=>k==='cur'?Object.values(S.cur).reduce((a,b)=>a+b,0):S.inv.filter(x=>INV_TABS.find(t=>t[0]===k)[2].includes(x.slot)).length;
@@ -3036,7 +3104,7 @@ function vItems(){
     list=`<div class="bag">${items.map(x=>irow(x,'itemInv')).join('')||'<span class="dim">Пусто</span>'}</div>`;}
   return `<div class="stack">
     <div class="panel">${doll}<p class="dim small" style="margin:8px 0 0">Коснитесь ячейки, чтобы посмотреть предмет и заменить его. Флаконы пьются в бою без траты хода.</p></div>
-    <div class="panel"><div class="seg">${tabs.map(([k,n])=>`<button class="${invTab===k?'on':''}" data-a="invTab" data-t="${k}">${n} · ${cnt(k)}</button>`).join('')}</div>
+    <div class="panel"><div class="seg2">${tabs.map(([k,n])=>`<button class="${invTab===k?'on':''}" data-a="invTab" data-t="${k}">${n} · ${cnt(k)}</button>`).join('')}</div>
       <div class="row" style="margin:8px 0"><span class="dim small sp">Сумка ${S.inv.length}/${INV_MAX} · ★ — избранное, наверху и не продаётся оптом · зелёная полоска — улучшение</span></div>
       ${list}</div></div>`;
 }
@@ -3138,7 +3206,7 @@ function vAuction(){
     const lots=(aucData.buy||[]).filter(l=>!l.mine).sort((a,b)=>b.ts-a.ts);
     h+=aucData.loading&&!aucData.buy?'<p class="dim">Загрузка…</p>':`<div class="list">${lots.map(l=>`<button class="irow" data-a="aucLot" data-id="${l.id}"><span class="sl">${SLOTN[l.item.slot]||''} · ${l.item.ilvl} · ${esc(l.seller.name)}</span><span class="row" style="justify-content:space-between;flex-wrap:nowrap"><span class="in r-${l.item.rar}">${esc(l.item.name)}</span><b class="num gold-t">${fmt(l.price)}</b></span></button>`).join('')||`<p class="dim" style="margin:0">${mode==='server'?'Лотов пока нет.':'Лотов других персонажей нет. Выставьте вещь одним персонажем и купите другим.'}</p>`}</div>`;
   }else if(aucTab==='sell'){
-    h+=`<p class="muted small" style="margin:0">Выберите вещь из сумки и назначьте цену. Налог аукциона — ${R(AUC_TAX*100)}% от цены продажи. Выручка копится на счёте аккаунта: её может забрать любой ваш персонаж.</p>
+    h+=`<p class="muted small" style="margin:0">Выберите вещь из сумки и назначьте цену. Комиссии нет: вся цена идёт продавцу. Выручка копится на счёте аккаунта: её может забрать любой ваш персонаж.</p>
       <div class="bag">${sortInv(S.inv).map(x=>irow(x,'aucSellPick')).join('')||'<span class="dim">Сумка пуста</span>'}</div>`;
   }else{
     const m=aucData.mine||{lots:[],sold:[],purse:0};
@@ -3209,6 +3277,7 @@ function vDummy(){
 }
 
 /* ---------- лабиринт ---------- */
+function labDiffText(n){const D=LAB_DIFF[n];return `ловушек в коридоре ${D.traps}, механизм ${D.len} из ${D.syms} символов${n?', Изаро сильнее и знает новые приёмы':''}${n>=2?', в залах 3 волны':''}`;}
 function vLab(){
   const L=S.labRun;
   if(!L){
@@ -3216,7 +3285,7 @@ function vLab(){
       ${labFailNote?`<p class="notice" style="border-color:var(--bad)">${labFailNote}</p>`:''}
       <div class="panel"><p class="muted" style="margin:0">Император Изаро построил лабиринт, чтобы найти достойного наследника. Это не только бои: коридоры ловушек проверяют силу, ловкость и ум, механизмы требуют найти порядок рычагов, а тёмные святилища дают благословения. Здоровье между комнатами не восстанавливается — лечат только фонтаны и флаконы. Золотые ключи открывают тайники и сокровищницу. В конце всегда ждёт Изаро.</p></div>`;
     LABS.forEach((LD,n)=>{const why=labUnlock(n);
-      h+=`<div class="loc ${why?'locked':''}"><div class="lv num">${LD.lvl}<small>УР.</small></div><div style="min-width:0"><b>${LD.n}</b><div class="small muted">${LD.rooms} комнат + Изаро${S.labs[n]?' · <span class="good-t">пройден</span>':' · +2 очка возвышения'}</div>${why?`<div class="small bad-t">${why}</div>`:''}</div>
+      h+=`<div class="loc ${why?'locked':''}"><div class="lv num">${LD.lvl}<small>УР.</small></div><div style="min-width:0"><b>${LD.n}</b><div class="small muted">${LD.rooms} комнат + Изаро · ${labDiffText(n)}${S.labs[n]?' · <span class="good-t">пройден</span>':' · +2 очка возвышения'}</div>${why?`<div class="small bad-t">${why}</div>`:''}</div>
         <button class="btn sm ${why?'':'pri'}" data-a="labEnter" data-n="${n}" ${why?'disabled':''}>${n===3?'Подношение':'Войти'}</button></div>`;});
     return h+'</div>';}
   const LD=LABS[L.n],R0=L.room,done=L.step>=L.steps.length;
@@ -3228,15 +3297,15 @@ function vLab(){
   else if(done&&!R0){h+=`<div class="panel framed"><div class="eyebrow">Финал</div><h2 style="font-size:22px;margin:4px 0 6px">Тронный зал Изаро</h2><p class="muted" style="margin:0 0 10px">Император ждёт. Он поднимает божественный щит, призывает стражей и бьёт клинком. Ключи (${L.keys}) откроют сундуки его сокровищницы после победы.</p>
       <button class="btn pri full" data-a="labBoss">Сразиться с Изаро</button></div>`;}
   else if(R0.type==='trap'){
-    h+=`<div class="panel"><div class="eyebrow">${ROOMS.trap.n} · ловушка ${Math.min(R0.i+1,3)}/3</div>`;
-    if(R0.i<3){const t=R0.traps[R0.i];h+=`<h3 style="font-size:18px;margin:4px 0">${t.n}</h3><p class="muted small" style="margin:0 0 8px">${t.d} Сложность: ${trapNeed()}.</p>
+    h+=`<div class="panel"><div class="eyebrow">${ROOMS.trap.n} · ловушка ${Math.min(R0.i+1,R0.traps.length)}/${R0.traps.length}</div>`;
+    if(R0.i<R0.traps.length){const t=R0.traps[R0.i];h+=`<h3 style="font-size:18px;margin:4px 0">${t.n}</h3><p class="muted small" style="margin:0 0 8px">${t.d} Сложность: ${trapNeed()}.</p>
       <div class="list">${t.o.map(([a,n],j)=>`<button class="btn" data-a="labTrap" data-j="${j}" style="text-align:left;display:flex;justify-content:space-between"><span><span style="color:var(--${a})">■</span> ${n}</span><span class="num">${trapChance(a)}%</span></button>`).join('')}</div>`;}
-    h+=`<div class="statl small" style="margin-top:8px">${R0.res.map(r=>`<span class="${r.ok?'good-t':'bad-t'}">${r.note}</span>`).join('')}</div>${R0.i>=3?'<button class="btn pri full" data-a="labNext" style="margin-top:8px">Дальше</button>':''}</div>`;}
+    h+=`<div class="statl small" style="margin-top:8px">${R0.res.map(r=>`<span class="${r.ok?'good-t':'bad-t'}">${r.note}</span>`).join('')}</div>${R0.i>=R0.traps.length?'<button class="btn pri full" data-a="labNext" style="margin-top:8px">Дальше</button>':''}</div>`;}
   else if(R0.type==='puzzle'){
     h+=`<div class="panel"><div class="eyebrow">${ROOMS.puzzle.n} · попыток ${R0.max-R0.tries.length}</div>
-      <p class="muted small" style="margin:4px 0 8px">Нажмите три разных символа. ● — символ на своём месте, ○ — символ есть, но в другом месте. Каждая ошибка ранит.</p>
-      <div class="pzrow">${PUZZLE_SYM.map((s,i)=>`<button class="pz ${R0.cur.includes(i)?'on':''}" data-a="labPz" data-s="${i}" ${R0.state!=='play'?'disabled':''}>${s}</button>`).join('')}</div>
-      <div class="pzcur">${[0,1,2].map(i=>`<span>${R0.cur[i]!=null?PUZZLE_SYM[R0.cur[i]]:'·'}</span>`).join('')}</div>
+      <p class="muted small" style="margin:4px 0 8px">Нажмите ${R0.secret.length===3?'три':'четыре'} разных символа из ${R0.k}. ● — символ на своём месте, ○ — символ есть, но в другом месте. Каждая ошибка ранит.</p>
+      <div class="pzrow" style="grid-template-columns:repeat(${R0.k},1fr)">${PUZZLE_SYM.slice(0,R0.k).map((s,i)=>`<button class="pz ${R0.cur.includes(i)?'on':''}" data-a="labPz" data-s="${i}" ${R0.state!=='play'?'disabled':''}>${s}</button>`).join('')}</div>
+      <div class="pzcur">${R0.secret.map((_,i)=>`<span>${R0.cur[i]!=null?PUZZLE_SYM[R0.cur[i]]:'·'}</span>`).join('')}</div>
       <div class="list small">${R0.tries.map(t=>`<div class="row" style="justify-content:space-between"><span class="pzg">${t.g.map(i=>PUZZLE_SYM[i]).join(' ')}</span><span class="num">${'●'.repeat(t.ex)}${'○'.repeat(t.pa)}${t.ex+t.pa?'':'—'}</span></div>`).join('')}</div>
       ${R0.state==='win'?'<p class="notice" style="border-color:var(--good)">Механизм поддался: вы получили золотой ключ.</p>':R0.state==='lose'?`<p class="notice" style="border-color:var(--bad)">Механизм заклинило. Порядок был: ${R0.secret.map(i=>PUZZLE_SYM[i]).join(' ')}</p>`:''}
       ${R0.state!=='play'?'<button class="btn pri full" data-a="labNext" style="margin-top:8px">Дальше</button>':''}</div>`;}
@@ -3280,7 +3349,6 @@ const ACT={
   mv(d){move(+d.d);},
   flask(d){useFlask(+d.k);},
   journal(){modal(vJournal());const j=document.getElementById('journal');if(j)j.scrollTop=j.scrollHeight;if(C&&C.over)window._reopen=true;},
-  auto(){C.auto=!C.auto;render();if(C.auto)scheduleAuto();},
   fleeAsk(){if(!C||C.over)return;modal(`<h2>Покинуть бой?</h2><p class="muted" style="margin:0">${C.B.type==='map'?'Карта будет потеряна.':C.B.type==='lab'?'Лабиринт будет потерян.':'Прогресс сражения не сохранится.'}</p><div class="row"><button class="btn sp" data-a="close">Остаться</button><button class="btn sp danger" data-a="flee">Уйти</button></div>`);},
   flee(){if(C){C.auto=false;if(C.B.type==='map')S.mapRun=null;if(C.B.type==='lab')S.labRun=null;}goMain();closeModal();save();render();},
   leave(){if(C)C.auto=false;window._reopen=false;closeModal();goMain();viewAct=actOfProg();render();offerReward();},
@@ -3300,7 +3368,9 @@ const ACT={
   treeTab(d){treeTab=d.t;render();},
   ascPick(){showAscChoice();},
   ascChoose(d){chooseAsc(d.id);closeModal();treeTab='asc';goMain('tree');render();toast('Возвышение: '+ascDef(d.id).n);},
-  ascAlloc(d){if(ascAlloc(+d.i)){haptic('medium');render();}},
+  ascSel(d){selAsc=d.id;render();},
+  ascAlloc(){if(selAsc&&ascAlloc(selAsc)){haptic('medium');render();}},
+  tclose(){selNode=null;selAsc=null;render();},
   gtab(d){gemTab=d.t;render();},
   pick(d){openPicker(d);},
   insert(d){const p=window._pick;if(!p)return;
@@ -3375,7 +3445,7 @@ const ACT={
   labLeaveAsk(){modal(`<h2>Покинуть лабиринт?</h2><p class="muted" style="margin:0">Прохождение будет потеряно${S.labRun&&S.labRun.n===3?', подношение не вернётся':''}.</p><div class="row"><button class="btn sp" data-a="close">Остаться</button><button class="btn sp danger" data-a="labLeave">Покинуть</button></div>`);},
   labLeave(){S.labRun=null;save();closeModal();render();},
 };
-document.addEventListener('click',ev=>{const el=ev.target.closest('[data-a]');if(!el||el.disabled)return;if(el.closest('#treebox')&&el.dataset.a!=='tz')return;const f=ACT[el.dataset.a];if(f)f(el.dataset,el,ev);});
+document.addEventListener('click',ev=>{const el=ev.target.closest('[data-a]');if(!el||el.disabled)return;if(el.closest('#treebox')&&!el.closest('.tinfo')&&el.dataset.a!=='tz')return;const f=ACT[el.dataset.a];if(f)f(el.dataset,el,ev);});
 /* последний экран итога боя — чтобы вернуться к нему после журнала */
 {const sv=showVictory,sd=showDeath,sl=showLabWin;
   showVictory=(n,c)=>{window._lastOver=()=>sv(n,c);sv(n,c);};
