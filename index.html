@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
-<title>Пепел Изгнания</title>
+<title>Path of Izgnannik</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@500;700;800&family=Alegreya+Sans:wght@400;500;700&display=swap">
@@ -341,6 +341,32 @@ button.sigil{padding:0;cursor:pointer;color:var(--gold2)}
 .ascbox .tinfo{right:6px}
 .ascbox g{cursor:pointer}
 .ascbox .tinfo{max-height:44%}
+/* ===== v4.2 ===== */
+.clsi{width:26px;height:26px;display:block}
+.clsi.sm{width:20px;height:20px;flex:none;color:var(--gold2)}
+.sigil .clsi{color:var(--gold2)}
+.sigil.big{width:56px;height:56px}.sigil.big .clsi{width:36px;height:36px}
+.lfgrid{display:grid;grid-template-columns:1.6fr repeat(3,1fr);gap:4px 6px;align-items:center;font-size:13px}
+.lfgrid b{font:600 11px var(--ff-d);color:var(--muted);text-align:center;letter-spacing:.04em}
+.lfgrid label{display:flex;justify-content:center;align-items:center;min-height:36px}
+.lfgrid input{width:22px;height:22px}
+.lfgrid span{color:var(--fg)}
+/* бой: панель героя закреплена внизу экрана */
+#app.fight{padding-bottom:var(--cbh,330px)}
+.cb-bot{position:fixed;left:0;right:0;bottom:0;z-index:5;background:linear-gradient(transparent,var(--bg) 10px);padding:8px 0 calc(8px + env(safe-area-inset-bottom,0px))}
+.cb-in{max-width:520px;margin:0 auto;padding-inline:14px}
+.cb-bot .buffs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;white-space:nowrap;min-height:18px}
+.cb-bot .buffs::-webkit-scrollbar{display:none}
+.cb-bot .chip{flex:none}
+.treebox{height:calc(var(--vh) - 420px);min-height:260px}
+.ascbox{height:auto}
+.orb .gt{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.orb .gt small{font-size:12px;color:var(--muted)}
+.fl.on{box-shadow:0 0 0 3px var(--gold2) inset;border-color:var(--gold2)}
+.gemi{display:flex;align-items:center;gap:8px;flex:1;min-width:0;background:none;border:0;padding:0;text-align:left}
+.gemi .gt{display:flex;flex-direction:column;min-width:0}
+.gemi .gt b{font:700 13px/1.15 var(--ff-d)}
+.gemi .gt small{font-size:11px;color:var(--muted)}
 
 </style>
 </head><body>
@@ -385,7 +411,7 @@ const CLASSES={
     auras:['hatred','precision','grace','clarity','discipline','wrath','malevolence','haste','heraldThunder']},
   marauder:{n:'Дикарь',attr:[36,11,11],weapon:'axe2',dt:'armour',gem:'heavy',sup:'s_mpd',
     lore:'Варвар северных племён. Броня, здоровье и сокрушительные удары вплотную.',
-    list:['heavy','cleave','slam','infernal','leap','molten','sunder','icecrash','cyclone','vuln','enfeeble','warlord'],
+    list:['heavy','cleave','slam','infernal','leap','molten','sunder','icecrash','vuln','enfeeble','warlord'],
     auras:['determination','vitality','pride','anger','purity','heraldAsh','arctic']},
   witch:{n:'Ведьма',attr:[11,11,36],weapon:'wand',dt:'es',mana:1,gem:'fireball',sup:'s_burn',
     lore:'Изгнана за запретную магию. Огонь, лёд и хаос с безопасной дистанции.',
@@ -645,40 +671,40 @@ const AURA_SLOTS=[4,16,32,50];
 /* ---------- монстры ---------- */
 const MONS={
   drowned:{n:'Утопленник',el:'phys',k:'melee',hp:1,dmg:1,sp:1},
-  crab:{n:'Краб-костолом',el:'phys',k:'melee',hp:1.3,dmg:.85,arm:3,sp:.5},
-  harpooner:{n:'Гарпунщик',el:'phys',k:'ranged',hp:.8,dmg:.95},
+  crab:{ev:0.5,n:'Краб-костолом',el:'phys',k:'melee',hp:1.3,dmg:.85,arm:3,sp:.5},
+  harpooner:{ev:1.2,n:'Гарпунщик',el:'phys',k:'ranged',hp:.8,dmg:.95},
   seawitch:{n:'Морская ведьма',el:'cold',k:'spell',hp:.7,dmg:1.05,res:{cold:40}},
   rotter:{n:'Гниющий бродяга',el:'chaos',k:'melee',hp:1.1,dmg:.85,poison:1,sp:1},
   varg:{n:'Боцман Варг',el:'phys',k:'melee',hp:1,dmg:1,sp:1,boss:{hp:7,spec:[{every:3,name:'Якорь на цепи',type:'pull',m:1.8}]}},
-  wolf:{n:'Лесной волк',el:'phys',k:'melee',hp:.75,dmg:.6,hits:2,sp:2},
-  weaver:{n:'Паучиха-ткачиха',el:'chaos',k:'melee',hp:.9,dmg:.9,poison:1,sp:1},
-  archer:{n:'Разбойник-лучник',el:'phys',k:'ranged',hp:.85,dmg:1.05},
+  wolf:{ev:1.6,n:'Лесной волк',el:'phys',k:'melee',hp:.75,dmg:.6,hits:2,sp:2},
+  weaver:{ev:1.2,n:'Паучиха-ткачиха',el:'chaos',k:'melee',hp:.9,dmg:.9,poison:1,sp:1},
+  archer:{ev:1.4,n:'Разбойник-лучник',el:'phys',k:'ranged',hp:.85,dmg:1.05},
   druid:{n:'Одержимый друид',el:'fire',k:'spell',hp:.9,dmg:1.1,res:{fire:40}},
-  spiderling:{n:'Паучонок',el:'chaos',k:'melee',hp:.4,dmg:.5,poison:1,sp:2},
+  spiderling:{ev:1.5,n:'Паучонок',el:'chaos',k:'melee',hp:.4,dmg:.5,poison:1,sp:2},
   matriarch:{n:'Матриарх Ткачих',el:'chaos',k:'melee',hp:1,dmg:1,poison:1,sp:1,boss:{hp:7,spec:[{every:4,name:'Выводок',type:'summon',mon:'spiderling',n:2},{every:3,name:'Ядовитый плевок',type:'nuke',m:1.6,el:'chaos'}]}},
-  rat:{n:'Чумная крыса',el:'chaos',k:'melee',hp:.6,dmg:.55,poison:1,hits:2,sp:2},
+  rat:{ev:1.4,n:'Чумная крыса',el:'chaos',k:'melee',hp:.6,dmg:.55,poison:1,hits:2,sp:2},
   cultist:{n:'Культист бури',el:'light',k:'spell',hp:.8,dmg:1.15,res:{light:40}},
-  xbow:{n:'Арбалетчик пепла',el:'fire',k:'ranged',hp:.9,dmg:1.05,res:{fire:20}},
-  ashguard:{n:'Пепельный страж',el:'fire',k:'melee',hp:1.4,dmg:.9,arm:2,res:{fire:50},sp:1},
-  golem:{n:'Литейный голем',el:'phys',k:'melee',hp:2,dmg:1.15,arm:3,sp:.5},
+  xbow:{ev:1.2,n:'Арбалетчик пепла',el:'fire',k:'ranged',hp:.9,dmg:1.05,res:{fire:20}},
+  ashguard:{ev:0.7,n:'Пепельный страж',el:'fire',k:'melee',hp:1.4,dmg:.9,arm:2,res:{fire:50},sp:1},
+  golem:{ev:0.4,n:'Литейный голем',el:'phys',k:'melee',hp:2,dmg:1.15,arm:3,sp:.5},
   kael:{n:'Инквизитор Каэль',el:'fire',k:'spell',hp:1,dmg:1,boss:{hp:7,heal:.25,spec:[{every:3,name:'Очищающий свет',type:'nuke',m:2,el:'light'}]}},
   miner:{n:'Мёртвый рудокоп',el:'phys',k:'melee',hp:1.05,dmg:1,sp:1},
-  thrower:{n:'Метатель кирок',el:'phys',k:'ranged',hp:.9,dmg:1.05},
-  beetle:{n:'Кристальный жук',el:'cold',k:'melee',hp:1.3,dmg:.9,arm:3,res:{cold:50},sp:1},
+  thrower:{ev:1.2,n:'Метатель кирок',el:'phys',k:'ranged',hp:.9,dmg:1.05},
+  beetle:{ev:0.5,n:'Кристальный жук',el:'cold',k:'melee',hp:1.3,dmg:.9,arm:3,res:{cold:50},sp:1},
   shaman:{n:'Глубинный шаман',el:'cold',k:'spell',hp:.8,dmg:1.15,res:{cold:40}},
-  worm:{n:'Слепой червь',el:'chaos',k:'melee',hp:1.8,dmg:1.25,poison:1,sp:.5},
+  worm:{ev:0.5,n:'Слепой червь',el:'chaos',k:'melee',hp:1.8,dmg:1.25,poison:1,sp:.5},
   torrum:{n:'Торрум, Кузнец Глубин',el:'fire',k:'melee',hp:1,dmg:1,sp:1,arm:2,boss:{hp:8,spec:[{every:3,name:'Раскалённая наковальня',type:'nuke',m:1.7,el:'fire'},{every:5,name:'Подмастерья',type:'summon',mon:'miner',n:2}]}},
-  legion:{n:'Легионер',el:'phys',k:'melee',hp:1.3,dmg:1,arm:2.5,sp:1},
-  xbowman:{n:'Арбалетчик легиона',el:'phys',k:'ranged',hp:.9,dmg:1.15},
+  legion:{ev:0.8,n:'Легионер',el:'phys',k:'melee',hp:1.3,dmg:1,arm:2.5,sp:1},
+  xbowman:{ev:1.2,n:'Арбалетчик легиона',el:'phys',k:'ranged',hp:.9,dmg:1.15},
   inquis:{n:'Инквизитор-маг',el:'fire',k:'spell',hp:.85,dmg:1.2,res:{fire:40}},
-  execut:{n:'Палач',el:'phys',k:'melee',hp:1.8,dmg:1.55,sp:.5},
+  execut:{ev:0.6,n:'Палач',el:'phys',k:'melee',hp:1.8,dmg:1.55,sp:.5},
   warden:{n:'Храмовый страж',el:'light',k:'melee',hp:1.4,dmg:1,res:{light:50},sp:1},
   assar:{n:'Верховный судья Ассар',el:'light',k:'spell',hp:1,dmg:1,boss:{hp:9,heal:.2,spec:[{every:3,name:'Приговор',type:'nuke',m:2.1,el:'light'},{every:5,name:'Легион',type:'summon',mon:'legion',n:2}]}},
   /* лабиринт */
-  sentinel:{n:'Страж лабиринта',el:'phys',k:'melee',hp:1.5,dmg:1.1,arm:3,sp:1,lab:1},
-  bladetrap:{n:'Ожившая пила',el:'phys',k:'melee',hp:.8,dmg:1.2,hits:2,sp:2,lab:1},
+  sentinel:{ev:0.7,n:'Страж лабиринта',el:'phys',k:'melee',hp:1.5,dmg:1.1,arm:3,sp:1,lab:1},
+  bladetrap:{ev:1.5,n:'Ожившая пила',el:'phys',k:'melee',hp:.8,dmg:1.2,hits:2,sp:2,lab:1},
   idol:{n:'Идол Изаро',el:'light',k:'spell',hp:1,dmg:1.15,res:{light:40,fire:20},lab:1},
-  zealot:{n:'Фанатик Изаро',el:'fire',k:'ranged',hp:.9,dmg:1.1,res:{fire:30},lab:1},
+  zealot:{ev:1.2,n:'Фанатик Изаро',el:'fire',k:'ranged',hp:.9,dmg:1.1,res:{fire:30},lab:1},
   izaro:{n:'Император Изаро',el:'phys',k:'melee',hp:1,dmg:1,sp:1,arm:2,lab:1,boss:{hp:8,spec:[
     {every:3,name:'Клинок императора',type:'nuke',m:1.9,el:'phys'},
     {every:4,name:'Божественный щит',type:'ward',t:2},
@@ -817,6 +843,9 @@ const MODS={
   critSpell:{r:[25,45],sc:.3,on:[W],wc:['caster'],sf:'Прозрения'},
   critM:{r:[12,22],sc:.3,on:[W,'amulet','quiver'],wc:['melee','bow','caster'],sf:'Резни'},
   critP:{r:[15,30],sc:.3,on:['amulet','ring','gloves','helm','quiver'],sf:'Точности'},
+  /* точность — против уклонения врагов; для чар не нужна */
+  acc:{r:[20,40],sc:1,on:[W,'quiver','helm','gloves','ring','amulet'],wc:['melee','bow'],sf:'Меткости'},
+  accP:{r:[8,15],sc:.15,on:['amulet','quiver','gloves'],sf:'Снайпера'},
   leech:{r:[1,1.6],sc:0,on:['ring','amulet','gloves',W],wc:['melee','bow'],sf:'Пиявки'},
   stunC:{r:[8,15],sc:.1,on:[W],wc:['melee'],sf:'Молота'},
   mreg:{r:[2,4],sc:.3,on:['ring','amulet','helm',W],wc:['caster'],sf:'Медитации'},
@@ -911,7 +940,7 @@ const BENCH=[
   {k:'addFire',cost:{alt:3},g:100},{k:'addCold',cost:{alt:3},g:100},{k:'addLight',cost:{alt:3},g:100},{k:'addPhys',cost:{alt:3},g:100},
   {k:'spFire',cost:{alt:3},g:100},{k:'spCold',cost:{alt:3},g:100},{k:'spLight',cost:{alt:3},g:100},
   {k:'spellP',cost:{regal:1},g:150},{k:'atkP',cost:{regal:1},g:150},{k:'elemAtkP',cost:{regal:1},g:150},
-  {k:'critM',cost:{chaos:1},g:150},{k:'critP',cost:{alt:4},g:120},{k:'projP',cost:{regal:1},g:150},{k:'meleeP',cost:{regal:1},g:150},
+  {k:'acc',cost:{aug:3},g:60},{k:'critM',cost:{chaos:1},g:150},{k:'critP',cost:{alt:4},g:120},{k:'projP',cost:{regal:1},g:150},{k:'meleeP',cost:{regal:1},g:150},
   {k:'lifeP',cost:{chaos:2},g:250},{k:'flaskEff',cost:{alch:1},g:120},{k:'kite',cost:{alch:1},g:120},
 ];
 const benchRemoveCost=it=>R(30+it.ilvl*4);
@@ -955,7 +984,7 @@ const LBL={
   aeL:pct('к броне и уклонению'),eeL:pct('к уклонению и энерг. щиту'),asL:pct('к броне и энерг. щиту'),
   dmgP:pct('к урону'),atkP:pct('к урону атак'),spellP:pct('к урону чар'),physP:pct('к физическому урону'),fireP:pct('к урону огнём'),coldP:pct('к урону холодом'),
   lightP:pct('к урону молнией'),chaosP:pct('к урону хаосом'),elemP:pct('к урону стихиями'),elemAtkP:pct('к урону стихиями от атак'),critP:pct('к шансу крит. удара'),critM:pct('к множителю крит. удара'),
-  critSpell:pct('к шансу крит. удара чар'),
+  critSpell:pct('к шансу крит. удара чар'),acc:flat('к точности'),accP:pct('к точности'),
   aoeP:pct('к урону по области'),projP:pct('к урону снарядами'),meleeP:pct('к урону в ближнем бою'),dualP:pct('к урону атак с двумя оружиями'),twoP:pct('к урону двуручным оружием'),
   resF:pct('к сопротивлению огню'),resC:pct('к сопротивлению холоду'),resL:pct('к сопротивлению молнии'),resAll:pct('ко всем сопротивлениям стихиям'),resCh:pct('к сопротивлению хаосу'),
   leech:v=>`${R(v*10)/10}% урона атак восстанавливает здоровье`,regen:v=>`Регенерация ${R(v*10)/10}% здоровья за ход`,mreg:flat('маны за ход'),esRech:pct('к восстановлению щита за ход'),
@@ -1168,7 +1197,7 @@ const KEYS={
   acro:{n:'Акробатика',text:'+20% к шансу уклонения, предел 85%. Можно уклоняться от чар. Броня и энергетический щит вдвое меньше.'},
   pointblank:{n:'Стрельба в упор',text:'Снаряды наносят на 30% больше урона вплотную и на 15% меньше на дальней дистанции. Нет штрафа за стрельбу вплотную.'},
   ironref:{n:'Железный рефлекс',text:'Всё уклонение превращается в броню. Шанс уклонения 0%.'},
-  resolute:{n:'Непоколебимая техника',text:'Атаки не могут быть критическими, но наносят на 35% больше урона.'},
+  resolute:{n:'Непоколебимая техника',text:'Атаки всегда попадают и наносят на 35% больше урона, но не могут быть критическими.'},
   vaal:{n:'Кровавый договор',text:'Вампиризм вдвое сильнее, лечение за действие до 30% здоровья. Нет регенерации здоровья.'},
   blood:{n:'Кровавая магия',text:'Умения тратят здоровье вместо маны, ауры резервируют здоровье. Маны нет.'},
   avatar:{n:'Аватар огня',text:'Весь физический урон, урон холодом и молнией становится огнём. Враги получают на 15% больше урона огнём.'},
@@ -1178,7 +1207,7 @@ const KEYS={
   ghost:{n:'Призрачный жнец',text:'Вампиризм восполняет энергетический щит, а не здоровье. +20% к энергетическому щиту.'},
   ego:{n:'Высшее эго',text:'Эффект аур на 50% больше, но ауры резервируют на 30% больше маны.'},
   hexmaster:{n:'Мастер порчи',text:'Ваши проклятия действуют бессрочно, но их эффект на 10% меньше.'},
-  arrowdance:{n:'Танец со стрелами',text:'+30% к шансу уклониться от стрелков и магов, можно уклоняться от чар. Против ударов вплотную шанс уклонения вдвое меньше.'},
+  arrowdance:{n:'Танец со стрелами',text:'+30% к шансу уклониться от стрелков. Против ударов вплотную шанс уклонения вдвое меньше. От чар не спасает.'},
   wind:{n:'Танцующая с ветром',text:'Если в прошлый ход вас не ранили — получаемый урон на 20% меньше. Если ранили — +20% к шансу уклонения.'},
   irongrip:{n:'Железная хватка',text:'Бонус силы к урону ближнего боя действует и на атаки снарядами.'},
   glancing:{n:'Скользящие удары',text:'Шанс блока удваивается (предел 75%), но заблокированный удар всё равно наносит 35% урона.'},
@@ -1203,15 +1232,15 @@ const SECTORS=[
     T({atkP:8},'Танец клинков',{dualP:15,ex_onslaught:25}),T({goldP:8},'Карманник',{goldP:25,iir:15}),
     T({resCh:6},'Ядовитая кожа',{resCh:20,ex_hitLife:4}),T({spellP:8},'Тёмная магия',{spellP:15,ex_vsCurse:12})]},
   {c:'ranger',a:30,key:'pointblank',kL:'arrowdance',kR:'wind',def:'dex',core:[{projP:5},{evaP:6},{life:8}],th:[
-    T({projP:10},'Меткий глаз',{projP:20,ex_far:15}),T({projP:8},'Охотничий инстинкт',{critP:20,ex_evadeCrit:1}),
+    T({projP:10},'Меткий глаз',{projP:20,accP:15,ex_far:15}),T({projP:8},'Охотничий инстинкт',{critP:20,ex_evadeCrit:1}),
     T({evaP:12},'Призрачный шаг',{evaP:30,ex_evadeDmg:25}),T({coldP:10},'Ледяной наконечник',{coldP:20,ex_chillEff:10}),
     T({kite:6},'Быстрые ноги',{kite:20,stepFree:15}),T({critM:8},'Смертельный выстрел',{critM:25,ex_full:20}),
     T({aoeP:8},'Широкий залп',{aoeP:20,ex_multi:5}),T({lightP:10},'Грозовая тетива',{lightP:20,ex_vsShock:12}),
     T({lifeP:4},'Выносливость следопыта',{lifeP:10,ex_waveHeal:6}),T({flaskEff:6},'Травница',{flaskEff:20,ex_flaskWave:8})]},
   {c:'duelist',a:90,key:'resolute',kL:'irongrip',kR:'glancing',def:'str',core:[{atkP:5},{lifeP:3},{meleeP:5}],th:[
-    T({atkP:10},'Мастер оружия',{atkP:20,ex_ambush:20}),T({meleeP:10},'Мастер клинка',{meleeP:20,ex_close:12}),
+    T({atkP:10},'Мастер оружия',{atkP:20,accP:15,ex_ambush:20}),T({meleeP:10},'Мастер клинка',{meleeP:20,ex_close:12}),
     T({leech:.4},'Кровопускание',{leech:1.2,ex_killLife:3}),T({physP:10},'Длинный клинок',{meleeP:15,reach:1}),
-    T({lifeP:4},'Гладиатор',{lifeP:10,ex_counter:20}),T({critP:10},'Брешь в защите',{critP:20,ex_armBreak:20}),
+    T({lifeP:4},'Гладиатор',{lifeP:10,ex_counter:20}),T({accP:8},'Брешь в защите',{critP:20,accP:10,ex_armBreak:20}),
     T({armourP:10},'Укреплённая позиция',{armourP:20,ex_fortify:1}),T({dualP:8},'Танец двух клинков',{dualP:20,ex_stepStrike:60}),
     T({block:2},'Щит и меч',{block:6,ex_blockDmg:25}),T({evaP:6,armourP:6},'Боевая выправка',{armourP:15,evaP:15,ex_onslaught:20})]},
   {c:'marauder',a:150,key:'blood',kL:'berserk',kR:'ironwill',def:'str',core:[{lifeP:3},{armourP:6},{physP:5}],th:[
@@ -1229,7 +1258,7 @@ const SECTORS=[
 ];
 const BRIDGES=[
   {a:T({chaosP:8},'Мор',{chaosP:20,dotMore:12}),b:T({es:10},'Тёмный покров',{es:40,ex_killEs:4}),key:'ci'},
-  {a:T({evaP:8},'Неуловимость',{evaP:20,ex_evadeCrit:1}),b:T({critM:6},'Охотник за головами',{critM:20,ex_exec:12}),key:'acro'},
+  {a:T({evaP:8},'Неуловимость',{evaP:20,acc:60,ex_evadeCrit:1}),b:T({critM:6},'Охотник за головами',{critM:20,ex_exec:12}),key:'acro'},
   {a:T({atkP:6},'Боевой танец',{atkP:15,ex_onslaught:15}),b:T({evaP:5,armourP:5},'Стальной ветер',{evaP:15,armourP:15,ex_counter:12}),key:'ironref'},
   {a:T({leech:.3},'Жажда крови',{leech:1,ex_killLife:3}),b:T({meleeP:6},'Берсерк',{meleeP:15,ex_low:15}),key:'vaal'},
   {a:T({fireP:8},'Пламенная плоть',{fireP:20,ex_ignDur:1}),b:T({armourP:6},'Кузнечный жар',{fireP:15,ex_armBreak:15}),key:'avatar'},
@@ -1322,10 +1351,11 @@ function xpFactor(m){
 
 /* ---------- сохранение ---------- */
 function newUid(){ACC.u=(ACC.u||0)+1;return 'u'+ACC.u;}
-function newAcc(){return {v:4,u:0,t:Date.now(),chars:[],cur:null,stash:{items:[],tabs:1},auc:{lots:[],seq:0},aucGold:0};}
+function newAcc(){return {v:4,u:0,t:0,chars:[],cur:null,stash:{items:[],tabs:1},auc:{lots:[],seq:0},aucGold:0,ui:{aura:1,flask:1,ability:1}};}
 function fixChar(c){
   c.maps=c.maps||{};c.offer=c.offer||0;c.labs=c.labs||[0,0,0,0];c.asc=c.asc||null;c.ascAlloc=c.ascAlloc||[];c.hex=c.hex||null;
   c.mapBest=c.mapBest||0;c.bonus=c.bonus||0;c.cur=c.cur||{};c.inv=c.inv||[];
+  if(!c.lf){c.lf=lfDefault();if(c.autoSell)LF_CATS.forEach(([k])=>{if(k!=='flasks')c.lf[k].normal=0;});}
   if(c.ascAlloc.some(x=>typeof x==='number'))c.ascAlloc=c.ascAlloc.flatMap(i=>typeof i==='number'?['s'+i,'n'+i]:[i]);
   for(const id in c.attrPick)if(!NODES[id]||NODES[id].t!=='attr')delete c.attrPick[id];
   c.alloc=c.alloc.filter(id=>NODES[id]);
@@ -1340,29 +1370,46 @@ function migrate3(o){
 function load(){
   try{const s=localStorage.getItem(KEY);if(s)ACC=JSON.parse(s);}catch(e){ACC=null;}
   if(!ACC){ACC=newAcc();try{const s3=localStorage.getItem(KEY3);if(s3){const o=JSON.parse(s3);if(o&&o.v===3){ACC.u=(o.u||0)+10;const c=migrate3(o);ACC.chars.push(c);ACC.cur=c.id;}}}catch(e){}}
-  ACC.chars.forEach(fixChar);ACC.stash=ACC.stash||{items:[],tabs:1};ACC.auc=ACC.auc||{lots:[],seq:0};
+  ACC.chars.forEach(fixChar);ACC.ui=ACC.ui||{aura:1,flask:1,ability:1};ACC.stash=ACC.stash||{items:[],tabs:1};ACC.auc=ACC.auc||{lots:[],seq:0};
   S=ACC.chars.find(c=>c.id===ACC.cur)||null;
 }
-let cloudTimer=null;
-function save(){
-  if(!ACC)return;ACC.t=Date.now();const str=JSON.stringify(ACC);
+let cloudTimer=null,cloudReady=false;
+const tgUid=()=>{try{const u=tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user;return u&&u.id?String(u.id):null;}catch(e){return null;}};
+function save(now){
+  if(!ACC)return;ACC.t=Date.now();const uid=tgUid();if(uid)ACC.tgId=uid;const str=JSON.stringify(ACC);
   try{localStorage.setItem(KEY,str);}catch(e){}
-  if(tg&&tg.CloudStorage){clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>cloudSave(str),2000);}
+  if(tg&&tg.CloudStorage&&cloudReady){clearTimeout(cloudTimer);if(now)cloudSave(str);else cloudTimer=setTimeout(()=>cloudSave(str),1500);}
 }
+/* сохранение в облако Telegram: кусками по 3800 символов (лимит значения — 4096) */
 function cloudSave(str){try{const parts=str.match(/[\s\S]{1,3800}/g)||[],cs=tg.CloudStorage;parts.forEach((p,i)=>cs.setItem(KEY+'_'+i,p));cs.setItem(KEY+'_n',String(parts.length));}catch(e){}}
+function cloudGetAll(cs,keys,cb){const out={};let i=0;
+  const next=()=>{if(i>=keys.length)return cb(null,out);const part=keys.slice(i,i+20);i+=20;
+    cs.getItems(part,(err,vals)=>{if(err||!vals)return cb(err||'empty');Object.assign(out,vals);next();});};next();}
+/* при входе в Telegram аккаунт берётся из облака пользователя: так один аккаунт открывается с любого устройства */
 function cloudLoad(){
-  try{const cs=tg.CloudStorage;if(!cs)return;
-    cs.getItem(KEY+'_n',(err,n)=>{n=parseInt(n);if(err||!n)return;const keys=Array.from({length:n},(_,i)=>KEY+'_'+i);
-      cs.getItems(keys,(e2,vals)=>{if(e2||!vals)return;try{const d=JSON.parse(keys.map(k=>vals[k]).join(''));
-        if(d&&d.v===4&&(!ACC||(d.t||0)>(ACC.t||0))){ACC=d;ACC.chars.forEach(fixChar);S=ACC.chars.find(c=>c.id===ACC.cur)||null;C=null;screen=S?'main':'roster';tab='map';render();toast('Сохранение загружено из Telegram');}}catch(e){}});});
+  try{const cs=tg.CloudStorage;if(!cs)return;const uid=tgUid();
+    const done=()=>{cloudReady=true;save(true);render();};
+    cs.getItem(KEY+'_n',(err,n)=>{n=parseInt(n);
+      if(err||!n){if(ACC&&ACC.tgId&&uid&&ACC.tgId!==uid){ACC=newAcc();S=null;C=null;screen='select';}done();return;}
+      const keys=Array.from({length:n},(_,i)=>KEY+'_'+i);
+      cloudGetAll(cs,keys,(e2,vals)=>{if(e2){cloudReady=true;return;}
+        try{const d=JSON.parse(keys.map(k=>vals[k]||'').join(''));
+          const other=ACC&&ACC.tgId&&uid&&ACC.tgId!==uid;
+          if(d&&d.v===4&&(other||!ACC||!ACC.chars.length||(d.t||0)>=(ACC.t||0))){
+            if(C&&!C.over)return void(cloudReady=true);
+            ACC=d;ACC.chars.forEach(fixChar);ACC.ui=ACC.ui||{aura:1,flask:1,ability:1};S=ACC.chars.find(c=>c.id===ACC.cur)||null;C=null;screen=S?'main':ACC.chars.length?'roster':'select';tab='map';
+            cloudReady=true;render();toast('Аккаунт загружен из Telegram');return;}
+        }catch(x){}
+        done();});});
   }catch(e){}
 }
+if(typeof window!=='undefined'){window.addEventListener('pagehide',()=>save(true));document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')save(true);});}
 function mainAttr(cls){const a=CLASSES[cls].attr;return ATTR_K[a.indexOf(Math.max(...a))];}
 function newGame(cls,name){
   const c=CLASSES[cls];
   S={id:'c'+Date.now().toString(36)+ri(10,99),v:4,t:Date.now(),name:name||'Изгнанник',cls,lvl:1,xp:0,gold:30,alloc:[startNode(cls)],attrPick:{},attrDef:mainAttr(cls),bonus:0,
      gems:[],skills:[{a:null,s:[]},{a:null,s:[]},{a:null,s:[]},{a:null,s:[]}],auras:[null,null,null,null],hex:null,
-     equip:{},inv:[],cur:{},prog:0,done:false,deaths:0,kills:0,autoSell:false,shop:null,maps:{},offer:0,mapBest:0,labs:[0,0,0,0],asc:null,ascAlloc:[]};
+     equip:{},inv:[],cur:{},prog:0,done:false,deaths:0,kills:0,lf:lfDefault(),shop:null,maps:{},offer:0,mapBest:0,labs:[0,0,0,0],asc:null,ascAlloc:[]};
   ACC.chars.push(S);ACC.cur=S.id;
   const g1={uid:newUid(),id:c.gem,lvl:1,xp:0},g2={uid:newUid(),id:c.sup,lvl:1,xp:0};
   S.gems.push(g1,g2);S.skills[0].a=g1.uid;S.skills[0].s=[g2.uid];
@@ -1465,15 +1512,19 @@ function calc(){
   P.rageMax=30+g('rageMax');P.rage=!!U.u_rage||!!g('ex_rage');
   P.dmgMore=g('dmgMore');P.curse=g('curse');P.freeMove=g('freeMove');
   P.costM=1+g('costP')/100;
+  P.acc=R((20+8*S.lvl+2*attr.dex+g('acc'))*(1+g('accP')/100));
   P.hex=hexInfo(P);
   P.skills=[0,1,2,3].map(i=>calcSkill(i,P));
   P.basic=basicSkill(P);
   return P;
 }
+/* шанс попасть атакой: точность против уклонения врага. Чары попадают всегда */
+const monEva=lvl=>lvl*6+20;
+function hitChance(P,eva){if(P.keys.has('resolute'))return 1;return clamp(1.25*P.acc/(P.acc+.7*eva),.6,1);}
 function evadeChance(P,mlvl,kind){
   if(P.eva<=0&&!P.evaFlat)return 0;
   let c=(P.eva>0?P.eva/(P.eva+50+15*mlvl)*100:0)+P.evaFlat;
-  if(P.keys.has('arrowdance')){if(kind==='melee')c*=.5;else c+=30;}
+  if(P.keys.has('arrowdance')){if(kind==='melee')c*=.5;else if(kind==='ranged')c+=30;}
   if(P.keys.has('wind')&&C&&C.hitLast)c+=20;
   return clamp(c,0,P.evaCap);
 }
@@ -1721,6 +1772,7 @@ function mkEnemy(type,lvl,o={}){
       if(em.id==='swift')e.hits++;if(em.id==='stone')arm*=3;if(em.id==='vamp')e.vamp=.25;if(em.id==='brutal')dmg*=1.25;if(em.id==='haste')e.sp+=1;
       if(em.id==='regen')e.regen=.015;if(em.id==='fiery')e.fiery=.4;if(em.id==='shielded')hp*=1.4;if(em.id==='frenzy')dmg*=1.15;});}
   if(M.boss){hp*=M.boss.hp;dmg*=1.6;e.boss=M.boss;e.turn=0;e.rar='boss';['fire','cold','light','chaos'].forEach(k=>e.res[k]=Math.max(e.res[k]||0,20));}
+  e.eva=R(monEva(lvl)*(M.ev||1)*(e.mods.includes('Быстрый')?1.3:1)*(mt?1+.02*mt:1));
   e.maxHp=e.hp=R(hp);e.dmg=dmg;e.arm=arm;
   e.d=o.d!=null?o.d:(M.boss?(M.k==='melee'?2:3):M.k==='melee'?pick([1,2,2,3]):M.k==='ranged'?pick([2,3,3]):pick([2,3]));
   return e;
@@ -1895,6 +1947,7 @@ function rollHit(sk,P,e,m,proj,force){
   return {total,crit,parts};
 }
 function dealHit(sk,e,m,proj,P){
+  if(sk.type==='attack'&&!roll(hitChance(P,e.eva)*100)){e.touched=true;fx(e.uid,'Промах','');logF(`&nbsp;&nbsp;→ ${e.n}: <span class="dim">промах</span> (шанс попасть ${R(hitChance(P,e.eva)*100)}%)`);return {total:0,crit:false,parts:{}};}
   const force=(P.t.ex_firstCrit&&!e.touched)||C.nextCrit;
   const r=rollHit(sk,P,e,m,proj,force);const {total,crit,parts}=r;
   e.touched=true;e.hp=Math.max(0,e.hp-total);
@@ -1926,7 +1979,9 @@ function applyMark(e,h){C.enemies.forEach(x=>{x.st.mark=null;});if(e.hp>0)e.st.m
 
 const KILL_CH={normal:2,magic:4,rare:7,boss:12};
 function killEnemy(e,P,sk){
-  if(e.dead)return;e.dead=true;S.kills++;C.kills++;
+  if(e.dead)return;e.dead=true;
+  /* призванные боссом существа не дают опыта и добычи и сразу исчезают */
+  if(e.summoned){e.gone=true;logC(`${e.n} рассыпается`);return;}S.kills++;C.kills++;
   const hx=hexOn(e);
   const m=e.mods.length,x=monXp(e);C.xp+=x;gainXp(x);
   const gold=R((2+e.lvl)*rnd(.5,1.5)*(1+.4*m)*(e.boss?12:1)*(1+(P.goldP+(hx.loot||0))/100));C.gold+=gold;S.gold+=gold;
@@ -1962,8 +2017,18 @@ function dropMaps(e,m){
     if(t>=5&&(e.boss?roll(15):Math.random()<.001*(1+m))){S.offer++;C.loot.push({offer:1,name:OFFER_N});logC(`Выпало <span class="r-unique">${OFFER_N}</span>`);}}
   else if(C.B.type==='camp'&&I.act===4){if(e.boss?roll(60):Math.random()<.012*(1+.6*m))addMap(1);}
 }
+/* лутфильтр: какие предметы подбирать; остальное сразу продаётся. Уникальные подбираются всегда */
+const LF_CATS=[['weapons','Оружие, щиты, колчаны'],['armour','Броня'],['acc','Аксессуары'],['flasks','Флаконы']],LF_RAR=[['normal','Обычные'],['magic','Волшебные'],['rare','Редкие']];
+function lfDefault(){const o={myWeapons:0};LF_CATS.forEach(([c])=>{o[c]={normal:1,magic:1,rare:1};});return o;}
+function lootKeep(it){
+  if(it.rar==='unique')return true;const lf=S.lf||lfDefault(),cat=(INV_TABS.find(t=>t[2].includes(it.slot))||[])[0];
+  if(cat&&lf[cat]&&!lf[cat][it.rar==='rare'&&it.slot==='flask'?'magic':it.rar])return false;
+  if(lf.myWeapons&&(it.slot==='weapon'||it.slot==='quiver')){const cats=new Set(S.skills.map(x=>gem(x.a)).filter(g=>g&&GEMS[g.id]).map(g=>GEMS[g.id].cat));
+    if(it.slot==='quiver')return cats.has('ranged');return [...cats].some(c=>SKILL_WEAPON[c](it));}
+  return true;
+}
 function addLoot(it){
-  if(S.autoSell&&it.rar==='normal'&&it.slot!=='flask'){const v=sellPrice(it);S.gold+=v;C.gold+=v;return;}
+  if(!lootKeep(it)){const v=sellPrice(it);S.gold+=v;C.gold+=v;C.lfN=(C.lfN||0)+1;C.lfG=(C.lfG||0)+v;logF(`Лутфильтр: ${esc(it.name)} продан за ${v} зол.`);return;}
   if(S.inv.length>=INV_MAX){const v=sellPrice(it);S.gold+=v;logC(`Сумка полна: ${esc(it.name)} продан за ${v} зол.`);return;}
   it.isNew=1;S.inv.push(it);C.loot.push(it);logC(`Добыча: <span class="r-${it.rar}">${esc(it.name)}</span>`);
 }
@@ -2103,7 +2168,7 @@ function enemyAct(e,P){
     if(sp){logC(`<span class="boss-t">${e.n}: ${sp.name}!</span>`);
       if(sp.type==='pull'){hurtPlayer(e,e.dmg*sp.m,e.el,'ranged',P);if(e.d>0){e.d=0;logC('Вас подтягивает вплотную');}return;}
       if(sp.type==='nuke'){hurtPlayer(e,e.dmg*sp.m*.5,e.el,'spell',P);hurtPlayer(e,e.dmg*sp.m*.5,sp.el,'spell',P);return;}
-      if(sp.type==='summon'){const n=Math.min(sp.n,6-alive().length);for(let i=0;i<n;i++)C.enemies.push(mkEnemy(sp.mon,e.lvl-1,{d:ri(2,3),map:C.I.mt}));return;}
+      if(sp.type==='summon'){const n=Math.min(sp.n,6-alive().length);for(let i=0;i<n;i++){const m=mkEnemy(sp.mon,e.lvl-1,{d:ri(2,3),map:C.I.mt});m.summoned=1;C.enemies.push(m);}return;}
       if(sp.type==='ward'){e.st.ward=sp.t+1;logC(`${e.n} получает вдвое меньше урона ${sp.t} хода`);return;}
     }
   }
@@ -2133,7 +2198,7 @@ function mitigate(raw,el,P){
 }
 function hurtPlayer(e,raw,el,kind,P){
   if(C.hp<=0)return;
-  if((kind!=='spell'||P.keys.has('acro')||P.keys.has('arrowdance'))&&roll(evadeChance(P,e.lvl,kind))){fx('me','Уклонение','');logF(`${e.n} [${DIST[e.d].toLowerCase()}]: <span class="good-t">уклонение</span>`);
+  if((kind!=='spell'||P.keys.has('acro'))&&roll(evadeChance(P,e.lvl,kind))){fx('me','Уклонение','');logF(`${e.n} [${DIST[e.d].toLowerCase()}]: <span class="good-t">уклонение</span>`);
     if(P.t.ex_evadeCrit)C.nextCrit=true;if(P.t.ex_evadeDmg)C.evaBuff=Math.max(C.evaBuff,P.t.ex_evadeDmg);return;}
   let glance=1;
   if(kind!=='spell'&&P.block&&roll(P.block)){fx('me','Блок','');if(P.U.u_blockHeal)C.hp=Math.min(P.life,C.hp+P.life*P.U.u_blockHeal/100);if(P.t.ex_blockDmg)C.blockBuff=Math.max(C.blockBuff,P.t.ex_blockDmg);
@@ -2367,7 +2432,7 @@ function labChoose(i){
   save();
 }
 function labTrap(j){
-  const L=S.labRun,R0=L.room;if(!R0||R0.type!=='trap'||R0.i>=3)return;
+  const L=S.labRun,R0=L.room;if(!R0||R0.type!=='trap'||R0.i>=R0.traps.length)return;
   const t=R0.traps[R0.i],a=t.o[j][0],ch=trapChance(a),ok=roll(ch);
   let note;
   if(ok){note=`${t.n}: успех (${ATTR[a].toLowerCase()}, ${ch}%)`;if(roll(25)){L.keys++;note+=' · найден золотой ключ';}}
@@ -2429,7 +2494,7 @@ function dummySim(i,preset,d,hex){
   const P=calc(),sk=i<0?P.basic:P.skills[i];if(!sk)return {err:'Пустой слот'};if(sk.bad)return {err:sk.bad};
   const pr=DUMMY_PRESETS[preset];const saved=C;
   const e={uid:'dummy',n:'Мишень',lvl:S.lvl,hp:1e12,maxHp:1e12,d,res:{fire:pr.res,cold:pr.res,light:pr.res,chaos:pr.ch},arm:pr.arm*(S.lvl*4+6),
-    st:{ign:null,poi:[],frozen:0,stun:0,shock:0,chill:0,maim:0,curse:null,mark:null,ee:null,ward:0,tc:0},touched:true,mods:[],rar:pr.boss?'boss':'normal',boss:pr.boss?{}:null,k:'melee'};
+    st:{ign:null,poi:[],frozen:0,stun:0,shock:0,chill:0,maim:0,curse:null,mark:null,ee:null,ward:0,tc:0},touched:true,mods:[],rar:pr.boss?'boss':'normal',boss:pr.boss?{}:null,k:'melee',eva:R(monEva(S.lvl)*(pr.res>=40?1.3:1))};
   C={B:{type:'dummy'},I:{lvl:S.lvl},enemies:[e],fx:[],log:[],full:null,hp:P.life,mana:P.mana,es:P.es,kills:0,waveActs:1,eo:0,evaBuff:0,blockBuff:0,rage:0,fb:[]};
   try{
     if(hex&&P.hex&&P.hex.ok){if(P.hex.kind==='curse')e.st.curse={id:P.hex.id,L:P.hex.L,f:P.hex.f,t:9};else e.st.mark={id:P.hex.id,L:P.hex.L,f:P.hex.f};}
@@ -2446,9 +2511,10 @@ function dummySim(i,preset,d,hex){
           if(!sk.noAil&&x.parts.cold>0)frz+=clamp(6+sk.ail.freeze+cb,0,100)/100;
           const pc=(x.parts.phys||0)+(x.parts.chaos||0);if(pc>0){const c=clamp(sk.ail.poison,0,100)/100;poi+=c;dot+=c*pc*.2*sk.poiMore*sk.poiDur;}}}
     }
+    const hc=sk.type==='attack'?hitChance(P,e.eva):1;sum*=hc;dot*=hc;for(const k in parts)parts[k]*=hc;crits*=hc;
     const hx=hexOn(e);dot*=1+(hx.dotT||0)/100;
-    const res={name:sk.name,perCast:sum/N,perHit:hits?sum/hits:0,hitsPerCast:hits/N,critRate:hits?crits/hits:0,dot:dot/N,parts:{},
-      ign:hits?ign/hits:0,shock:hits?shock/hits:0,frz:hits?frz/hits:0,poi:hits?poi/hits:0,cost:sk.cost};
+    const res={name:sk.name,perCast:sum/N,perHit:hits?sum/(hits*hc):0,hitsPerCast:hits/N,critRate:hits?crits/hits:0,dot:dot/N,parts:{},
+      ign:hits?ign/hits:0,shock:hits?shock/hits:0,frz:hits?frz/hits:0,poi:hits?poi/hits:0,cost:sk.cost,hit:hc,acc:sk.type==='attack'?P.acc:0,eva:e.eva};
     for(const k in parts)res.parts[k]=parts[k]/N;
     return res;
   }finally{C=saved;}
@@ -2541,6 +2607,17 @@ const ICONS={
   gems:'<svg viewBox="0 0 24 24"><path d="M6.6 19.8L4.6 13.6 10.6 4.8 18.6 3.6 19.6 10.4Z"/><path d="M4.6 13.6L12.8 11 19.6 10.4M12.8 11L10.6 4.8M12.8 11L6.6 19.8"/><ellipse cx="12" cy="12.2" rx="11" ry="3.4" transform="rotate(-24 12 12.2)"/></svg>',
   items:'<svg viewBox="0 0 24 24"><path d="M8.5 3L4 5.5l1.6 5.2L7.5 10v10.5h9V10l1.9.7L20 5.5 15.5 3c-.6 1.7-1.9 2.6-3.5 2.6S9.1 4.7 8.5 3z"/><path d="M9 14h6M12 6v14.5"/></svg>',
 };
+/* силуэты классов (по мотивам PoE 1) */
+const CLS_SVG={
+  marauder:'<path d="M2.5 22c0-5 4.2-8 9.5-8s9.5 3 9.5 8z"/><circle cx="12" cy="9" r="3.6"/><path d="M8.6 7.4 5.6 3.8l.9 4.8zM15.4 7.4l3-3.6-.9 4.8z"/><path d="M19.2 1.8l1 .3-3.2 12-1-.3z"/><path d="M19.5 2c2.6.3 3.8 2.3 3.4 4.6l-4-1.2z"/>',
+  duelist:'<path d="M5 22c0-4.2 3-7 7-7s7 2.8 7 7z"/><circle cx="12" cy="9" r="3.3"/><path d="M13 5.7c1.8-2 4-2.6 5.6-2-1.8.4-3 1.6-3.6 3.3z"/><path d="M3.3 2.6l.8-.5 10 13.2-.7.5z"/><path d="M1.8 5.4l3.4-2.5.5.7-3.4 2.5z"/>',
+  ranger:'<path d="M5 22c0-4.2 3-7 7-7s7 2.8 7 7z"/><path d="M12 3.8c3 0 4.5 2.6 4.3 5.6l-1.2 3H8.9l-1.2-3C7.5 6.4 9 3.8 12 3.8z"/><path d="M19.4 2.6c3.4 4.8 3.4 11.8 0 16.6l-.8-.5c3-4.4 3-11.2 0-15.6z"/><path d="M19 3h.45v15.8H19z"/>',
+  shadow:'<path d="M5.5 22c0-4 2.8-6.6 6.5-6.6s6.5 2.6 6.5 6.6z"/><path d="M12 1.8l4.8 6.6c.3 2.1-.5 3.7-1.7 4.6H8.9c-1.2-.9-2-2.5-1.7-4.6z"/><path d="M1.5 20.6l6.3-6.3.8.8-6.3 6.3zM22.5 20.6l-6.3-6.3-.8.8 6.3 6.3z"/>',
+  witch:'<path d="M5.5 22c0-4.2 3-6.9 6.5-6.9s6.5 2.7 6.5 6.9z"/><circle cx="12" cy="11" r="3.1"/><path d="M12.6 1.2l2.6 6.4h3.6v1.2H5.2V7.6h3.6z"/><path d="M3.5 8.6h1v13.4h-1z"/><circle cx="4" cy="6.8" r="2"/>',
+  templar:'<path d="M5 22c0-4.2 3-7 7-7s7 2.8 7 7z"/><circle cx="12" cy="11.2" r="3.2"/><path d="M12 1.5l3.6 3.4v3.4H8.4V4.9z"/><path d="M19.5 8.6h1v13.4h-1z"/><path d="M20 3.8l1.8 2.4-1.8 2.4-1.8-2.4z"/>',
+  scion:'<path d="M5 22c0-4.2 3-7 7-7s7 2.8 7 7z"/><circle cx="12" cy="10.4" r="3.3"/><path d="M8.2 6.2l1.5 1.3L12 5l2.3 2.5 1.5-1.3-.6 2.6H8.8z"/><path d="M8.1 10c0 4 .2 6-1.7 8.3h2.8c.8-1.7 1.1-3.6.9-5.5zM15.9 10c0 4-.2 6 1.7 8.3h-2.8c-.8-1.7-1.1-3.6-.9-5.5z"/>',
+};
+const clsIcon=(c,cls='')=>`<svg class="clsi ${cls}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${CLS_SVG[c]}</svg>`;
 const KIND={melee:'<svg class="kind" viewBox="0 0 16 16"><path d="M3 13L12 4M10 3h3v3M2 11l3 3"/></svg>',
   ranged:'<svg class="kind" viewBox="0 0 16 16"><path d="M3 13C3 7 7 3 13 3M2 14L14 2M10 2h4v4"/></svg>',
   spell:'<svg class="kind" viewBox="0 0 16 16"><path d="M8 1l1.8 4.6L14.5 6l-3.7 3 1.2 4.8L8 11.2 4 13.8l1.2-4.8L1.5 6l4.7-.4z"/></svg>'};
@@ -2554,7 +2631,7 @@ const ascName=()=>S.asc?ascDef(S.asc).n:null;
 
 function topBar(){
   const pf=pointsFree(),af=S.asc?ascFree():0;
-  return `<div class="top"><button class="sigil" data-a="roster" aria-label="Персонажи">${CLASSES[S.cls].n[0]}</button>
+  return `<div class="top"><button class="sigil" data-a="roster" aria-label="Персонажи">${clsIcon(S.cls)}</button>
     <div class="who"><b>${esc(S.name)}</b><span class="muted small">${ascName()||CLASSES[S.cls].n} · уровень <span class="num">${S.lvl}</span></span>
       <div class="xpbar"><i style="width:${S.lvl>=MAXLVL?100:clamp(S.xp/xpNeed(S.lvl)*100,0,100)}%"></i></div></div>
     ${pf>0||af>=1?`<button class="pts" data-a="tab" data-t="tree">+${pf}${af>=1?' ✦':''}</button>`:''}
@@ -2576,7 +2653,7 @@ function render(){
   else h=topBar()+({map:vMap,char:vChar,tree:vTree,gems:vGems,items:vItems})[tab]();
   app.className=screen==='combat'?'fight':'';
   app.innerHTML=h;renderTabs();syncBack();
-  if(screen==='combat')flushFx();
+  if(screen==='combat'){const cb=app.querySelector('.cb-bot');if(cb)app.style.setProperty('--cbh',(cb.offsetHeight+6)+'px');flushFx();}
   if(screen==='main'&&tab==='tree'&&treeTab==='tree')bindTree();
 }
 function vSub(){return ({shop:vShop,stash:vStash,auction:vAuction,device:vDevice,bench:vBench,dummy:vDummy,lab:vLab})[sub]();}
@@ -2594,11 +2671,11 @@ function flushFx(){
 /* ---------- персонажи ---------- */
 function vRoster(){
   const list=ACC.chars;
-  return `<div class="hero"><div class="eyebrow">Морвейн · изгнание</div><h1>Пепел Изгнания</h1>
+  return `<div class="hero"><h1>Path of Izgnannik</h1>
     <p>Ваши персонажи. У каждого своя сумка и золото, а тайник и выручка аукциона общие.</p></div>
   <div class="stack">
     ${list.map(c=>{const K=CLASSES[c.cls],a=c.asc&&ascDef(c.asc);
-      return `<div class="charrow ${c.id===ACC.cur?'on':''}"><div class="sigil">${K.n[0]}</div>
+      return `<div class="charrow ${c.id===ACC.cur?'on':''}"><div class="sigil">${clsIcon(c.cls)}</div>
         <div class="sp"><b>${esc(c.name)}</b><div class="muted small">${a?a.n:K.n} · уровень ${c.lvl}${c.done?' · убежище':` · ${ACTS[Math.min(BATTLES[Math.min(c.prog,BATTLES.length-1)].act,4)].n}`}</div></div>
         ${delAsk===c.id?`<button class="btn sm danger" data-a="delYes" data-id="${c.id}">Удалить</button><button class="btn sm ghost" data-a="delNo">Нет</button>`
           :`<button class="btn sm ghost" data-a="delAsk" data-id="${c.id}" aria-label="Удалить персонажа">✕</button><button class="btn sm pri" data-a="play" data-id="${c.id}">Играть</button>`}</div>`;}).join('')}
@@ -2610,13 +2687,13 @@ function vRoster(){
 function vSelect(){
   const c=CLASSES[pendingCls];const tgName=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user&&tg.initDataUnsafe.user.first_name)||'';
   const cnt={melee:0,ranged:0,spell:0,hex:0};c.list.forEach(id=>GEMS[id]?cnt[GEMS[id].cat]++:cnt.hex++);
-  return `<div class="hero"><div class="eyebrow">Морвейн · изгнание</div><h1>Пепел Изгнания</h1>
+  return `<div class="hero"><h1>Path of Izgnannik</h1>
     <p>Классы различаются только стартом на древе и начальными атрибутами. Особые способности дают возвышения в лабиринтах.</p></div>
   <div class="stack">
     ${ACC.chars.length?'<button class="btn sm ghost" data-a="roster">‹ К персонажам</button>':''}
-    <div class="cls-grid">${CLASS_ORDER.map(k=>{const K=CLASSES[k];return `<button class="cls ${k===pendingCls?'on':''}" data-a="pickCls" data-c="${k}"><b>${K.n}</b>${attrBar(K.attr)}<small class="num">${K.attr.join(' · ')}</small></button>`}).join('')}</div>
+    <div class="cls-grid">${CLASS_ORDER.map(k=>{const K=CLASSES[k];return `<button class="cls ${k===pendingCls?'on':''}" data-a="pickCls" data-c="${k}"><span class="row" style="gap:6px;flex-wrap:nowrap">${clsIcon(k,'sm')}<b>${K.n}</b></span>${attrBar(K.attr)}<small class="num">${K.attr.join(' · ')}</small></button>`}).join('')}</div>
     <div class="panel framed stack">
-      <div><div class="eyebrow">Класс</div><h2 style="font-size:24px;margin-top:4px">${c.n}</h2><p class="muted" style="margin:6px 0 0">${c.lore}</p></div>
+      <div class="row" style="flex-wrap:nowrap;gap:12px"><div class="sigil big">${clsIcon(pendingCls)}</div><div><div class="eyebrow">Класс</div><h2 style="font-size:24px;margin-top:4px">${c.n}</h2></div></div><div><p class="muted" style="margin:6px 0 0">${c.lore}</p></div>
       <div class="row num" style="gap:14px">${ATTR_K.map((k,i)=>`<span><span style="color:var(--${k})">■</span> ${ATTR[k]} ${c.attr[i]}</span>`).join('')}</div>
       <div><div class="eyebrow">Возвышения</div><p class="small muted" style="margin:4px 0 0">${ASC[pendingCls].map(a=>a.n).join(' · ')}</p></div>
       <div><div class="eyebrow">Стартовое снаряжение</div><p class="small muted" style="margin:4px 0 0">${WEAP[c.weapon].n}${c.off==='dagger'?' + кинжал во второй руке':c.off==='shield'?' + щит':c.off==='quiver'?' + колчан':WEAP[c.weapon].h===2?' (двуручное)':''}</p></div>
@@ -2681,19 +2758,20 @@ function statusChips(e){
   return c.length?`<div class="chips">${c.map(([t,col])=>chip(t,col)).join('')}</div>`:'';
 }
 function buffRow(P){
-  const b=[];
-  P.auras.filter(a=>a.on).forEach(a=>b.push(chip(AURAS[a.id].n,'var(--gold2)')));
+  const b=[],ui=ACC.ui||{};
+  if(ui.aura)P.auras.filter(a=>a.on).forEach(a=>b.push(chip(AURAS[a.id].n,'var(--gold2)')));
   if(C.B.type==='lab'&&S.labRun)S.labRun.buffs.forEach(k=>b.push(chip(SHRINES[k].n,'var(--r-unique)')));
-  C.fb.forEach(f=>b.push(chip(`${f.name.split(' ').slice(-2).join(' ')} ${f.turns}`,'var(--r-magic)')));
-  if(C.fort)b.push(chip(`Укрепление ${C.fort}`,'var(--phys)'));
-  if(C.eo)b.push(chip('Перегрузка','var(--light)'));
-  if(C.nextCrit)b.push(chip('След. удар — крит','var(--dex)'));
-  if(C.evaBuff)b.push(chip(`После уклонения +${C.evaBuff}%`,'var(--dex)'));
-  if(C.blockBuff)b.push(chip(`После блока +${C.blockBuff}%`,'var(--str)'));
-  if(C.free)b.push(chip('Свободный шаг','var(--good)'));
-  if(C.freeCast)b.push(chip('Бесплатное умение','var(--int)'));
-  if(P.rage&&C.rage)b.push(chip(`Ярость ${C.rage}`,'var(--fire)'));
-  if(C.cure)b.push(chip('Очищение','var(--good)'));
+  if(ui.flask)C.fb.forEach(f=>b.push(chip(`${f.name.split(' ').slice(-2).join(' ')} ${f.turns}`,'var(--r-magic)')));
+  if(ui.ability){
+    if(C.fort)b.push(chip(`Укрепление ${C.fort}`,'var(--phys)'));
+    if(C.eo)b.push(chip('Перегрузка','var(--light)'));
+    if(C.nextCrit)b.push(chip('След. удар — крит','var(--dex)'));
+    if(C.evaBuff)b.push(chip(`После уклонения +${C.evaBuff}%`,'var(--dex)'));
+    if(C.blockBuff)b.push(chip(`После блока +${C.blockBuff}%`,'var(--str)'));
+    if(C.free)b.push(chip('Свободный шаг','var(--good)'));
+    if(C.freeCast)b.push(chip('Бесплатное умение','var(--int)'));
+    if(P.rage&&C.rage)b.push(chip(`Ярость ${C.rage}`,'var(--fire)'));
+    if(C.cure)b.push(chip('Очищение','var(--good)'));}
   if(C.poison.length)b.push(chip('Отравлен','var(--chaos)'));
   if(C.burn)b.push(chip('Горит','var(--fire)'));
   return `<div class="buffs">${b.join('')||'<span class="dim small">Нет активных эффектов</span>'}</div>`;
@@ -2726,6 +2804,7 @@ function vCombat(){
       <button class="btn sm ghost" data-a="journal">Журнал</button><button class="btn sm ghost" data-a="fleeAsk" ${C.busy?'disabled':''}>Уйти</button></div>
   <div class="field">${lanes}</div>
   <button class="log" data-a="journal" aria-label="Открыть журнал боя">${C.log.slice(-3).map(l=>`<div>${l}</div>`).join('')}</button>
+  <div class="cb-bot"><div class="cb-in">
   <div class="me" id="mebox">
     ${P.es>0?bar('esb',C.es,P.es,`Щит ${fmt(C.es)} / ${fmt(P.es)}`):''}
     ${bar('hpb',C.hp,P.life,`Здоровье ${fmt(C.hp)} / ${fmt(P.life)}`)}
@@ -2740,7 +2819,7 @@ function vCombat(){
     <button class="btn" data-a="mv" data-d="1" ${C.busy?'disabled':''}>↓ Назад</button>
     <button class="btn" data-a="skill" data-i="-1" ${C.busy||!bOk?'disabled':''}>Атака ≈${fmt(bs.avg)}</button>
     <button class="btn" data-a="mv" data-d="-1" ${C.busy?'disabled':''}>Вперёд ↑</button>
-  </div>`;
+  </div></div></div>`;
 }
 function vJournal(){
   let last=-1,h='';
@@ -2754,7 +2833,7 @@ function showVictory(note,cont){
   const orbs=Object.entries(C.orbs).map(([k,v])=>`<div class="r-cur">${ORBS[k].n} ×${v}</div>`).join('');
   const lab=C.B.type==='lab';
   modal(`<div class="eyebrow">${C.I.sub}</div><h2>Победа</h2>${note?`<p class="notice">${note}</p>`:''}
-    <div class="sheet"><div><span>Опыт</span><span>+${fmt(C.xp)}</span></div><div><span>Золото</span><span>+${fmt(C.gold)}</span></div><div><span>Убито</span><span>${C.kills}</span></div><div><span>Ходов</span><span>${C.turn}</span></div></div>
+    <div class="sheet"><div><span>Опыт</span><span>+${fmt(C.xp)}</span></div><div><span>Золото</span><span>+${fmt(C.gold)}</span></div><div><span>Убито</span><span>${C.kills}</span></div><div><span>Ходов</span><span>${C.turn}</span></div></div>${C.lfN?`<p class="dim small" style="margin:0">Лутфильтр продал ${C.lfN} предм. за ${fmt(C.lfG)} зол.</p>`:''}
     <div><div class="eyebrow" style="margin-bottom:6px">Добыча</div><div class="list">${lootH}${orbs}</div></div>
     ${C.loot.some(it=>!it.gem&&!it.map&&!it.offer&&isUpgrade(it))?'<p class="notice" style="border-color:var(--good)">Среди добычи есть улучшения — загляните во «Вещи».</p>':''}
     <div class="row"><button class="btn sp" data-a="journal">Журнал</button>${cont?`${lab?'':`<button class="btn sp" data-a="leave">${S.done?'В убежище':'В лагерь'}</button>`}<button class="btn pri sp" data-a="next" data-c='${JSON.stringify(cont)}'>${lab?'В лабиринт ›':'Дальше ›'}</button>`:`<button class="btn pri sp" data-a="leave">${S.done?'В убежище':'В лагерь'}</button>`}</div>`,true);
@@ -2811,16 +2890,18 @@ function vChar(){
       <div><span>Здоровье</span><span>${fmt(P.life)}</span></div><div><span>Мана</span><span>${P.keys.has('blood')?'—':fmt(P.mana)+' / '+fmt(P.manaMax)}</span></div>
       <div><span>Энерг. щит</span><span>${fmt(P.es)}</span></div><div><span>Броня</span><span>${fmt(P.armour)}</span></div>
       <div><span>Уклонение</span><span>${fmt(P.eva)}</span></div><div><span>Шанс уклон.*</span><span>${R(evadeChance(P,S.lvl,'ranged'))}%</span></div>
-      <div><span>Блок атак</span><span>${R(P.block)}%</span></div><div><span>Регенерация</span><span>${R(P.regen*10)/10}%/ход</span></div>
+      <div><span>Точность</span><span>${fmt(P.acc)}</span></div><div><span>Попадание*</span><span>${R(hitChance(P,monEva(S.lvl))*100)}%</span></div><div><span>Блок атак</span><span>${R(P.block)}%</span></div><div><span>Регенерация</span><span>${R(P.regen*10)/10}%/ход</span></div>
       ${resRow('fire','Сопр. огню','fire')}${resRow('cold','Сопр. холоду','cold')}${resRow('light','Сопр. молнии','light')}${resRow('chaos','Сопр. хаосу','chaos')}
       <div><span>Резерв аур</span><span>${R(P.reserved)}%</span></div><div><span>Эффект флаконов</span><span>+${R(P.flaskEff)}%</span></div>
-    </div><p class="dim small" style="margin:10px 0 0">* против врага вашего уровня. Предел сопротивлений 75%.${P.pen?` Штраф текущей области: −${P.pen}%.`:' В IV акте −10%, в V акте −20%, на картах −30%.'}</p></div>
+    </div><p class="dim small" style="margin:10px 0 0">* против врага вашего уровня. Точность нужна только атакам: чары попадают всегда, а уклониться от чар врагов можно лишь с «Акробатикой». Предел сопротивлений 75%.${P.pen?` Штраф текущей области: −${P.pen}%.`:' В IV акте −10%, в V акте −20%, на картах −30%.'}</p></div>
     <div class="panel"><div class="ph"><h2>Оружие</h2></div><p class="small muted" style="margin:0">${P.weapons.length?P.weapons.map(w=>`${WEAP[w.wk].n} (${WEAP[w.wk].h===2?'двуручное':'одноручное'}, ${WKIND_N[w.kind]}${w.spell?', чары':''})`).join(' + '):'Без оружия'}${P.dual?' · два оружия: +15% урона атак и +15% блока':''}</p>
       <div class="list" style="margin-top:8px">${P.skills.map(sk=>sk?`<div class="row" style="justify-content:space-between;border-bottom:1px dotted var(--line);padding-block:4px"><span>${gemIcon(sk.gid)} <b style="font-family:var(--ff-d)">${sk.name}</b> <span class="dim">ур. ${sk.lvl}</span></span><span class="num ${sk.bad?'bad-t':'muted'}">${sk.bad||`≈${fmt(sk.avg)} · крит ${(sk.crit*100).toFixed(1)}%`}</span></div>`:'').join('')}
       <div class="row" style="justify-content:space-between"><span class="muted">Атака оружием</span><span class="num muted">≈${fmt(P.basic.avg)}</span></div></div></div>
     ${ex.length?`<div class="panel"><div class="ph"><h2>Особые эффекты</h2></div><div class="statl">${ex.map(([k,v])=>`<span style="color:var(--gold2)">${lbl(k,v)}</span>`).join('')}</div></div>`:''}
     ${uq.length?`<div class="panel"><div class="ph"><h2>Уникальные свойства</h2></div><div class="statl">${uq.map(([k,v])=>`<span style="color:#d6a06a">${lbl(k,v)}</span>`).join('')}</div></div>`:''}
     ${keys.length?`<div class="panel"><div class="ph"><h2>Ключевые умения</h2></div>${keys.map(n=>`<p style="margin:0 0 8px"><b style="font-family:var(--ff-d);color:var(--gold2)">${n.n}.</b> ${n.text}</p>`).join('')}</div>`:''}
+    <div class="panel"><div class="ph"><h2>Панель боя</h2></div><p class="dim small" style="margin:0 0 6px">Что показывать в строке эффектов под полосами здоровья. Яд и горение видны всегда.</p>
+      ${[['aura','Бафы аур'],['flask','Бафы флаконов'],['ability','Бафы способностей (укрепление, ярость, перегрузка и др.)']].map(([k,n])=>`<label class="row" style="min-height:40px;flex-wrap:nowrap"><input type="checkbox" data-a="uiSet" data-k="${k}" ${ACC.ui&&ACC.ui[k]?'checked':''} style="width:22px;height:22px;flex:none"> <span>${n}</span></label>`).join('')}</div>
     <div class="panel"><div class="ph"><h2>Прогресс</h2></div><div class="sheet"><div><span>Кампания</span><span>${S.done?'пройдена':`${S.prog}/${BATTLES.length}`}</span></div><div><span>Лучшая карта</span><span>${S.mapBest||'—'}</span></div>
       <div><span>Лабиринты</span><span>${S.labs.filter(Boolean).length}/4</span></div><div><span>Карт в запасе</span><span>${mapCount()}</span></div>
       <div><span>Убито врагов</span><span>${fmt(S.kills)}</span></div><div><span>Смертей</span><span>${S.deaths}</span></div></div></div>
@@ -3106,8 +3187,15 @@ function vItems(){
     <div class="panel">${doll}<p class="dim small" style="margin:8px 0 0">Коснитесь ячейки, чтобы посмотреть предмет и заменить его. Флаконы пьются в бою без траты хода.</p></div>
     <div class="panel"><div class="seg2">${tabs.map(([k,n])=>`<button class="${invTab===k?'on':''}" data-a="invTab" data-t="${k}">${n} · ${cnt(k)}</button>`).join('')}</div>
       <div class="row" style="margin:8px 0"><span class="dim small sp">Сумка ${S.inv.length}/${INV_MAX} · ★ — избранное, наверху и не продаётся оптом · зелёная полоска — улучшение</span></div>
-      ${list}</div></div>`;
+      ${list}</div>
+    ${lootFilterPanel()}</div>`;
 }
+function lootFilterPanel(){const lf=S.lf;
+  return `<div class="panel"><div class="ph"><h2>Лутфильтр</h2></div>
+    <p class="dim small" style="margin:0 0 8px">Снимите галочку — такие предметы не попадут в сумку, а сразу продадутся за золото. Уникальные подбираются всегда.</p>
+    <div class="lfgrid"><span></span>${LF_RAR.map(([,n])=>`<b>${n}</b>`).join('')}
+      ${LF_CATS.map(([c,n])=>`<span>${n}</span>${LF_RAR.map(([r])=>c==='flasks'&&r==='rare'?'<i></i>':`<label><input type="checkbox" data-a="lf" data-c="${c}" data-r="${r}" ${lf[c][r]?'checked':''}></label>`).join('')}`).join('')}</div>
+    <label class="row" style="margin-top:10px;min-height:40px;flex-wrap:nowrap"><input type="checkbox" data-a="lfMy" ${lf.myWeapons?'checked':''} style="width:22px;height:22px;flex:none"> <span>Оружие и колчаны — только для моих умений</span></label></div>`;}
 function orbPanel(it){
   if(it.rar==='unique')return '';
   const opts=ORB_IDS.filter(k=>(S.cur[k]||0)>0&&ORBS[k].ok(it));
@@ -3156,7 +3244,7 @@ function vShop(){
     h+=`<div class="panel"><div class="eyebrow" style="margin-bottom:8px">Продать оптом (кроме избранного ★)</div>
       <div class="sellgrid">${grp.map(([r,n])=>{const g=sellGroup(r);return `<button class="btn ${r==='all'?'danger':''}" data-a="${r==='all'?'sellAllAsk':'sellBulk'}" data-r="${r}" ${g.length?'':'disabled'}>Продать ${n}<br><small class="num">${g.length} шт. · ${fmt(sum(g))} зол.</small></button>`;}).join('')}</div>
       ${sellAllAsk?`<p class="notice" style="margin-top:8px">Продать все ${sellGroup('all').length} вещей, кроме избранных, за ${fmt(sum(sellGroup('all')))} зол.?</p><div class="row" style="margin-top:6px"><button class="btn sp" data-a="sellAllNo">Отмена</button><button class="btn sp danger" data-a="sellBulk" data-r="all">Продать всё</button></div>`:''}
-      <label class="row" style="margin-top:12px;min-height:44px;flex-wrap:nowrap"><input type="checkbox" id="autosell" data-a="autosell" ${S.autoSell?'checked':''} style="width:22px;height:22px;flex:none"> <span>Сразу продавать обычные (белые) предметы с монстров</span></label></div>
+      <p class="dim small" style="margin:10px 0 0">Чтобы ненужное вообще не попадало в сумку, настройте лутфильтр внизу вкладки «Вещи».</p></div>
       <div class="panel"><div class="eyebrow" style="margin-bottom:8px">Сумка · ${S.inv.length}/${INV_MAX}</div>
       <div class="list">${sortInv(S.inv).map(x=>`<div class="sellrow"><button class="irow" data-a="itemInv" data-u="${x.uid}"><span class="sl">${x.fav?'<b class="gold-t">★</b> ':''}${SLOTN[x.slot]} · ${x.ilvl}</span><span class="in r-${x.rar}">${esc(x.name)}</span></button><button class="btn sm" data-a="sellOne" data-u="${x.uid}">${fmt(sellPrice(x))}</button></div>`).join('')||'<span class="dim">Сумка пуста</span>'}</div></div>`;
   }else if(shopTab==='gems'){
@@ -3165,7 +3253,7 @@ function vShop(){
     h+=`<p class="muted small" style="margin:0">Камни ${L} уровня.${S.done?'':' До конца кампании доступны только умения вашего класса.'} Сильные камни появляются с уровнем героя.</p>`;
     groups.forEach(([n,ids])=>{const list=ids.filter(obtainable),later=ids.filter(id=>allowed(id)&&!obtainable(id));if(!list.length&&!later.length)return;
       h+=`<div class="panel"><div class="ph"><h2>${n}</h2></div><div class="list">${list.map(id=>{const G=gdef(id),p=gemPrice(id);
-        return `<div class="gemb">${gemIcon(id)}<span class="gt"><b>${G.n}</b><small>${GEMS[id]&&!GEMS[id].sup?G.rng+'. '+G.d:gemDesc(id,L)}</small></span><button class="btn sm" data-a="buyGem" data-id="${id}" ${S.gold>=p?'':'disabled'}>${fmt(p)}</button></div>`}).join('')}
+        return `<div class="gemb"><button class="gemi" data-a="gemInfo" data-id="${id}">${gemIcon(id)}<span class="gt"><b>${G.n}</b><small>${gemWeaponShort(id)} · <span class="gold-t">подробнее</span></small></span></button><button class="btn sm" data-a="buyGem" data-id="${id}" ${S.gold>=p?'':'disabled'}>${fmt(p)}</button></div>`}).join('')}
         ${later.length?`<p class="dim small" style="margin:4px 0 0">Позже: ${later.map(id=>`${gdef(id).n} (${gemRl(id)} ур.)`).join(', ')}</p>`:''}</div></div>`;});
   }else{
     h+=`<div class="panel"><p class="muted" style="margin:0 0 10px">Сбросить все пассивные умения и вернуть очки. Отдельный узел можно забыть прямо в древе.</p>
@@ -3174,6 +3262,38 @@ function vShop(){
       <button class="btn full" data-a="resetAsc" ${S.gold>=ascResetCost()&&S.ascAlloc.length?'':'disabled'}>Сбросить возвышение · ${fmt(ascResetCost())} зол.</button></div>`;
   }
   return h+'</div>';
+}
+
+/* ---------- подробное описание камня (торговец) ---------- */
+const TAG_N={attack:'атаки',spell:'чары',melee:'ближний бой',proj:'снаряды',area:'область',chain:'цепь',strike:'удар',slam:'удар по земле',move:'передвижение',channel:'поддержание',fire:'огонь',cold:'холод',light:'молния',chaos:'хаос',phys:'физический',any:'любые умения'};
+const weaponsFor=cat=>Object.keys(WEAP).filter(wk=>SKILL_WEAPON[cat]({wk})).map(wk=>WEAP[wk].n);
+function gemWeaponShort(id){const G=gdef(id);if(GEMS[id]&&!G.sup)return 'Нужно: '+SKILL_WEAPON_N[G.cat];if(GEMS[id])return 'Поддержка: '+G.req.map(t=>TAG_N[t]||t).join(', ');return isAura(id)?'Аура, без оружия':'Без оружия';}
+function gemInfo(id){
+  const G=gdef(id),L=newGemLvl(),P=calc(),p=gemPrice(id),sup=GEMS[id]&&G.sup,act=GEMS[id]&&!sup;
+  const kind=act?CAT_N[G.cat]:sup?'Камень поддержки':isAura(id)?'Аура':G.kind==='mark'?'Метка':'Проклятие';
+  const need=gemAttrReq(L,sup),have=P.attr[G.c];
+  let rows=`<div><span>Тип</span><span>${kind}</span></div><div><span>Уровень при покупке</span><span>${L}</span></div>
+    <div><span>Требует</span><span class="${have>=need?'':'bad-t'}">${ATTR[G.c]} ${need} (у вас ${have})</span></div>`;
+  let body='';
+  if(act){const ok=P.weapons.some(w=>SKILL_WEAPON[G.cat](w.it)),o=baseO();G.make(o,L);
+    rows+=`<div><span>Дальность</span><span>${G.rng}</span></div><div><span>Расход маны</span><span>~${R(o.cost+L*.6)}</span></div>`;
+    rows+=G.cat==='spell'?`<div><span>Базовый урон</span><span>${R(G.base[0]*SPELL_BASE*Math.pow(1.2,L-1))}–${R(G.base[1]*SPELL_BASE*Math.pow(1.2,L-1))} (${EL[G.el]})</span></div>`
+      :`<div><span>Урон</span><span>${R(o.mult*100)}% урона оружия</span></div>`;
+    body+=`<div class="panel"><div class="eyebrow" style="margin-bottom:4px">Оружие</div><p style="margin:0">Нужно: <b>${SKILL_WEAPON_N[G.cat]}</b>.</p>
+      <p class="small muted" style="margin:4px 0 0">Подходит: ${weaponsFor(G.cat).join(', ')}.</p>
+      <p class="small ${ok?'good-t':'bad-t'}" style="margin:6px 0 0">${ok?'С вашим текущим оружием работает.':'С вашим текущим оружием не работает: '+(P.weapons.map(w=>WEAP[w.wk].n).join(' + ')||'нет оружия')+'.'}</p></div>`;
+    body+=`<p class="small muted" style="margin:0">Метки умения: ${G.tags.map(t=>TAG_N[t]||t).join(', ')}. Поддержки подходят по этим меткам.</p>`;}
+  else if(sup){const mine=S.skills.map(s=>gem(s.a)).filter(Boolean).filter(g=>supFits(G,GEMS[g.id])).map(g=>GEMS[g.id].n);
+    body+=`<div class="panel"><div class="eyebrow" style="margin-bottom:4px">Эффект</div><p style="margin:0">${G.e(L)}</p></div>
+      <div class="panel"><div class="eyebrow" style="margin-bottom:4px">С чем работает</div><p style="margin:0">Вставляется в гнездо активного умения с метками: <b>${G.req.map(t=>TAG_N[t]||t).join(', ')}</b>. Своего оружия не требует — работает с тем, что нужно самому умению.</p>
+      <p class="small ${mine.length?'good-t':'muted'}" style="margin:6px 0 0">${mine.length?'Подходит к вашим умениям: '+mine.join(', '):'К вставленным сейчас умениям не подходит.'}</p></div>`;}
+  else{body+=`<div class="panel"><div class="eyebrow" style="margin-bottom:4px">Эффект</div><p style="margin:0">${isAura(id)?G.e(L,1)+'. Резерв маны '+G.res+'%.':G.e(L)+'.'}</p>
+      <p class="small muted" style="margin:6px 0 0">Оружие не требуется. ${isAura(id)?'Ставится в слот ауры и действует постоянно.':'Ставится в слот проклятия (с 8 уровня). '+(G.kind==='mark'?'Метка не тратит ход.':'Проклятие тратит ход и действует на группу.')}</p></div>`;}
+  modal(`<div class="row"><span class="eyebrow sp">Торговец · камень</span><button class="btn sm ghost" data-a="close">Закрыть</button></div>
+    <div class="row" style="flex-wrap:nowrap">${gemIcon(id)}<h2 style="font-size:20px">${G.n}</h2></div>
+    ${act?`<p class="muted" style="margin:0">${G.d}</p>`:''}
+    <div class="sheet">${rows}</div>${body}
+    <button class="btn pri full" data-a="buyGem" data-id="${id}" ${S.gold>=p?'':'disabled'}>Купить · ${fmt(p)} зол.</button>`);
 }
 
 /* ---------- тайник ---------- */
@@ -3246,7 +3366,8 @@ function vBench(){
     h+=`${itemCard(it)}<div class="row"><button class="btn sm ghost" data-a="benchSel" data-u="">‹ Другой предмет</button>${it.mods.some(m=>m.cr)?`<button class="btn sm" data-a="benchRemove" ${S.gold>=benchRemoveCost(it)?'':'disabled'}>Удалить свойство мастера · ${benchRemoveCost(it)}</button>`:''}</div>
       ${blk?`<p class="notice">${blk}</p>`:''}
       <div class="list">${rec.map(r=>{const v=benchVal(r.k,it.ilvl),ok=!blk&&canPay(r);
-        return `<button class="recipe" data-a="benchCraft" data-k="${r.k}" ${ok?'':'disabled'}><span class="sp">${lbl(r.k,v)}</span><small class="num">${Object.entries(r.cost).map(([o,n])=>`<span class="${(S.cur[o]||0)>=n?'':'bad-t'}">${ORBS[o].n.replace('Сфера ','')} ×${n}</span>`).join(', ')} · <span class="${S.gold>=r.g?'':'bad-t'}">${r.g} зол.</span></small></button>`;}).join('')||'<span class="dim">Для этой базы нет рецептов</span>'}</div>`;}
+        const miss=[...Object.entries(r.cost).filter(([o,n])=>(S.cur[o]||0)<n).map(([o,n])=>`${ORBS[o].n} ×${n-(S.cur[o]||0)}`),...(S.gold<r.g?[`${fmt(r.g-S.gold)} зол.`]:[])];
+        return `<button class="recipe" data-a="benchCraft" data-k="${r.k}" ${ok?'':'disabled'}><span class="sp">${lbl(r.k,v)}</span>${!blk&&miss.length?`<small class="bad-t">Не хватает: ${miss.join(', ')}</small>`:''}<small class="num">${Object.entries(r.cost).map(([o,n])=>`<span class="${(S.cur[o]||0)>=n?'':'bad-t'}">${ORBS[o].n.replace('Сфера ','')} ×${n}</span>`).join(', ')} · <span class="${S.gold>=r.g?'':'bad-t'}">${r.g} зол.</span></small></button>`;}).join('')||'<span class="dim">Для этой базы нет рецептов</span>'}</div>`;}
   else h+=`<div class="eyebrow">Выберите предмет</div><div class="bag">${all.map(x=>`<button class="irow" data-a="benchSel" data-u="${x.uid}"><span class="sl">${Object.values(S.equip).includes(x)?'надето · ':''}${SLOTN[x.slot]}${x.mods.some(m=>m.cr)?' · мастер':''}</span><span class="in r-${x.rar}">${esc(x.name)}</span></button>`).join('')||'<span class="dim">Нет подходящих предметов</span>'}</div>`;
   return h+'</div>';
 }
@@ -3269,7 +3390,7 @@ function vDummy(){
         <div><span>За применение</span><span>${fmt(r.perCast)}</span></div><div><span>Попаданий</span><span>${r.hitsPerCast.toFixed(1)}</span></div>
         <div><span>За попадание</span><span>${fmt(r.perHit)}</span></div><div><span>Криты</span><span>${R(r.critRate*100)}%</span></div>
         <div><span>Недуги (ожид.)</span><span>${fmt(r.dot)}</span></div><div><span>Итого</span><span>${fmt(tot)}</span></div>
-        <div><span>Расход</span><span>${r.cost}</span></div><div><span>Урон на ману</span><span>${(tot/Math.max(1,r.cost)).toFixed(1)}</span></div></div>
+        ${r.acc?`<div><span>Точность</span><span>${fmt(r.acc)}</span></div><div><span>Шанс попасть</span><span>${R(r.hit*100)}%</span></div>`:''}<div><span>Расход</span><span>${r.cost}</span></div><div><span>Урон на ману</span><span>${(tot/Math.max(1,r.cost)).toFixed(1)}</span></div></div>
         <div class="eyebrow" style="margin:10px 0 4px">По стихиям за применение</div><div class="statl small">${ELS.filter(k=>r.parts[k]>.5).map(k=>`<span style="color:${ELC[k]}">${EL[k]}: ${fmt(r.parts[k])}</span>`).join('')}</div>
         <div class="eyebrow" style="margin:10px 0 4px">Шанс состояний за попадание</div><div class="statl small"><span>Поджог ${R(r.ign*100)}% · Шок ${R(r.shock*100)}% · Заморозка ${R(r.frz*100)}% · Яд ${R(r.poi*100)}%</span></div>
         <p class="dim small" style="margin:8px 0 0">Мишень одна, поэтому умения по области бьют её один раз за волну удара. В бою по группе урон умножается на число задетых врагов.</p></div>`;}}
@@ -3396,13 +3517,16 @@ const ACT={
       <button class="btn pri full" data-a="buy" data-u="${it.uid}" ${S.gold>=p&&S.inv.length<INV_MAX?'':'disabled'}>Купить · ${fmt(p)} зол.</button>`);},
   buy(d){const it=S.shop.items.find(x=>x.uid===d.u);if(!it)return;const p=buyPrice(it);if(S.gold<p)return;S.gold-=p;S.shop.items=S.shop.items.filter(x=>x!==it);it.isNew=1;S.inv.push(it);save();closeModal();render();toast(`Куплено: ${it.name}`);},
   shopRefresh(){const c=shopRefreshCost();if(S.gold<c)return;S.gold-=c;shopStock(true);save();render();},
-  buyGem(d){const p=gemPrice(d.id);if(S.gold<p)return;S.gold-=p;addGem(d.id);save();render();toast(`Куплен камень: ${gdef(d.id).n}`);},
+  gemInfo(d){gemInfo(d.id);},
+  buyGem(d){const p=gemPrice(d.id);if(S.gold<p)return;S.gold-=p;addGem(d.id);save();closeModal();render();toast(`Куплен камень: ${gdef(d.id).n}`);},
   resetTree(){const c=treeResetCost();if(S.gold<c)return;S.gold-=c;S.alloc=[startNode(S.cls)];S.attrPick={};save();render();toast('Древо сброшено');},
   resetAsc(){const c=ascResetCost();if(S.gold<c)return;S.gold-=c;S.ascAlloc=[];save();render();toast('Очки возвышения возвращены');},
   sellOne(d){const it=S.inv.find(x=>x.uid===d.u);if(!it)return;const v=sellPrice(it);S.gold+=v;S.inv=S.inv.filter(x=>x!==it);save();render();toast(`Продано за ${v} зол.`);},
   sellBulk(d){const g=sellGroup(d.r);let v=0;g.forEach(x=>v+=sellPrice(x));const set=new Set(g);S.inv=S.inv.filter(x=>!set.has(x));S.gold+=v;sellAllAsk=false;save();render();toast(`Продано ${g.length} шт. за ${fmt(v)} зол.`);},
   sellAllAsk(){sellAllAsk=true;render();},sellAllNo(){sellAllAsk=false;render();},
-  autosell(d,el){S.autoSell=el.checked;save();},
+  uiSet(d,el){ACC.ui=ACC.ui||{};ACC.ui[d.k]=el.checked?1:0;save();},
+  lf(d,el){S.lf[d.c][d.r]=el.checked?1:0;save();},
+  lfMy(d,el){S.lf.myWeapons=el.checked?1:0;save();},
   stTab(d){stashTab=d.t;render();},
   stIn(d){if(toStash(d.u))render();},
   stOut(d){if(fromStash(d.u))render();},
