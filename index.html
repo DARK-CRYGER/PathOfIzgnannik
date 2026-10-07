@@ -415,7 +415,7 @@ button.sigil{padding:0;cursor:pointer;color:var(--gold2)}
 <div id="ov"></div>
 <script>
 /* Адрес сервера аукциона (server/auction-server.js). Пусто — аукцион между персонажами одного игрока. */
-window.AUCTION_URL = window.AUCTION_URL || 'izgnannik.darkcryger.workers.dev';
+window.AUCTION_URL = window.AUCTION_URL || 'https://izgnannik.darkcryger.workers.dev';
 </script>
 <script>
 'use strict';
@@ -4039,9 +4039,16 @@ function pinPanel(){let h='';
 let ldr={list:null,err:null,local:false};
 function openLeaders(){
   if(srvOn()){modal(`<h2>Таблица лидеров</h2><p class="dim">Загрузка…</p>`);
-    srvReq('/leaders').then(r=>{ldr={list:r.list||[],err:null,local:false};showLeaders();}).catch(e=>{ldr={list:localBoard(),err:'Сервер недоступен — показаны ваши персонажи',local:true};showLeaders();});}
+    srvReq('/leaders').then(r=>{ldr={list:r.list||[],err:null,local:false};showLeaders();}).catch(e=>{ldr={list:localBoard(),err:'Сервер недоступен — показаны ваши персонажи. '+srvWhy(e),local:true};showLeaders();});}
   else{ldr={list:localBoard(),err:'Общая таблица работает, когда подключён сервер игры. Сейчас — ваши персонажи.',local:true};showLeaders();}
 }
+/* понятная причина ошибки сервера */
+function srvWhy(e){const u=String(AUCTION_URL||'');
+  if(e===401)return 'Причина: сервер не принял подпись Telegram — проверьте, что BOT_TOKEN в Cloudflare совпадает с токеном этого бота (после /revoke нужен новый).';
+  if(e===500)return 'Причина: ошибка на сервере — проверьте привязку базы D1 с именем DB (Settings → Bindings) и нажмите Deploy.';
+  if(e===404)return 'Причина: по адресу '+u+' нет сервера игры — проверьте адрес Worker и что код worker.js сохранён (Deploy).';
+  if(typeof e==='number')return 'Причина: ответ сервера '+e+'.';
+  return 'Причина: нет связи с '+u+(u.startsWith('https://')?'':' (адрес должен начинаться с https://)')+'. Проверьте адрес или блокировку сайта в вашей сети.';}
 function localBoard(){return boardOf().map(b=>({...b,uid:'me'})).sort((a,b)=>b.lvl-a.lvl||b.xp-a.xp);}
 function showLeaders(){const L=ldr.list||[];
   modal(`<div class="row"><h2 class="sp" style="font-size:20px">Таблица лидеров</h2><button class="btn sm ghost" data-a="close">Закрыть</button></div>
