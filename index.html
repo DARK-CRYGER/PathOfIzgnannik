@@ -1610,8 +1610,9 @@ function save(now){
   const uid=tgUid();if(uid){ACC.tgId=uid;const u=tgUser();if(u)ACC.tgName=u.username||u.first_name||'';}
   const str=JSON.stringify(ACC);
   try{localStorage.setItem(KEY,str);}catch(e){}
-  if(tg&&tg.CloudStorage&&cloudReady&&!cloudBlocked){clearTimeout(cloudTimer);if(now)cloudSave(str);else cloudTimer=setTimeout(()=>cloudSave(str),1500);}
-  if(srvReady){clearTimeout(srvTimer);if(now)srvSave(str);else srvTimer=setTimeout(()=>srvSave(str),4000);}
+  /* сначала сервер игры (основная копия), затем облако Telegram (запасная) */
+  if(srvReady){clearTimeout(srvTimer);if(now)srvSave(str);else srvTimer=setTimeout(()=>srvSave(str),1500);}
+  if(tg&&tg.CloudStorage&&cloudReady&&!cloudBlocked){clearTimeout(cloudTimer);if(now)cloudSave(str);else cloudTimer=setTimeout(()=>cloudSave(str),srvReady?5000:1500);}
 }
 /* облако Telegram: два слота (a/b) кусками по 3800 символов. Сначала пишется запасной слот, потом указатель —
    оборванная запись не портит последнее целое сохранение. Указатель хранит контрольную сумму. */
@@ -1627,11 +1628,12 @@ function cloudGetAll(cs,keys,cb){const out={};let i=0;
 function cloudReadSlot(cs,sl,cb){if(!sl||!sl.n)return cb('nometa');const keys=Array.from({length:sl.n},(_,i)=>KEY+'_'+sl.slot+'_'+i);
   cloudGetAll(cs,keys,(err,vals)=>{if(err)return cb(err);const parts=keys.map(k=>vals[k]||''),str=parts.join('');
     if(hash32(str)!==sl.h)return cb('hash');try{slotCache[sl.slot]=parts;cb(null,JSON.parse(str));}catch(e){cb('parse');}});}
-let cloudTries=0;
+let cloudTries=0,cloudWhy='';
 function cloudLoad(){
-  let cs;try{cs=tg&&tg.CloudStorage;if(!cs||!cs.getItem)return;}catch(e){return;}
+  let cs;try{cs=tg&&tg.CloudStorage;if(!cs||!cs.getItem){srvLoad();return;}}catch(e){srvLoad();return;}
   const uid=tgUid();
-  const fail=why=>{cloudReady=false;if(++cloudTries<=3)setTimeout(cloudLoad,3000*cloudTries);else toast('Облако Telegram недоступно: прогресс хранится на устройстве');};
+  const fail=why=>{cloudReady=false;cloudWhy=why;if(++cloudTries<=3)setTimeout(cloudLoad,3000*cloudTries);
+    else{toast(srvOn()?'Облако Telegram не ответило ('+why+') — сохраняем на сервер игры':'Облако Telegram недоступно ('+why+'): прогресс хранится на устройстве');srvLoad();}};
   const finish=d=>{
     if(d&&d.ver&&d.ver>GAME_VER){cloudBlocked='new';cloudReady=true;toast('Вышла новая версия игры — перезапустите её, чтобы сохраняться в облако');if(d.chars)adoptAcc(mergeAcc(ACC,d));render();return;}
     let base=ACC;if(base&&base.tgId&&uid&&base.tgId!==uid){backupLocal();base=newAcc();}
@@ -1651,13 +1653,28 @@ function cloudLoad(){
 /* база на сервере (если задан адрес): у каждого игрока хранится текущий аккаунт и история версий */
 function srvOn(){return !!(AUCTION_URL&&tg&&tg.initData);}
 function srvReq(path,opt={}){return fetch(AUCTION_URL.replace(/\/$/,'')+path,{method:opt.method||'GET',headers:{'Content-Type':'application/json','X-Tg-Init-Data':tg.initData},body:opt.body}).then(r=>r.ok?r.json():Promise.reject(r.status));}
-function srvLoad(){if(!srvOn())return;srvReq('/save').then(j=>{if(j&&j.acc&&j.acc.chars){const m=mergeAcc(ACC,j.acc);if(!sameChars(ACC,m))backupLocal();adoptAcc(m,'Аккаунт синхронизирован с сервером');}
-  srvReady=true;save(true);render();}).catch(()=>{srvReady=false;});}
+let srvLoading=false;
+function srvLoad(){if(!srvOn()||srvReady||srvLoading)return;srvLoading=true;srvReq('/save').finally(()=>{srvLoading=false;}).then(j=>{if(j&&j.acc&&j.acc.chars){const m=mergeAcc(ACC,j.acc);if(!sameChars(ACC,m))backupLocal();adoptAcc(m,'Аккаунт синхронизирован с сервером');}
+  srvReady=true;save(true);render();}).catch(()=>{srvReady=false;srvTries++;if(srvTries<4)setTimeout(srvLoad,5000*srvTries);});}
+let srvTries=0;
 let boardAt=0;
-function srvSave(str){if(!srvOn())return;srvReq('/save',{method:'POST',body:str}).then(()=>{if(Date.now()-boardAt>60000){boardAt=Date.now();srvReq('/board',{method:'POST',body:JSON.stringify(boardOf())}).catch(()=>{});}}).catch(()=>{});}
+function srvSave(str){if(!srvOn())return;srvReq('/save',{method:'POST',body:str}).then(()=>{if(Date.now()-boardAt>30000){boardAt=Date.now();srvReq('/board',{method:'POST',body:JSON.stringify(boardOf())}).catch(()=>{});}}).catch(()=>{});}
 /* сводка персонажей для таблицы лидеров: уровень и умение с наибольшим уроном */
-function charTop(c){const pS=S,pC=C;let top=null;try{S=c;C=null;const P=calc();const sk=P.skills.filter(s=>s&&!s.bad).sort((a,b)=>b.avgUse-a.avgUse)[0];if(sk)top={n:sk.name,d:R(sk.avgUse),g:sk.gid};}catch(e){}S=pS;C=pC;return top;}
-function boardOf(){return ACC.chars.map(c=>({id:c.id,name:c.name,cls:c.cls,asc:c.asc,lvl:c.lvl,xp:c.xp,top:charTop(c),maps:c.mapBest||0,pin:Object.keys(c.pinK||{}).filter(k=>c.pinK[k]>0)}));}
+/* сводка персонажа для лидеров и статистики администратора */
+function charInfo(c){const pS=S,pC=C;const o={top:null,b:null};try{S=c;C=null;const P=calc();
+    const sk=P.skills.filter(s=>s&&!s.bad).sort((a,b)=>b.avgUse-a.avgUse)[0];if(sk)o.top={n:sk.name,d:R(sk.avgUse),g:sk.gid};
+    const g=u=>c.gems.find(x=>x.uid===u);
+    o.b={sk:c.skills.map(sl=>g(sl.a)).filter(Boolean).map(x=>gdef(x.id).n),
+      sup:[...new Set(c.skills.flatMap(sl=>(sl.s||[]).map(g).filter(Boolean).map(x=>gdef(x.id).n)))],
+      au:c.auras.map(g).filter(Boolean).map(x=>gdef(x.id).n),hex:g(c.hex)?gdef(g(c.hex).id).n:null,
+      keys:c.alloc.filter(id=>NODES[id]&&NODES[id].t==='key').map(id=>NODES[id].n),
+      uq:EQ_SLOTS.concat(FLASK_SLOTS).map(sl=>c.equip[sl]).filter(it=>it&&it.rar==='unique').map(it=>it.name),
+      wp:c.equip.weapon?WEAP[c.equip.weapon.wk].n:null,life:P.life,es:P.es,res:[P.res.fire,P.res.cold,P.res.light,P.res.chaos],
+      prog:c.done?'убежище':ACTS[actOfProgC(c)].n,labs:(c.labs||[]).filter(Boolean).length,deaths:c.deaths||0};
+  }catch(e){}S=pS;C=pC;return o;}
+function actOfProgC(c){return c.done?4:BATTLES[Math.min(c.prog||0,BATTLES.length-1)].act;}
+function charTop(c){return charInfo(c).top;}
+function boardOf(){return ACC.chars.map(c=>{const i=charInfo(c);return {id:c.id,name:c.name,cls:c.cls,asc:c.asc,ascN:c.asc&&ascDef(c.asc)?ascDef(c.asc).n:null,lvl:c.lvl,xp:c.xp,top:i.top,b:i.b,maps:c.mapBest||0,pin:Object.keys(c.pinK||{}).filter(k=>c.pinK[k]>0)};});}
 if(typeof window!=='undefined'){window.addEventListener('pagehide',()=>save(true));document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')save(true);});}
 function mainAttr(cls){const a=CLASSES[cls].attr;return ATTR_K[a.indexOf(Math.max(...a))];}
 function newGame(cls,name){
@@ -3170,7 +3187,9 @@ function initTG(){
   try{tg.disableVerticalSwipes&&tg.disableVerticalSwipes();}catch(e){}
   try{tg.setHeaderColor('#14100d');tg.setBackgroundColor('#14100d');}catch(e){}
   try{tg.BackButton.onClick(onBack);}catch(e){}
-  cloudLoad();syncBack();render();
+  /* сервер игры — основная копия: подключаемся сразу, облако Telegram параллельно */
+  srvLoad();cloudLoad();syncBack();render();
+  setTimeout(()=>{if(!srvReady)srvLoad();},6000);
 }
 function syncBack(){try{if(!tg||!tg.BackButton)return;(modalHtml&&!modalLock)||inFight()||screen==='sub'||screen==='combat'||(screen==='select'&&ACC.chars.length)?tg.BackButton.show():tg.BackButton.hide();}catch(e){}}
 function onBack(){
@@ -3500,6 +3519,11 @@ function vChar(){
     <div class="panel"><div class="ph"><h2>Панель боя</h2></div><p class="dim small" style="margin:0 0 6px">Что показывать в строке эффектов под полосами здоровья. Яд и горение видны всегда.</p>
       ${[['aura','Бафы аур'],['flask','Бафы флаконов'],['ability','Бафы способностей (укрепление, ярость, перегрузка и др.)']].map(([k,n])=>`<label class="row" style="min-height:40px;flex-wrap:nowrap"><input type="checkbox" data-a="uiSet" data-k="${k}" ${ACC.ui&&ACC.ui[k]?'checked':''} style="width:22px;height:22px;flex:none"> <span>${n}</span></label>`).join('')}
       <div class="eyebrow" style="margin:10px 0 4px">Кнопки умений · порядок и видимость</div>${cbPanel(P)}</div>
+    <div class="panel"><div class="ph"><h2>Сохранения</h2></div><div class="sheet">
+      <div><span>Облако Telegram</span><span class="${cloudReady?'good-t':'bad-t'}">${!tg||!tg.CloudStorage?'нет (вне Telegram)':cloudBlocked?'нужна новая версия':cloudReady?'подключено':cloudWhy?'ошибка: '+esc(cloudWhy):'подключается…'}</span></div>
+      <div><span>Сервер игры</span><span class="${srvReady?'good-t':AUCTION_URL?'bad-t':'dim'}">${!AUCTION_URL?'не задан':!srvOn()?'только в Telegram':srvReady?'подключён':'нет связи'}</span></div>
+      <div><span>На устройстве</span><span class="good-t">сохраняется</span></div></div>
+      ${AUCTION_URL&&srvOn()&&!srvReady?'<button class="btn sm full" data-a="srvRetry" style="margin-top:8px">Подключиться к серверу</button>':''}</div>
     <div class="panel"><div class="ph"><h2>Прогресс</h2></div><div class="sheet"><div><span>Кампания</span><span>${S.done?'пройдена':`${S.prog}/${BATTLES.length}`}</span></div><div><span>Лучшая карта</span><span>${S.mapBest||'—'}</span></div>
       <div><span>Лабиринты</span><span>${S.labs.filter(Boolean).length}/4</span></div><div><span>Карт в запасе</span><span>${mapCount()}</span></div>
       <div><span>Убито врагов</span><span>${fmt(S.kills)}</span></div><div><span>Смертей</span><span>${S.deaths}</span></div></div></div>
@@ -4251,6 +4275,7 @@ const ACT={
   pinOpen(d){startPin(d.g);},
   evGo(){evGo();},
   leaders(){openLeaders();},
+  srvRetry(){srvTries=0;srvLoad();toast('Подключаемся к серверу…');setTimeout(render,2500);},
   ldrView(d){ldrView(d.u,d.id);},
   evSkip(){evSkip();},
   mapForge(d){if(forgeMaps(+d.t)){toast(`Получена карта ${+d.t+1} тира`);openTier(+d.t);render();}},
