@@ -4047,6 +4047,11 @@ function ascPath(id){if(!S.asc||S.ascAlloc.includes(id))return [];const p=[];if(
 function ascAlloc(id){const p=ascPath(id);if(!p.length||ascFree()<p.length)return false;S.ascAlloc.push(...p);save();return true;}
 function ascRefund(id){if(!S.ascAlloc.includes(id))return false;if(id[0]==='s'&&S.ascAlloc.includes('n'+id.slice(1)))return false;S.ascAlloc=S.ascAlloc.filter(x=>x!==id);save();return true;}
 const ascResetCost=()=>R(100+S.lvl*25);
+/* смена возвышения — только в конце пройденного лабиринта (любого, в том числе повторного).
+   Цена растёт с уровнем и с числом изученных узлов возвышения: (300 + 30 × ур.) × (1 + 0,5 × узлов) */
+const ascSwapCost=()=>R((300+S.lvl*30)*(1+.5*(S.ascAlloc||[]).length));
+function swapAsc(id){if(!S.asc||id===S.asc||!ASC[S.cls].some(a=>a.id===id))return false;const c=ascSwapCost();if(S.gold<c)return false;
+  S.gold-=c;S.asc=id;S.ascAlloc=[];selAsc=null;if(labResult)labResult.swapped=1;save();return true;}
 
 /* ---------- верстак ---------- */
 /* свойство мастера занимает место префикса или суффикса — как то же свойство в таблице */
@@ -4209,7 +4214,11 @@ function toast(m){if(typeof document==='undefined')return;let el=document.queryS
 /* ---------- Telegram ---------- */
 function initTG(){
   tg=window.Telegram&&window.Telegram.WebApp;if(!tg)return;
-  try{tg.ready();tg.expand();}catch(e){}
+  try{tg.ready();}catch(e){}
+  /* Telegram Desktop и веб-версии: полноэкранный режим растягивает окно на весь монитор (на двух мониторах — на стык экранов),
+     поэтому на компьютере при запуске выходим из него в обычное окно; на телефоне разворачиваем окно на всю высоту */
+  const desk=/^(tdesktop|macos|weba|webk|web|unigram)$/.test(tg.platform||'');
+  try{if(desk){if(tg.isFullscreen&&tg.exitFullscreen)tg.exitFullscreen();}else tg.expand();}catch(e){}
   try{tg.disableVerticalSwipes&&tg.disableVerticalSwipes();}catch(e){}
   try{tg.setHeaderColor('#14100d');tg.setBackgroundColor('#14100d');}catch(e){}
   try{tg.BackButton.onClick(onBack);}catch(e){}
@@ -4504,7 +4513,23 @@ function showLabWin(){
     <div class="sheet"><div><span>Золото</span><span>+${fmt(r.gold)}</span></div><div><span>Ключи потрачены на сундуки</span><span>${r.keys}</span></div></div>
     <p class="dim small" style="margin:0">Сундуков: ${2+r.keys} (2 + по одному за каждый ключ). Ключи сгорели — в следующий лабиринт они не переходят.</p>
     <div><div class="eyebrow" style="margin-bottom:6px">Сокровищница Изаро</div><div class="list">${r.got.map(lootLine).join('')}${Object.entries(r.orbs).map(([k,v])=>`<div class="r-cur">${ORBS[k].n} ×${v}</div>`).join('')}</div></div>
+    ${S.asc&&!r.swapped?`<div class="panel" style="margin:0"><div class="row"><span class="sp small">Желаете сменить возвышение? Сейчас: <b class="gold-t">${ascDef(S.asc).n}</b>, изучено узлов: ${S.ascAlloc.length}.</span></div>
+      <button class="btn full" data-a="ascSwapAsk" style="margin-top:8px">Сменить возвышение · ${fmt(ascSwapCost())} зол.</button></div>`:''}
     <div class="row">${r.first&&!S.asc?'<button class="btn pri sp" data-a="ascPick">Выбрать возвышение</button>':`<button class="btn pri sp" data-a="leave">${S.done?'В убежище':'В лагерь'}</button>`}</div>`,true);
+}
+/* окно смены возвышения: другие возвышения класса, цена и подтверждение */
+function showAscSwap(pickId){
+  const c=ascSwapCost(),can=S.gold>=c,cur=ascDef(S.asc);
+  if(pickId){const A=ascDef(pickId);
+    modal(`<div class="eyebrow">Смена возвышения</div><h2>${cur.n} → ${A.n}</h2>
+      <p class="muted" style="margin:0">Изученные узлы «${cur.n}» (${S.ascAlloc.length}) будут забыты, очки возвышения вернутся и их можно сразу распределить в «${A.n}».</p>
+      <div class="sheet"><div><span>Цена</span><span class="${can?'gold-t':'bad-t'}">${fmt(c)} зол.</span></div><div><span>У вас</span><span>${fmt(S.gold)} зол.</span></div></div>
+      <div class="row"><button class="btn sp" data-a="ascSwapAsk">‹ Назад</button><button class="btn pri sp" data-a="ascSwap" data-id="${pickId}" ${can?'':'disabled'}>Сменить</button></div>`,true);return;}
+  modal(`<div class="eyebrow">Смена возвышения · ${CLASSES[S.cls].n}</div><h2>Выберите новый путь</h2>
+    <p class="muted" style="margin:0">Сейчас: <b class="gold-t">${cur.n}</b>. Цена смены — ${fmt(c)} зол. (зависит от уровня и числа изученных узлов: (300 + 30 × уровень) × (1 + 0,5 × узлов)). Сменить возвышение можно только в конце лабиринта.</p>
+    <div class="choice">${ASC[S.cls].filter(a=>a.id!==S.asc).map(a=>`<div class="panel"><div class="row"><b class="sp" style="font-family:var(--ff-d);font-size:18px;color:var(--gold2)">${a.n}</b><button class="btn sm pri" data-a="ascSwapPick" data-id="${a.id}">Выбрать</button></div>
+      <p class="muted small" style="margin:4px 0 6px">${a.d}</p><div class="statl small">${ascList(a)}</div></div>`).join('')}</div>
+    <div class="row"><button class="btn sp" data-a="ascSwapBack">‹ К итогам лабиринта</button></div>`,true);
 }
 function showAscChoice(){
   modal(`<div class="eyebrow">Возвышение · ${CLASSES[S.cls].n}</div><h2>Выберите путь</h2>
@@ -4781,7 +4806,7 @@ function vAsc(){
       ${id==='start'?'':on?'<div class="row" style="margin-top:6px"><span class="tag ok">Изучено</span></div>':`<div class="row" style="margin-top:6px"><button class="btn sm pri sp" data-a="ascAlloc" ${free>=p.length?'':'disabled'}>${free>=p.length?(p.length>1?`Изучить путь · ${p.length} очк.`:'Изучить · 1 очко'):`Нужно ${p.length} очк., есть ${free}`}</button></div>`}</div>`;}
   return `<div class="row"><div class="sp"><div class="eyebrow">Возвышение · ${S.labs.filter(Boolean).length}/4 лабиринтов</div><b style="font-family:var(--ff-d);font-size:18px">${AD.n} · свободно <span class="num" style="color:var(--gold2)">${free}</span> из ${ascPoints()}</b></div></div>
     <div class="treebox ascbox"><svg viewBox="-250 -228 500 470" preserveAspectRatio="xMidYMid meet">${ascSvg(AD)}</svg>${info}</div>
-    <p class="dim small" style="margin:0">Каждый узел стоит 1 очко, значимому нужен малый узел перед ним. Лабиринт даёт 2 очка: всего 8 — хватит на 4 значимых умения из 7. Сбросить очки можно у торговца.</p>`;
+    <p class="dim small" style="margin:0">Каждый узел стоит 1 очко, значимому нужен малый узел перед ним. Лабиринт даёт 2 очка: всего 8 — хватит на 4 значимых умения из 7. Сбросить очки можно у торговца, сменить возвышение — в конце любого пройденного лабиринта.</p>`;
 }
 /* ---------- камни ---------- */
 function gemAttrOk(gm,P){const G=gdef(gm.id),sup=GEMS[gm.id]&&GEMS[gm.id].sup;return P.attr[G.c]>=gemAttrReq(gm.lvl,sup);}
@@ -5072,7 +5097,7 @@ function vShop(){
   }else{
     h+=`<div class="panel"><p class="muted" style="margin:0 0 10px">Сбросить все пассивные умения и вернуть очки. Отдельный узел можно забыть прямо в древе.</p>
       <button class="btn full" data-a="resetTree" ${S.gold>=treeResetCost()&&S.alloc.length>1?'':'disabled'}>Сбросить древо · ${fmt(treeResetCost())} зол.</button></div>
-      <div class="panel"><p class="muted" style="margin:0 0 10px">Вернуть очки возвышения (само возвышение не меняется).</p>
+      <div class="panel"><p class="muted" style="margin:0 0 10px">Вернуть очки возвышения (само возвышение не меняется). Сменить возвышение можно в конце любого пройденного лабиринта.</p>
       <button class="btn full" data-a="resetAsc" ${S.gold>=ascResetCost()&&S.ascAlloc.length?'':'disabled'}>Сбросить возвышение · ${fmt(ascResetCost())} зол.</button></div>`;
   }
   return h+'</div>';
@@ -5442,6 +5467,10 @@ const ACT={
   treeSum(){showTreeSum=!showTreeSum;render();},
   treeTab(d){treeTab=d.t;render();},
   ascPick(){showAscChoice();},
+  ascSwapAsk(){if(!labResult||labResult.swapped||!S.asc)return;showAscSwap();},
+  ascSwapPick(d){showAscSwap(d.id);},
+  ascSwapBack(){showLabWin();},
+  ascSwap(d){const old=ascDef(S.asc).n;if(!swapAsc(d.id)){toast('Не хватает золота');return;}closeModal();treeTab='asc';goMain('tree');render();toast(old+' → '+ascDef(S.asc).n+': очки возвышения возвращены');},
   ascChoose(d){chooseAsc(d.id);closeModal();treeTab='asc';goMain('tree');render();toast('Возвышение: '+ascDef(d.id).n);},
   ascSel(d){selAsc=d.id;render();},
   ascAlloc(){if(selAsc&&ascAlloc(selAsc)){haptic('medium');render();}},
