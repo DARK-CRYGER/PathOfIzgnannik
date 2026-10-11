@@ -482,6 +482,26 @@ button.sigil{padding:0;cursor:pointer;color:var(--gold2)}
 .skills.n1 .sk{grid-column:1/-1}
 .mtags{display:inline-flex;gap:1px;margin-left:5px;vertical-align:-1px;opacity:.9;white-space:nowrap}.mti{width:12px;height:12px;flex:none}
 
+/* v6.2: азуритовая шахта */
+.mseg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.mseg button{white-space:normal;background:var(--panel);border:1px solid var(--line);padding:8px 4px;font:700 12.5px/1.15 var(--ff-d);color:var(--muted);min-height:44px}
+.mseg button.on{border-color:var(--gold2);color:var(--gold2);background:#2c2216}
+.panel.mine{background:linear-gradient(135deg,#1d1730,#141019 60%,#2a1a0c);border-color:#4b3c6e}
+.mopts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.mopt{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;background:linear-gradient(#2a2131,#1a1520);border:1px solid #4b3c6e;padding:7px 7px;min-height:96px;color:var(--fg);min-width:0}
+.mopt b{font:700 14px/1.15 var(--ff-d)}.mopt .eyebrow{font-size:9.5px;letter-spacing:.06em}.mopt .mnode{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mopt:disabled{opacity:.5}
+.mnode{font:600 11px var(--ff-b);padding:1px 7px;border-radius:10px;border:1px solid #5a4a80;color:#c9b8ff;background:#211a33}
+.mnode.vein{color:#8fd0ff;border-color:#2e6d99;background:#0f2433}.mnode.city{color:#ffd27a;border-color:#8a6a2a;background:#2a200d}.mnode.boss{color:#ff8a75;border-color:#9a3a2a;background:#2e120d}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:4px}
+.ftile{position:relative;display:flex;align-items:center;justify-content:center;height:46px;background:#1a1410;border:1px solid var(--line2);padding:0}
+.ftile.on{border-color:var(--gold2);background:#3a2a12;box-shadow:inset 0 0 0 1px var(--gold2)}.ftile.none{opacity:.38}
+.ftile span{position:absolute;right:2px;bottom:1px;font-size:10px;color:var(--fg);text-shadow:0 0 3px #000}
+.fsel{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.vein{display:flex;flex-direction:column;align-items:center;gap:1px;width:100%;margin-bottom:4px;padding:6px;background:linear-gradient(#4a3a08,#2a2004);border:1px solid #c9a227;color:#ffe27a;animation:vglow 1.6s ease-in-out infinite alternate}
+.vein small{color:#e8d49a;font-size:11px}
+@keyframes vglow{from{box-shadow:0 0 0 rgba(255,210,80,0)}to{box-shadow:0 0 12px rgba(255,210,80,.45)}}
+.mup .row b{font-family:var(--ff-d)}
+
 </style>
 </head><body>
 <div id="app"></div>
@@ -2002,7 +2022,7 @@ function charInfo(c){const pS=S,pC=C;const o={top:null,b:null};try{S=c;C=null;co
   }catch(e){}S=pS;C=pC;return o;}
 function actOfProgC(c){return c.done?4:BATTLES[Math.min(c.prog||0,BATTLES.length-1)].act;}
 function charTop(c){return charInfo(c).top;}
-function boardOf(){return ACC.chars.map(c=>{const i=charInfo(c);return {id:c.id,name:c.name,cls:c.cls,asc:c.asc,ascN:c.asc&&ascDef(c.asc)?ascDef(c.asc).n:null,lvl:c.lvl,xp:c.xp,top:i.top,b:i.b,maps:c.mapBest||0,dng:c.dngBest||0,pin:Object.keys(c.pinK||{}).filter(k=>c.pinK[k]>0)};});}
+function boardOf(){return ACC.chars.map(c=>{const i=charInfo(c);return {id:c.id,name:c.name,cls:c.cls,asc:c.asc,ascN:c.asc&&ascDef(c.asc)?ascDef(c.asc).n:null,lvl:c.lvl,xp:c.xp,top:i.top,b:i.b,maps:c.mapBest||0,dng:(c.mine&&c.mine.best)||0,pin:Object.keys(c.pinK||{}).filter(k=>c.pinK[k]>0)};});}
 if(typeof window!=='undefined'){window.addEventListener('pagehide',()=>save(true));document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')save(true);});}
 function mainAttr(cls){const a=CLASSES[cls].attr;return ATTR_K[a.indexOf(Math.max(...a))];}
 function newGame(cls,name){
@@ -2055,7 +2075,7 @@ function pointsFree(){return (S.lvl-1)+S.bonus-(S.alloc.length-1);}
 function ascPoints(){return 2*S.labs.filter(Boolean).length;}
 function ascFree(){return ascPoints()-ASC_NODE_COST*S.ascAlloc.length;}
 function actOfProg(){if(S.done)return 4;return BATTLES[Math.min(S.prog,BATTLES.length-1)].act;}
-function resPenalty(){if(C&&(C.B.type==='map'||C.B.type==='dng'))return 30;if(C&&C.B.type==='lab')return [10,20,30,30][C.I.lab];const a=C?C.I.act:actOfProg();return [0,0,0,10,20][a]||0;}
+function resPenalty(){if(C&&(C.B.type==='map'||C.B.type==='mine'))return 30;if(C&&C.B.type==='lab')return [10,20,30,30][C.I.lab];const a=C?C.I.act:actOfProg();return [0,0,0,10,20][a]||0;}
 const itemOk=it=>!it.req||S.lvl>=it.req;
 /* сумма стата по свойствам предмета (старым и новым) */
 function itStat(it,k){let n=0;it.mods.forEach(m=>modStats(m).forEach(([kk,v])=>{if(kk===k&&!Array.isArray(v))n+=v;}));return n;}
@@ -2553,7 +2573,7 @@ const AIL_C={normal:8,magic:12,rare:18,boss:15};
 /* жёлтые (6–10) и красные (11–16) карты: дополнительное здоровье монстров */
 const mapTierHp=t=>t<=5?1:t<=10?1+.06*(t-5):1.3+.07*(Math.min(t,16)-10);
 function mkEnemy(type,lvl,o={}){
-  const M=MONS[type],mt=o.map||0,mI=C&&C.I&&C.I.map&&!C.I.dng&&!C.I.pin?C.I:null;let hp=mHP(lvl)*M.hp*(mt?1.2+.06*mt:1)*(mI?mapTierHp(mI.mtier||mI.mt):1),dmg=mDMG(lvl)*M.dmg*(mt?1+.03*mt:1);
+  const M=MONS[type],mt=o.map||0,mI=C&&C.I&&C.I.map&&!C.I.pin?C.I:null;let hp=mHP(lvl)*M.hp*(mt?1.2+.06*mt:1)*(mI?mapTierHp(mI.mtier||mI.mt):1),dmg=mDMG(lvl)*M.dmg*(mt?1+.03*mt:1);
   const act=C&&C.I&&!C.I.map&&C.I.lab==null?C.I.act:null;
   const e={uid:'e'+(++EUID),type,n:M.n,lvl,el:M.el,k:M.k,hits:M.hits||1,sp:M.sp||1,mv:0,poison:!!M.poison,res:{...(M.res||{})},
     st:{ign:null,ign2:null,poi:[],bleed:[],imp:[],wither:null,blind:0,frozen:0,stun:0,shock:0,chill:0,maim:0,curse:null,curse2:null,mark:null,ee:null,ward:0,tc:0},touched:false,mods:[],rar:'normal'};
@@ -2561,8 +2581,8 @@ function mkEnemy(type,lvl,o={}){
   let arm=(M.arm||1)*(lvl*4+6);
   if(mt)['fire','cold','light'].forEach(k=>e.res[k]=(e.res[k]||0)+10);
   if(mt>=11){['fire','cold','light'].forEach(k=>e.res[k]=(e.res[k]||0)+10);e.res.chaos=(e.res.chaos||0)+10;}
-  const nm=o.rar==='rare'?ri(2,3):o.rar==='magic'?1:0;
-  if(nm){e.rar=o.rar;hp*=o.rar==='rare'?2.6:1.6;dmg*=o.rar==='rare'?1.3:1.12;
+  const nm=(o.rar==='rare'?ri(2,3):o.rar==='magic'?1:0)+(o.xm||0);if(M.idle)e.idle=M.idle;
+  if(nm){if(o.rar==='rare'||o.rar==='magic'){e.rar=o.rar;hp*=o.rar==='rare'?2.6:1.6;dmg*=o.rar==='rare'?1.3:1.12;}
     shuffle(ELITE_MODS).slice(0,nm).forEach(em=>{e.mods.push(em.n);
       if(em.id==='swift')e.hits++;if(em.id==='stone')arm*=3;if(em.id==='vamp')e.vamp=.25;if(em.id==='brutal')dmg*=1.25;if(em.id==='haste')e.sp+=1;
       if(em.id==='regen')e.regen=.015;if(em.id==='fiery')e.fiery=.4;if(em.id==='shielded')hp*=1.4;if(em.id==='frenzy')dmg*=1.15;
@@ -2588,7 +2608,7 @@ function battleInfo(B){
     return {lvl:b.lvl,boss:b.boss,pool:b.pool,name:l[0],sub:`${A.n} · бой ${b.ix+1}/${A.total}`,act:b.act,waves:4};}
   if(B.type==='lab'){const L=S.labRun,LD=LABS[L.n];
     return {lvl:LD.lvl,boss:B.boss?'izaro':null,pool:LAB_MOBS,name:B.boss?'Тронный зал Изаро':ROOMS.fight.n,sub:`${LD.n} · ${B.boss?'финал':'комната '+(L.step+1)+'/'+L.steps.length}`,act:4,lab:L.n,waves:B.boss?1:(L.n>=2?3:2)};}
-  if(B.type==='dng')return {lvl:DNG_LVL,pool:S.dng.pool,name:'Подземелье',sub:'Бесконечные волны',act:5,map:1,mt:16,mtier:16,waves:1e9,dng:1};
+  if(B.type==='mine')return mineInfo(B);
   const m=S.mapRun,lvl=67+m.tier;
   if(m.pin)return {lvl:86,boss:m.pin,pool:m.pool,name:PIN_GROUPS[m.pin].arena,sub:`Пинакл-босс · ${PIN_GROUPS[m.pin].n}`,act:5,map:1,mt:19,mtier:16,waves:1,pin:1};
   if(m.guard)return {lvl:lvl+1,boss:B.step===3?m.guard:null,pool:m.pool,name:m.name,sub:`${PIN_GROUPS[GUARD[m.guard].g].map} ${m.tier} · бой ${B.step+1}/4`,act:5,map:1,mt:m.tier+3,mtier:m.tier,waves:3,hard:1};
@@ -2612,7 +2632,7 @@ function startBattle(B){
 }
 function spawnWave(){
   const I=C.I;C.wave++;C.enemies=[];C.waveActs=0;
-  if(I.dng){dngWave();return;}
+  if(I.mine){mineWave();return;}
   const n=I.map?(I.mt<=5?ri(3,6):I.mt<=10?ri(4,8):ri(5,10)):I.lab!=null?ri(3,4):[[2,3],[2,4],[3,4],[3,5],[3,5]][I.act].reduce((a,b)=>ri(a,b));
   const rareC=I.map?10+I.mt+(I.hard?8:0):I.lab!=null?7+I.lab*3:3+I.act*1.5,magC=I.map?28+(I.hard?10:0):I.lab!=null?22:14+I.act*3;
   const roll3=()=>{const r=Math.random()*100;return r<rareC?'rare':r<rareC+magC?'magic':'normal';};
@@ -2627,6 +2647,7 @@ function spawnWave(){
     logC(`<span class="boss-t">${b.n}</span> преграждает путь!`);}
   else for(let i=0;i<n;i++)C.enemies.push(mkEnemy(pick(I.pool),I.lvl+(Math.random()<.25?1:0),{rar:roll3(),map:I.mt}));
   logC(`<b>Волна ${C.wave}/${C.waves}</b>: ${C.enemies.map(e=>e.n).join(', ')}`);
+  if(I.map)veinCheck();
   C.target=null;autoTarget();
 }
 
@@ -2885,7 +2906,7 @@ function killEnemy(e,P,sk,mk_){
   if(C.corpses&&!e.boss&&MONS[e.type]&&!MONS[e.type].lab){C.corpses.push({type:e.type,v:MONS[e.type].dmg*MONS[e.type].hp*(e.rar==='rare'?1.3:e.rar==='magic'?1.1:1)});if(C.corpses.length>8)C.corpses.shift();}
   const hx=hexOn(e);
   const m=e.mods.length,x=monXp(e);C.xp+=x;gainXp(x);
-  const dngM=C.I.dng?DNG_LOOT:1;
+  const dngM=C.I.mine?mineLootM():1;
   const gold=R((2+e.lvl)*rnd(.5,1.5)*(1+.4*m)*(e.boss?12:1)*(1+(P.goldP+(hx.loot||0))/100)*dngM);C.gold+=gold;S.gold+=gold;
   logC(`${e.n} повержен · +${fmt(x)} опыта, +${gold} зол.`);
   /* заряды флаконов */
@@ -2908,16 +2929,16 @@ function killEnemy(e,P,sk,mk_){
   if(sk&&sk.fn==='infernal'){const exd=e.maxHp*.2;alive().filter(o=>o.d<=1).forEach(o=>{const v=R(exd*(1-(o.res.fire||0)/100));o.hp=Math.max(0,o.hp-v);fx(o.uid,fmt(v),'dot');if(o.hp<=0)killEnemy(o,P);});logC('Взрыв пламени!');}
   /* добыча: каждое свойство монстра увеличивает награды */
   const iir=P.iir+30*m+(C.I.map?50+C.I.mt*5:0)+(e.boss?100:0)+(hx.loot||0)+(C.I.lab!=null?40:0);
-  const drops=e.boss?(C.I.dng?1:3):(Math.random()<.13*(1+.6*m)*dngM?1:0)+(m>=2&&Math.random()<.5*dngM?1:0);
+  const drops=e.boss?3:(Math.random()<.13*(1+.6*m)*dngM?1:0)+(m>=2&&Math.random()<.5*dngM?1:0);
   /* уровень предмета — уровень локации, с босса на 1 выше */
   const il=(C.I&&C.I.lvl||e.lvl)+(e.boss?1:0);
   for(let i=0;i<drops;i++){const it=e.boss&&i===0&&Math.random()<.35?makeUnique(il):dropItem(il,iir);addLoot(it);}
-  const orbN=e.boss?(C.I.dng?1:ri(2,4)):(Math.random()<.06*(1+.6*m)*dngM?1:0);
+  const orbN=e.boss?ri(2,4):(Math.random()<.06*(1+.6*m)*dngM?1:0);
   for(let i=0;i<orbN;i++)addOrb(rollOrb());
   if(e.rar==='magic'&&Math.random()<.0035)addOrb('crutch');
   if(!C.I.map&&Math.random()<(e.boss?.5:.02*(1+.5*m))){const pool=[...ACTIVE_IDS,...SUPPORT_IDS,...AURA_IDS,...HEX_IDS].filter(obtainable);if(pool.length){const id=pick(pool);
     addGem(id,Math.max(1,maxGemLvl(S.lvl)-3));logC(`Выпал камень: <span class="r-gem">${gdef(id).n}</span>`);C.loot.push({gem:true,name:gdef(id).n});}}
-  if(!C.I.dng)dropMaps(e,m);
+  if(!C.I.mine)dropMaps(e,m);else mineKill(e,m);
   if(e.guardian){const G=GUARD[e.guardian];S.frag[e.guardian]=(S.frag[e.guardian]||0)+1;C.loot.push({frag:1,name:G.frag});logC(`Выпал <span class="r-unique">${G.frag}</span>`);
     if(roll(25)){const it=makeUnique(e.lvl);addLoot(it);}}
   if(e.pinnacle){S.pinK[e.pinnacle]=(S.pinK[e.pinnacle]||0)+1;const pool=PIN_UNIQUES[e.pinnacle],n=roll(35)?2:1;
@@ -3211,21 +3232,24 @@ function enemySpeed(e,P){if(e.st.chill&&P.U.u_frostbind)return 0;const hx=hexOn(
 function enemyAct(e,P){
   if(e.st.frozen){e.st.frozen=0;logC(`${e.n} заморожен и пропускает ход`);return;}
   if(e.st.stun){e.st.stun=0;logC(`${e.n} оглушён и пропускает ход`);return;}
+  if(e.idle){mineIdle(e);return;}
   const hx=hexOn(e);
   if(hx.skip3&&!e.boss){e.st.tc++;if(e.st.tc%3===0){logC(`${e.n} скован временем и пропускает ход`);return;}}
-  if(e.boss){e.turn++;
+  if(e.boss){if(e.mineBoss&&mineBossPre(e,P))return;e.turn++;
     const ph=e.boss.phases&&e.boss.phases[e.phase||0];
     if(ph&&e.hp<e.maxHp*ph.at){e.phase=(e.phase||0)+1;logC(`<span class="boss-t">${ph.name}!</span>`);
       if(ph.summon)ph.summon.forEach(id=>{const m=mkEnemy(id,e.lvl-2,{d:ri(1,3),map:C.I.mt});m.maxHp=m.hp=R(m.hp*.28);m.dmg*=.75;m.summoned=1;m.boss={...m.boss,spec:m.boss.spec.slice(0,1)};C.enemies.push(m);});
       if(ph.ward){e.st.ward=ph.ward+1;}
       if(ph.hex)C.fb.push({slot:'hx'+e.uid+e.phase,name:ph.name,eff:hexYou(ph.hex,P),turns:ph.t||3,bad:1});
+      if(e.mineBoss)minePhase(e,ph);
       return;}
     if(e.boss.heal&&!e.healed&&e.hp<e.maxHp*.5){e.healed=true;const h=R(e.maxHp*e.boss.heal);e.hp+=h;fx(e.uid,'+'+fmt(h),'heal');logC(`${e.n} исцеляется на ${fmt(h)}`);return;}
     const sp=e.boss.spec.slice().reverse().find(s=>e.turn%s.every===0);
     if(sp){logC(`<span class="boss-t">${e.n}: ${sp.name}!</span>`);
+      if(e.mineBoss&&mineSpec(e,sp,P))return;
       if(sp.type==='pull'){hurtPlayer(e,e.dmg*sp.m,e.el,'ranged',P,false,e.mix);if(e.d>0){e.d=0;logC('Вас подтягивает вплотную');}return;}
       if(sp.type==='nuke'){hurtPlayer(e,e.dmg*sp.m*.5,e.el,'spell',P);hurtPlayer(e,e.dmg*sp.m*.5,sp.el,'spell',P);return;}
-      if(sp.type==='summon'){const n=Math.min(sp.n,6-alive().length);for(let i=0;i<n;i++){const m=mkEnemy(sp.mon,e.lvl-1,{d:ri(2,3),map:C.I.mt});m.summoned=1;C.enemies.push(m);}return;}
+      if(sp.type==='summon'){const n=Math.min(sp.n,6-alive().length);for(let i=0;i<n;i++){const m=mkEnemy(sp.mon,e.lvl-1,{d:ri(2,3),map:C.I.mt});if(C.I.mine){const dp=mineDeep(C.I.depth);m.maxHp=m.hp=R(m.hp*dp.hp);m.dmg*=dp.dmg;}m.summoned=1;C.enemies.push(m);}return;}
       if(sp.type==='ward'){e.st.ward=sp.t+1;logC(`${e.n} получает вдвое меньше урона ${sp.t} хода`);return;}
       if(sp.type==='burn'){const el=sp.el||'fire',d=e.dmg*sp.m*(1-(P.res[el]||0)/100)*(C.cure?0:1);if(d>0){C.burn={d:R(d),t:sp.t};logC(`Земля под вами горит: ${fmt(d)} урона за ход, ${sp.t} хода`);}else logC('Очищение защищает вас');return;}
       if(sp.type==='hex'){const ef=hexYou(sp.eff,P);C.fb=C.fb.filter(b=>b.slot!=='hx'+e.uid);C.fb.push({slot:'hx'+e.uid,name:sp.name,eff:ef,turns:sp.t,bad:1});
@@ -3248,7 +3272,7 @@ function enemyAct(e,P){
 /* множитель урона врага от состояний: охлаждение, проклятия */
 /* ауры врагов: действуют на союзников на своей и соседних дистанциях */
 function enemyAura(e,k){let v=0;if(!C)return 0;for(const a of C.enemies)if(a.hp>0&&a.aura&&a.aura[k]&&Math.abs(a.d-e.d)<=1)v+=a.aura[k];return v;}
-function enemyOut(e,P){const hx=hexOn(e);let m=1+enemyAura(e,'fury')/100;
+function enemyOut(e,P){const hx=hexOn(e);let m=(1+enemyAura(e,'fury')/100)*(e.spireM||1);
   if(e.st.chill)m*=.85*(1-(P.t.ex_chillEff||0)/100);
   if(hx.weak)m*=1-(e.boss?hx.weak/2:hx.weak)/100;
   if(e.st.wither&&false)m*=1;
@@ -3407,7 +3431,7 @@ function endRound(P){
 let pendingReward=null;
 async function waveCleared(){
   C.busy=true;save();
-  if(C.wave<C.waves){if(!C.I.dng)logC(`<b class="gold-t">Волна ${C.wave} зачищена</b>`);render();await sleep(700);if(!C||C.over)return;
+  if(C.wave<C.waves){logC(`<b class="gold-t">Волна ${C.wave} зачищена</b>`);render();await sleep(700);if(!C||C.over)return;
     const P=calc();
     /* ход, в котором добита волна, тоже восстанавливает ману, здоровье и щит, плюс передышка между волнами */
     regenTick(P);C.mana=Math.min(P.mana,C.mana+P.mana*.15);
@@ -3415,7 +3439,7 @@ async function waveCleared(){
     if(P.t.ex_flaskWave)C.fl.forEach(f=>{if(!f)return;const st=flaskStats(S.equip[f.slot],P);f.ch=Math.min(st.max,f.ch+P.t.ex_flaskWave);});
     C.fb.forEach(b=>b.turns--);C.fb=C.fb.filter(b=>b.turns>0);
     if(C.ev&&C.ev.fight){if(evWaveDone())return;}
-    if(C.I.dng)dngCleared();
+    if(C.I.mine){if(mineWaveDone())return;}
     else if(C.I.map&&!C.I.pin&&!C.evDone&&roll(EVENT_CH)){C.evDone=1;offerEvent();return;}
     spawnWave();C.busy=false;render();if(C.auto)scheduleAuto();return;}
   if(C.ev&&C.ev.fight){if(evWaveDone())return;}
@@ -3434,6 +3458,7 @@ async function battleWon(){
       if(B.g===BATTLES.length-1&&!S.done){S.done=true;S.maps[1]=(S.maps[1]||0)+2;note='Кампания пройдена! Открыто убежище с устройством картографа (+2 карты 1 тира) и Беспощадный лабиринт. Все умения теперь доступны.';}
     }
     if(S.prog<BATTLES.length)cont={type:'camp',g:S.prog};
+  }else if(B.type==='mine'){save();mineNodeWon();return;
   }else if(B.type==='lab'){
     const L=S.labRun,P=calc();L.hp=clamp(C.hp/P.life,.05,1);L.fl=C.fl.map(f=>f?f.ch:null);
     if(B.boss){save();finishLab();return;}
@@ -3450,7 +3475,7 @@ async function death(){
   C.over=true;C.busy=true;S.deaths++;S.mkeep=[];let loss=0;
   if(C.B.type==='map'){loss=R(xpNeed(S.lvl)*.1);S.xp=Math.max(0,S.xp-loss);S.mapRun=null;}
   if(C.B.type==='lab')S.labRun=null;
-  if(C.B.type==='dng')S.dng=null;
+  if(C.B.type==='mine'){loss=R(xpNeed(S.lvl)*.1);S.xp=Math.max(0,S.xp-loss);mineEnd(true);}
   logC('<b class="bad-t">Вы пали</b>');
   save();notifyH('error');showDeath(loss);
 }
@@ -3460,10 +3485,12 @@ function expHit(e,raw,P,kind,el){const M=el&&el!==e.el?{[el]:1}:e.mix||{[e.el]:1
 function intent(e,P){
   if(e.hp<=0)return null;
   if(e.st.frozen||e.st.stun)return {t:'Пропустит ход',c:'ok'};
+  if(e.idle)return {t:'Питает Аула',c:'warn'};
   const hx=hexOn(e);if(hx.skip3&&!e.boss&&(e.st.tc+1)%3===0)return {t:'Пропустит ход',c:'ok'};
   const om=enemyOut(e,P),stn=e.stunner&&!P.keys.has('k_unwaver')?' ⚡':'';
   if(e.boss){const nt=e.turn+1;if(e.boss.heal&&!e.healed&&e.hp<e.maxHp*.5)return {t:'Исцелится',c:'warn'};
     const sp=e.boss.spec.slice().reverse().find(s=>nt%s.every===0);
+    if(sp&&sp.type==='blind')return {t:`Готовит: ${sp.name} — сделайте шаг, чтобы уклониться`,c:'bad'};
     if(sp)return {t:`Готовит: ${sp.name}`+(sp.type==='nuke'||sp.type==='pull'?` ~${fmt((expHit(e,e.dmg*sp.m*.5,P,'spell')+expHit(e,e.dmg*sp.m*.5,P,'spell',sp.el||e.el))*om)}`:''),c:'bad'};}
   if(e.k==='melee'){
     if(e.d>0){const spd=enemySpeed(e,P);if(spd<=0)return {t:'Скован',c:''};const st=Math.floor(e.mv+spd);return st>0?{t:`Идёт → ${DIST[Math.max(0,e.d-st)].toLowerCase()}`,c:''}:{t:'Замедлен, не дойдёт',c:'ok'};}
@@ -3476,6 +3503,7 @@ let autoT=null;
 function scheduleAuto(){clearTimeout(autoT);autoT=setTimeout(autoStep,window.FAST?0:450);}
 function autoStep(){
   if(!C||!C.auto||C.busy||C.over)return;
+  if(C.vein)mineVein();
   const P=calc();
   C.fl.forEach((f,k)=>{if(!f)return;const it=S.equip[f.slot],st=flaskStats(it,P);if(f.ch<st.use)return;
     if(st.type==='life'&&C.hp<P.life*.5)useFlask(k);
@@ -3813,8 +3841,13 @@ function afxRoll(it){
   const B=AFX_P[afxBase(it)];if(!B)return false;
   const have=new Set(it.mods.filter(isAfx).map(m=>m.g)),L=afxLimit(it),np=afxUsed(it,'p'),ns=afxUsed(it,'s');
   const cand=[];let tot=0;
+  const RU=typeof AFX_RULE!=='undefined'?AFX_RULE:null;
   B.forEach(([g,tl])=>{const G=AFX_G[g];if(!G||G.old||have.has(g))return;if((G.a==='p'?np:ns)>=L)return;
-    afxTierPool(AFX_T[tl],it.ilvl).forEach(([row,w])=>{cand.push([g,row,w]);tot+=w;});});
+    /* станок ископаемых: только префиксы/суффиксы, метки (чаще, только эти или без них), лучшие тиры */
+    let mult=1;if(RU){if(RU.side&&G.a!==RU.side)return;if(RU.tags.length){const tg=afxGTags(g),any=RU.tags.some(t=>tg.includes(t));
+      if(RU.mode==='same'&&!any)return;if(RU.mode==='not'&&any)return;if(RU.mode==='more'&&any)mult=RU.tags.every(t=>tg.includes(t))?15:10;}}
+    let pool=afxTierPool(AFX_T[tl],it.ilvl);if(RU&&RU.perf)pool=pool.slice(0,2);
+    pool.forEach(([row,w])=>{cand.push([g,row,w*mult]);tot+=w*mult;});});
   if(!cand.length)return false;
   let r=Math.random()*tot,pick_=cand[0];for(const c of cand){r-=c[2];if(r<=0){pick_=c;break;}}
   const [g,row]=pick_,G=AFX_G[g];
@@ -4009,7 +4042,7 @@ function startMap(tier){
   if(!(S.maps[tier]>0)){toast('Нет карты этого тира');return;}
   S.maps[tier]--;
   const pool=shuffle(ALL_MOBS).slice(0,3);
-  S.mapRun={tier,step:0,pool,boss:pick(BOSSES),name:pick(MAP_NAMES)};save();startBattle({type:'map',step:0});
+  S.mapRun={tier,step:0,pool,boss:pick(BOSSES),name:pick(MAP_NAMES),sv:mapVeins()};save();startBattle({type:'map',step:0});
 }
 /* ---------- карты защитников и пинакл-боссы ---------- */
 const gmapCount=()=>Object.values(S.gmaps||{}).reduce((a,b)=>a+b,0);
@@ -4017,7 +4050,7 @@ function startGMap(key){
   if(!(S.gmaps[key]>0)||S.mapRun)return false;const [g,t]=key.split('|');S.gmaps[key]--;if(!S.gmaps[key])delete S.gmaps[key];
   /* босс — один из четырёх; чаще тот, чьего фрагмента ещё нет */
   const gs=PIN_GROUPS[g].guards,miss=gs.filter(x=>!(S.frag[x]>0)),id=miss.length&&roll(60)?pick(miss):pick(gs);
-  S.mapRun={tier:+t,step:0,pool:shuffle(ALL_MOBS).slice(0,3),guard:id,boss:id,name:'Логово: '+MONS[id].n};save();startBattle({type:'map',step:0});return true;
+  S.mapRun={tier:+t,step:0,pool:shuffle(ALL_MOBS).slice(0,3),guard:id,boss:id,name:'Логово: '+MONS[id].n,sv:mapVeins()};save();startBattle({type:'map',step:0});return true;
 }
 const pinReady=g=>PIN_GROUPS[g].guards.every(id=>(S.frag[id]||0)>0);
 function startPin(g){
@@ -4292,31 +4325,233 @@ const AUC={
 /* выдаём вещи с аукциона новым uid, чтобы не было совпадений между игроками */
 function aucReceive(it){const c=JSON.parse(JSON.stringify(it));c.uid=newUid();c.isNew=1;delete c.fav;afxMigrate(c);return c;}
 
-/* ---------- Подземелье: волны без конца, пока герой жив ----------
-   Монстры с 83 уровня и с каждой волной сильнее; число врагов растёт до 15.
-   Награды за убийства урезаны (золото, вещи, сферы — 35%), зато каждые 5 волн — сундук со сферами, каждые 10 — карта. */
-const DNG_LVL=83,DNG_LOOT=.35;
-const dngCount=w=>Math.min(15,3+Math.floor((w-1)/2));
-const dngScale=w=>Math.pow(1.07,w-1);
-const dngLvl=w=>Math.min(90,DNG_LVL+Math.floor((w-1)/5));
-function startDungeon(){if(!S.done)return false;S.dng={pool:shuffle(ALL_MOBS).slice(0,4)};save();startBattle({type:'dng'});return true;}
-function dngWave(){const w=C.wave,lvl=dngLvl(w),sc=dngScale(w);
-  if(w>1&&(w-1)%5===0)S.dng.pool=shuffle(ALL_MOBS).slice(0,4);
-  const rareC=Math.min(55,12+w*1.5),magC=35;
-  const n=dngCount(w);
+
+/* =========================================================
+   АЗУРИТОВАЯ ШАХТА: сульфур с карт, бесконечный спуск, азурит, ископаемые, боссы шахты
+   Глубина 1 — 68 уровень монстров, каждые 10 глубин +1 уровень, с 151 глубины — 83 (предел).
+   После 160 глубины монстры сильнее с каждой глубиной и получают дополнительные свойства.
+   ========================================================= */
+const MINE_LVL_MAX=83,MINE_DEEP=160,SULPH_START=150;
+const mineLvl=d=>Math.min(MINE_LVL_MAX,68+Math.floor((d-1)/10));
+/* первая доступная глубина по лучшей пройденной карте: тир 4 (71 уровень) → 31 глубина */
+const mineStartDepth=t=>t>0?(Math.min(t,16)-1)*10+1:1;
+function MN(){if(!S.mine)S.mine={best:0,su:0,az:0,up:{},fos:{},init:0,fights:0,bossK:{}};const M=S.mine;M.up=M.up||{};M.fos=M.fos||{};M.bossK=M.bossK||{};return M;}
+function mineSync(){const M=MN();M.best=Math.max(M.best||0,mineStartDepth(S.mapBest||0)-1);if(!M.init){M.init=1;M.su=Math.max(M.su||0,SULPH_START);}return M;}
+
+/* ---------- улучшения шахты (за азурит) ---------- */
+const MINE_UP={
+  sulph:{n:'Экономная крепь',d:l=>`Спуск тратит на ${l*5}% меньше сульфура`,max:10,c:40},
+  cap:{n:'Сульфуровые бочки',d:l=>`Вместимость сульфура: ${mineCap(l)}`,max:10,c:30},
+  yield:{n:'Сульфуровый бур',d:l=>`+${l*12}% сульфура с жил на картах`,max:10,c:40},
+  azur:{n:'Азуритовый бур',d:l=>`+${l*10}% азурита`,max:10,c:50},
+  boss:{n:'Чутьё на боссов',d:l=>`Шанс узла с боссом шахты: ${(2+l*.5).toFixed(1)}% (с 151 глубины)`,max:10,c:80},
+  fosCh:{n:'Глаз рудокопа',d:l=>`+${l*12}% к шансу найти ископаемые и сундуки`,max:10,c:50},
+  fosN:{n:'Крепкие кирки',d:l=>`${l*8}% шанс, что ископаемое выпадет вдвое`,max:10,c:60},
+  scout:{n:'Карта ходов',d:l=>`+${l*2}% шанс узла с жилой азурита или подземным городом`,max:5,c:60},
+  light:{n:'Фонари',d:l=>`Монстры в шахте наносят на ${l*2}% меньше урона`,max:10,c:60},
+};
+const MINE_UP_IDS=Object.keys(MINE_UP);
+const upL=k=>(S&&S.mine&&S.mine.up&&S.mine.up[k])||0;
+const mineUpCost=k=>R(MINE_UP[k].c*Math.pow(1.5,upL(k)));
+function mineUpgrade(k){const U=MINE_UP[k],M=MN();if(!U||upL(k)>=U.max)return false;const c=mineUpCost(k);if(M.az<c)return false;M.az-=c;M.up[k]=upL(k)+1;save();return true;}
+const mineCap=l=>600+150*(l==null?upL('cap'):l);
+const mineCost=d=>Math.max(5,R((30+d*.4)*(1-.05*upL('sulph'))));
+const veinSulph=t=>R((20+8*t)*rnd(.85,1.15)*(1+.12*upL('yield')));
+const mineAzur=d=>R((10+d*.35)*rnd(.85,1.15)*(1+.1*upL('azur')));
+function addSulph(n){const M=MN(),cap=mineCap(),was=M.su;M.su=Math.min(cap,M.su+n);return M.su-was;}
+
+/* ---------- жилы сульфура на картах: 25% карт, три жилы на карту ---------- */
+const VEIN_CH=25;
+function mapVeins(){if(!roll(VEIN_CH))return null;const slots=[];for(let s=0;s<4;s++)for(let w=1;w<=3;w++)if(!(s===3&&w===3))slots.push(s+'|'+w);return shuffle(slots).slice(0,3);}
+function veinCheck(){const m=S.mapRun;if(!m||!m.sv||!C.I.map||C.I.mine||C.I.pin)return;const k=m.step+'|'+C.wave;if(m.sv.includes(k)){m.sv=m.sv.filter(x=>x!==k);C.vein={k,t:m.tier};logC('<span class="gold-t">Рядом жила сульфура — нажмите на неё, чтобы добыть</span>');}}
+function mineVein(){if(!C||!C.vein)return false;const v=C.vein;C.vein=null;
+  const a=veinSulph(v.t),got=addSulph(a);
+  logC(`<span class="gold-t">Жила сульфура</span>: +${fmt(got)} сульфура${got<a?` (хранилище полно: ${fmt(mineCap())})`:''}`);fx('me','+'+got+' сульфура','heal');
+  if(!C.mineSu)C.mineSu=0;C.mineSu+=got;save();render();return true;}
+
+/* ---------- узлы шахты ---------- */
+const MINE_NODE={fight:{n:'Штольня',d:'Бой: 2 волны'},vein:{n:'Азуритовая жила',d:'Бой: 2 волны, затем азурит'},city:{n:'Подземный город',d:'4 волны, больше монстров и добычи'},boss:{n:'Логово босса',d:'Бой с боссом шахты'}};
+const MINE_BOSSES=['aul','kurgal','ahuat'];
+function mineRollNode(d){const sc=upL('scout')*2;
+  if(mineLvl(d)>=MINE_LVL_MAX&&roll(2+.5*upL('boss')))return {node:'boss',boss:pick(MINE_BOSSES)};
+  const r=Math.random()*100;return {node:r<20+sc?'vein':r<28+sc*1.5?'city':'fight'};}
+function mineOpts(d){const o=[{dir:'fwd',d:d+1,...mineRollNode(d+1)},{dir:'stay',d,...mineRollNode(d)}];if(d>1)o.push({dir:'back',d:Math.max(1,d-10),...mineRollNode(Math.max(1,d-10))});return o;}
+const MINE_DIR={fwd:'Спуститься на этаж',stay:'Дальше по этажу',back:'На 10 этажей назад'};
+/* старт спуска: выбранная глубина — от 1 до глубочайшей пройденной + 1 */
+function mineStart(d){const M=mineSync();d=Math.round(+d);if(!(d>=1&&d<=M.best+1)){toast(`Можно выбрать глубину от 1 до ${M.best+1}`);return false;}
+  if(S.mapRun||S.labRun){toast('Сначала завершите карту или лабиринт');return false;}
+  const c=mineCost(d);if(M.su<c){toast(`Нужно ${c} сульфура, есть ${fmt(M.su)}`);return false;}
+  M.su-=c;S.mineRun={depth:d,...mineRollNode(d),pool:shuffle(ALL_MOBS).slice(0,3),fights:0};save();startBattle({type:'mine'});return true;}
+function mineGo(i){const R0=S.mineRun,M=MN();if(!R0||!R0.opts)return false;const o=R0.opts[i];if(!o)return false;
+  const c=mineCost(o.d);if(M.su<c){toast(`Нужно ${c} сульфура, есть ${fmt(M.su)}`);return false;}
+  M.su-=c;Object.assign(R0,{depth:o.d,node:o.node,boss:o.boss||null,pool:shuffle(ALL_MOBS).slice(0,3),opts:null});save();startBattle({type:'mine'});return true;}
+function mineEnd(){S.mineRun=null;save();}
+function mineInfo(B){const R0=S.mineRun,d=R0.depth,lvl=mineLvl(d),t=Math.max(1,lvl-67),nd=R0.node;
+  return {lvl,pool:R0.pool,name:nd==='boss'?MONS[R0.boss].n:MINE_NODE[nd].n,sub:`Азуритовая шахта · глубина ${d}`,act:5,map:1,mt:t,mtier:t,
+    waves:nd==='city'?4:nd==='boss'?1:2,mine:1,depth:d,node:nd,mboss:nd==='boss'?R0.boss:null};}
+/* после 160 глубины: здоровье и урон растут с каждой глубиной, каждые 35 глубин — ещё одно свойство монстрам (до 4) */
+function mineDeep(d){const x=Math.max(0,d-MINE_DEEP);return {hp:Math.pow(1.022,x),dmg:Math.pow(1.012,x),xm:x>0?Math.min(4,1+Math.floor(x/35)):0};}
+function mineWave(){const I=C.I,d=I.depth,dp=mineDeep(d),lt=1-.02*upL('light');C.vein=null;
+  if(I.node==='boss'){const b=mkEnemy(I.mboss,I.lvl+1,{map:I.mt});b.maxHp=b.hp=R(b.hp*dp.hp);b.dmg*=dp.dmg*lt;b.mineBoss=I.mboss;b.phase=0;C.enemies.push(b);
+    logC(`<span class="boss-t">${b.n}</span> пробуждается в глубине ${d}!`);logC(`<span class="dim">${MONS[I.mboss].hint}</span>`);C.target=null;autoTarget();return;}
+  const city=I.node==='city',n=Math.min(city?10:9,ri(4,7)+(city?3:0)+(d>MINE_DEEP?1:0));
+  const rareC=12+I.mt+(city?10:0)+Math.min(20,Math.max(0,d-MINE_DEEP)/8),magC=30;
   for(let i=0;i<n;i++){const r=Math.random()*100,rar=r<rareC?'rare':r<rareC+magC?'magic':'normal';
-    const e=mkEnemy(pick(S.dng.pool),lvl,{rar,map:16});e.maxHp=e.hp=R(e.hp*sc);e.dmg*=Math.pow(1.045,w-1);C.enemies.push(e);}
-  if(w%10===0){const b=mkEnemy(pick(BOSSES),lvl+1,{map:16});b.maxHp=b.hp=R(b.hp*sc);b.dmg*=Math.pow(1.045,w-1);C.enemies.push(b);logC(`<span class="boss-t">${b.n}</span> стережёт ${w}-ю волну!`);}
-  logC(`<b>Подземелье · волна ${w}</b>: ${C.enemies.length} врагов, уровень ${lvl}`);
-  C.target=null;autoTarget();}
-function dngCleared(){const w=C.wave;S.dngBest=Math.max(S.dngBest||0,w);
-  logC(`<b class="gold-t">Волна ${w} пройдена</b>${w===S.dngBest?' · новый рекорд':''}`);
-  if(w%5===0){const pool=['chaos','chaos','alch','regal','alt','annul','exalt','divine'],n=1+Math.floor(w/15);
-    for(let i=0;i<n;i++)addOrb(w>=20&&roll(30)?pick(['exalt','divine','annul']):pick(pool));}
-  if(w%10===0)addMap(Math.min(16,1+Math.floor(w/4)));
-  save();}
-let dngTop=null,dngTopAt=0;
-function dngFetch(){if(!srvOn()||Date.now()-dngTopAt<30000)return;dngTopAt=Date.now();srvReq('/dungeon').then(r=>{dngTop=r.best||null;if(screen==='sub'&&sub==='dungeon')render();}).catch(()=>{});}
+    const e=mkEnemy(pick(I.pool),I.lvl+(roll(25)?1:0),{rar,map:I.mt,xm:dp.xm});e.maxHp=e.hp=R(e.hp*dp.hp);e.dmg*=dp.dmg*lt;C.enemies.push(e);}
+  logC(`<b>Глубина ${d} · волна ${C.wave}/${C.waves}</b>: ${C.enemies.map(e=>e.n).join(', ')}`);C.target=null;autoTarget();}
+/* подземный город: золото, вещи и сферы ×1,6 */
+const mineLootM=()=>C&&C.I&&C.I.node==='city'?1.6:1;
+function mineWaveDone(){mineChest();return false;}
+function mineChest(){const d=C.I.depth;if(!roll(5*(1+.12*upL('fosCh'))*(C.I.node==='city'?2:1)))return;
+  logC('<span class="gold-t">Среди камней — сундук с ископаемыми!</span>');const n=ri(2,4);for(let i=0;i<n;i++)mineFossilDrop(d);}
+function mineNodeWon(){const R0=S.mineRun,M=MN(),d=R0.depth,got=[];
+  if(R0.node==='vein'||R0.node==='city'){const a=R(mineAzur(d)*(R0.node==='city'?.5:1));M.az+=a;C.mineAz=(C.mineAz||0)+a;got.push(`+${fmt(a)} азурита`);}
+  mineChest();
+  if(d>M.best){M.best=d;got.push(`новая глубина: ${d}`);}
+  M.fights=(M.fights||0)+1;R0.fights=(R0.fights||0)+1;R0.opts=mineOpts(d);
+  save();showMineWin(got.join(' · '));}
+/* добыча шахты с монстров: ископаемые; с боссов — ещё и ископаемые боссов и уникальные предметы */
+function mineKill(e,m){const d=C.I.depth;
+  if(e.mineBoss){M_bossLoot(e);return;}
+  const ch=(e.rar==='rare'?2.5:e.rar==='magic'?1:.5)*(1+.12*upL('fosCh'))*(C.I.node==='city'?1.5:1);
+  if(Math.random()*100<ch)mineFossilDrop(d);}
+function M_bossLoot(e){const M=MN(),d=C.I.depth,id=e.mineBoss;M.bossK[id]=(M.bossK[id]||0)+1;
+  const nb=roll(40)?2:1;for(let i=0;i<nb;i++)mineFossilDrop(d,true);
+  const nr=ri(3,5);for(let i=0;i<nr;i++)mineFossilDrop(d);
+  const a=R(mineAzur(d)*2);M.az+=a;C.mineAz=(C.mineAz||0)+a;logC(`+${fmt(a)} азурита`);
+  if(roll(55)){const u=pick(MINE_UNIQUES[id]),it=makeUnique(84,u);it.mineU=id;addLoot(it);logC(`Уникальный предмет босса шахты: <span class="r-unique">${esc(it.name)}</span>`);}
+  for(let i=0;i<3;i++)addOrb(pick(['exalt','divine','chaos','annul']));}
+
+/* ---------- ископаемые ---------- */
+/* метки → ископаемые; чем реже свойства метки, тем глубже ископаемое и реже выпадает (самые редкие — с 300 глубины) */
+const FOSSILS=[
+  {id:'same',n:'Ископаемое сходства',ic:'same',kind:'mode',minD:1,w:55,d:'С ископаемыми меток: выпадают только свойства с этими метками'},
+  {id:'not',n:'Ископаемое отрицания',ic:'not',kind:'mode',minD:1,w:55,d:'С ископаемыми меток: свойства с этими метками не выпадают'},
+  ...[['life','Первозданное',1,40],['def','Плотное',1,40],['res','Оберегающее',1,40],['attr','Кристаллическое',1,36],
+    ['atk','Зубчатое',15,32],['phys','Рваное',15,32],['mana','Светящееся',15,32],
+    ['es','Мерцающее',40,27],['fire','Опалённое',40,27],['cold','Ледяное',40,27],['light','Металлическое',40,27],
+    ['spell','Эфирное',80,21],['chaos','Аберрантное',80,21],['flask','Стеклянное',80,19],['loot','Золотоносное',80,17],
+    ['ail','Разъедающее',130,15],['speed','Дрожащее',180,12],['crit','Острое',240,9],['minion','Связующее',240,9],['gem','Гранёное',300,6]]
+    .map(([t,n,minD,w])=>({id:'t_'+t,tag:t,ic:t,n:n+' ископаемое',kind:'tag',minD,w,d:`Свойства с меткой «${MTAG_N[t]}» выпадают в 10 раз чаще`})),
+  {id:'pre',n:'Ископаемое начала',ic:'pre',kind:'side',boss:1,minD:151,w:40,d:'Меняются только префиксы, суффиксы не трогаются'},
+  {id:'suf',n:'Ископаемое окончания',ic:'suf',kind:'side',boss:1,minD:151,w:40,d:'Меняются только суффиксы, префиксы не трогаются'},
+  {id:'sanct',n:'Освящённое ископаемое',ic:'sanct',kind:'val',boss:1,minD:200,w:22,d:'После сферы числовые значения свойств перебрасываются: из двух бросков остаётся лучший'},
+  {id:'perf',n:'Безупречное ископаемое',ic:'perf',kind:'tier',boss:1,minD:300,w:10,d:'Новые свойства — только лучший или предшествующий ему тир, доступный на базе предмета'},
+];
+const FOS=Object.fromEntries(FOSSILS.map(f=>[f.id,f]));
+function mineFossilDrop(d,boss){const M=MN();const pool=FOSSILS.filter(f=>!!f.boss===!!boss&&f.minD<=d);if(!pool.length)return;
+  const tot=pool.reduce((a,f)=>a+f.w,0);let r=Math.random()*tot,f=pool[0];for(const x of pool){r-=x.w;if(r<=0){f=x;break;}}
+  const n=1+(roll(8*upL('fosN'))?1:0);M.fos[f.id]=(M.fos[f.id]||0)+n;
+  if(C&&C.loot){C.loot.push({frag:1,name:f.n+(n>1?' ×'+n:'')});logC(`Ископаемое: <span class="r-unique">${f.n}</span>${n>1?' ×'+n:''}`);}}
+/* значки ископаемых: кусок оранжевого кристалла, внутри — значок метки или особый знак */
+const FOS_IC={
+  same:'M7 9h10M7 15h10',not:'M12 6a6 6 0 1 0 0 12a6 6 0 0 0 0-12M8 16l8-8',
+  pre:'M7 6v12M11 12h7M14 9l-3 3 3 3',suf:'M17 6v12M6 12h7M10 9l3 3-3 3',
+  sanct:'M12 5v14M7 10h10M8 18h8',perf:'M5 16l2-8 5 4 5-4 2 8z'};
+function fosSvg(id,sz){const f=FOS[id];if(!f)return '';const t=f.kind==='tag'?MTAGS.find(x=>x[0]===f.tag):null,p=t?t[3]:FOS_IC[f.ic],col=t?'#3a1604':'#3a1604';
+  const gid='fg'+id;
+  return `<svg class="fos" viewBox="0 0 32 32" width="${sz||32}" height="${sz||32}" aria-hidden="true"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffd27a"/><stop offset=".55" stop-color="#f28a2e"/><stop offset="1" stop-color="#a8460f"/></linearGradient></defs>
+    <path d="M9 3l11-1 8 9-3 15-10 4-10-8L3 11z" fill="url(#${gid})" stroke="#5a2306" stroke-width="1.2"/><path d="M9 3l5 9 14-1M14 12l1 18M14 12L3 11" fill="none" stroke="#ffe7b0" stroke-opacity=".35" stroke-width=".8"/>
+    <g transform="translate(7 7) scale(.75)"><path d="${p}" fill="none" stroke="${col}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></g>${f.boss?'<circle cx="26" cy="6" r="3" fill="#c33" stroke="#3a1604" stroke-width=".8"/>':''}</svg>`;}
+
+/* ---------- станок ископаемых: правила броска ---------- */
+let AFX_RULE=null;
+const _gtc={};
+function afxGTags(g){if(_gtc[g])return _gtc[g];const G=AFX_G[g];const s=new Set();if(G)G.st.forEach(x=>{if(x)statTags(x[0]).forEach(t=>s.add(t));});return _gtc[g]=[...s];}
+/* проверка набора: «сходство» и «отрицание», «начало» и «окончание» вместе нельзя; метки — только если есть свойство со всеми выбранными метками */
+function fosRule(sel){const ids=[...sel],tags=ids.filter(i=>FOS[i]&&FOS[i].kind==='tag').map(i=>FOS[i].tag);
+  const has=i=>ids.includes(i);
+  if(!ids.length)return {ok:false,why:'Выберите ископаемые'};
+  if(has('same')&&has('not'))return {ok:false,why:'«Сходство» и «отрицание» вместе нельзя'};
+  if(has('pre')&&has('suf'))return {ok:false,why:'«Начало» и «окончание» вместе нельзя'};
+  if((has('same')||has('not'))&&!tags.length)return {ok:false,why:'«Сходство» и «отрицание» работают только с ископаемыми меток'};
+  if(tags.length>3)return {ok:false,why:'Не больше трёх ископаемых меток'};
+  const mode=has('same')?'same':has('not')?'not':'more';
+  if(mode!=='not'&&tags.length>1&&!Object.keys(AFX_G).some(g=>!AFX_G[g].old&&tags.every(t=>afxGTags(g).includes(t))))
+    return {ok:false,why:`Нет свойств, у которых есть все метки: ${tags.map(t=>MTAG_N[t]).join(' + ')}`};
+  const M=MN();const lack=ids.filter(i=>!(M.fos[i]>0));if(lack.length)return {ok:false,why:'Не хватает: '+lack.map(i=>FOS[i].n).join(', ')};
+  return {ok:true,rule:{tags,mode,side:has('pre')?'p':has('suf')?'s':null,perf:has('perf'),sanct:has('sanct')}};}
+/* фильтр свойств, на которые действует набор (для сфер, которые убирают или меняют значения) */
+function fosMatch(m,RU){if(!isAfx(m)||m.cr)return false;if(RU.side&&m.a!==RU.side)return false;
+  if(!RU.tags.length)return true;const tg=afxGTags(m.g),any=RU.tags.some(t=>tg.includes(t));return RU.mode==='not'?!any:any;}
+const FOS_ORBS=['trans','alt','aug','regal','alch','chaos','exalt','scour','annul','divine','crutch'];
+function fosOrbOk(it,k){if(!it||it.slot==='flask'||it.rar==='unique'||it.mirrored)return false;if(it.legacy&&LEGACY_LOCK.has(k))return false;return ORBS[k].ok(it);}
+function sanctVals(it,ms){ms.forEach(m=>{const T=afxTiers(afxBase(it),m.g),row=T&&T.find(x=>x[0]===m.t);if(!row)return;const G=AFX_G[m.g];
+  const a=afxVals(row,G),b=afxVals(row,G),sum=v=>v.reduce((s,x)=>s+x,0);m.r=sum(a)>=sum(b)?a:b;});}
+function fossilCraft(it,k,sel){
+  const chk=fosRule(sel);if(!chk.ok){toast(chk.why);return false;}const RU=chk.rule,M=MN();
+  if(it.pend){toast('Сначала выберите свойство для сферы временного костыля');return false;}
+  if(!(S.cur[k]>0)||!fosOrbOk(it,k)){toast('Эту сферу сейчас нельзя применить');return false;}
+  const before=JSON.stringify(it.mods);let done=true;AFX_RULE=RU;
+  try{
+    if(k==='trans'){it.rar='magic';it.afx=1;delete it.legacy;afxRollN(it,ri(1,2));}
+    else if(k==='aug'||k==='exalt')done=afxRoll(it);
+    else if(k==='regal'){it.rar='rare';delete it.rname;afxRoll(it);}
+    else if(k==='alch'){it.rar='rare';it.afx=1;delete it.rname;delete it.legacy;afxRollN(it,rareN(it.ilvl));}
+    else if(k==='alt'||k==='chaos'){
+      /* без «начала/окончания» перебрасываются все свойства; с ними — только префиксы или только суффиксы */
+      it.mods=it.mods.filter(m=>m.cr||(RU.side&&isAfx(m)&&m.a!==RU.side));it.afx=1;delete it.legacy;delete it.rname;
+      const want=k==='alt'?ri(1,2):rareN(it.ilvl),n=Math.max(1,want-it.mods.filter(m=>!m.cr).length);afxRollN(it,n);}
+    else if(k==='scour'){if(RU.side){it.mods=it.mods.filter(m=>m.cr||!isAfx(m)||m.a!==RU.side);if(!it.mods.some(m=>!m.cr)){it.mods=[];it.rar='normal';}}else{it.mods=[];it.rar='normal';}delete it.rname;}
+    else if(k==='annul'){const pool=it.mods.filter(m=>fosMatch(m,RU));if(!pool.length){done=false;toast('Нет свойств, подходящих под ископаемые');}else it.mods.splice(it.mods.indexOf(pick(pool)),1);}
+    else if(k==='divine'){const ms=it.mods.filter(m=>fosMatch(m,RU));if(!ms.length){done=false;toast('Нет свойств, подходящих под ископаемые');}else if(RU.sanct)sanctVals(it,ms);else ms.forEach(m=>{const T=afxTiers(afxBase(it),m.g),row=T&&T.find(x=>x[0]===m.t);if(row)m.r=afxVals(row,AFX_G[m.g]);});}
+    else if(k==='crutch'){const pool=it.mods.filter(m=>fosMatch(m,RU));if(!pool.length){done=false;toast('Нет свойств, подходящих под ископаемые');}
+      else{const rm=pick(pool),rest=it.mods.filter(m=>m!==rm),opts=[],seen=new Set();
+        for(let i=0;i<30&&opts.length<3;i++){const tmp={...it,mods:rest.slice()};if(!afxRoll(tmp))break;const m=tmp.mods[tmp.mods.length-1];if(seen.has(m.g))continue;seen.add(m.g);opts.push(m);}
+        if(!opts.length){done=false;toast('Нет подходящих свойств');}else{it.mods=rest;it.pend=opts;}}}
+    if(done&&RU.sanct&&k!=='divine')sanctVals(it,it.mods.filter(m=>isAfx(m)&&!m.cr&&(!RU.side||m.a===RU.side)));
+  }finally{AFX_RULE=null;}
+  if(!done||JSON.stringify(it.mods)===before&&!['trans','alch','regal','scour'].includes(k)){if(done)toast('Не удалось: под ископаемые не подходит ни одно свойство');return false;}
+  S.cur[k]--;[...sel].forEach(i=>{M.fos[i]--;if(!M.fos[i])delete M.fos[i];});
+  nameItem(it);haptic('medium');save();toast(`${ORBS[k].n} с ископаемыми: ${it.name}`);return true;}
+
+/* ---------- монстры и боссы шахты ---------- */
+Object.assign(MONS,{
+  spire:{n:'Кристальный шпиль',el:'cold',k:'spell',hp:.45,dmg:.1,res:{cold:75,fire:30,light:30},idle:'spire',mineM:1},
+  bloodspawn:{n:'Порождение крови',el:'chaos',k:'melee',hp:.7,dmg:.9,sp:1,res:{chaos:40},mineM:1},
+  vaalserv:{n:'Ваальский слуга',el:'fire',k:'melee',hp:.7,dmg:.95,sp:1,res:{fire:40},mineM:1},
+  aul:{n:'Аул, Кристальный царь',el:'cold',k:'melee',hp:1,dmg:1.15,sp:1,arm:3,res:{cold:60,fire:30,light:30,chaos:25},mineB:1,
+    hint:'Пока стоят кристальные шпили, Аул получает вдвое меньше урона и бьёт сильнее — разбивайте шпили.',
+    boss:{hp:26,spec:[{every:3,name:'Кристальный обвал',type:'nuke',m:2,el:'cold'},{every:4,name:'Кристальные шпили',type:'spires',n:2},{every:7,name:'Сокрушение',type:'pull',m:2.4}],
+      phases:[{at:.5,name:'Аул облачается в кристалл',ward:2,spires:3}]}},
+  kurgal:{n:'Каргал, Чёрная кровь',el:'chaos',k:'spell',hp:1,dmg:1.15,res:{chaos:60,fire:30,cold:30,light:30},mineB:1,
+    hint:'Каргал копит на вас «Чёрную кровь» — урон хаосом за ход, который растёт с каждым её применением. Очищение флаконом снимает её.',
+    boss:{hp:28,spec:[{every:3,name:'Чёрная кровь',type:'blackblood',m:1.3,p:.3},{every:4,name:'Кровопийство',type:'bloodsip',m:1.7,heal:.04},{every:6,name:'Порождения крови',type:'summon',mon:'bloodspawn',n:2}],
+      phases:[{at:.4,name:'Каргал принимает кровавую форму',summon:['bloodspawn','bloodspawn'],rage:1}]}},
+  ahuat:{n:'Ахуатотли, Слепой',el:'fire',k:'spell',hp:1,dmg:1.2,res:{fire:60,light:40,cold:30,chaos:25},mineB:1,
+    hint:'Ахуатотли слеп и бьёт на звук: если вы в этот ход сделали шаг, его «Удар на звук» проходит мимо, а обычные удары промахиваются вдвое чаще.',
+    boss:{hp:26,spec:[{every:3,name:'Удар на звук',type:'blind',m:2.6,el:'light'},{every:5,name:'Ваальские слуги',type:'summon',mon:'vaalserv',n:2},{every:7,name:'Огненная ловушка',type:'burn',m:.5,t:3,el:'fire'}],
+      phases:[{at:.4,name:'Ярость слепца',summon:['vaalserv','vaalserv'],rage:2}]}},
+});
+/* особые приёмы боссов шахты; true — ход потрачен */
+function mineSpec(e,sp,P){
+  if(sp.type==='spires'){const have=alive().filter(x=>x.idle==='spire').length,n=Math.min(sp.n,4-have,6-alive().length);
+    for(let i=0;i<n;i++){const s=mkEnemy('spire',e.lvl-1,{d:ri(1,3),map:C.I.mt});s.summoned=1;s.maxHp=s.hp=R(e.maxHp*.035);C.enemies.push(s);}
+    logC(n>0?`Из земли вырастают кристальные шпили: ${n}`:'Шпили уже стоят');return true;}
+  if(sp.type==='blackblood'){hurtPlayer(e,e.dmg*sp.m,'chaos','spell',P);if(C.cure){logC('Очищение защищает от чёрной крови');return true;}
+    const add=R(e.dmg*sp.p*(1-(P.res.chaos||0)/100));if(add>0){const d=(C.burn&&C.burn.bb?C.burn.d:0)+add;C.burn={d,t:4,bb:1};logC(`Чёрная кровь: ${fmt(d)} урона хаосом за ход, 4 хода`);}return true;}
+  if(sp.type==='bloodsip'){hurtPlayer(e,e.dmg*sp.m,'chaos','spell',P);const h=R(e.maxHp*sp.heal);e.hp=Math.min(e.maxHp,e.hp+h);fx(e.uid,'+'+fmt(h),'heal');logC(`${e.n} пьёт кровь: +${fmt(h)} здоровья`);return true;}
+  if(sp.type==='blind'){if(C.moved){logC(`<span class="good-t">${e.n} бьёт туда, где вы стояли, — промах</span>`);fx('me','Промах','');return true;}
+    hurtPlayer(e,e.dmg*sp.m*.5,'fire','spell',P);hurtPlayer(e,e.dmg*sp.m*.5,sp.el,'spell',P);return true;}
+  return false;}
+/* в начале хода босса: шпили Аула, слепота Ахуатотли; true — ход пропущен */
+function mineBossPre(e,P){
+  if(e.mineBoss==='aul'){const sp=alive().filter(x=>x.idle==='spire').length;if(sp){e.st.ward=Math.max(e.st.ward,2);e.spireM=1+.12*sp;}else e.spireM=1;}
+  if(e.mineBoss==='ahuat'&&C.moved){const nt=e.turn+1;const sp=e.boss.spec.slice().reverse().find(s=>nt%s.every===0);
+    if(!sp&&roll(50)){e.turn++;logC(`${e.n} не слышит вас и бьёт мимо`);return true;}}
+  return false;}
+function minePhase(e,ph){if(ph.spires)mineSpec(e,{type:'spires',n:ph.spires},null);if(ph.rage===1){e.dmg*=1.35;e.regen=.01;}if(ph.rage===2){e.hits=2;}}
+function mineIdle(e){if(e.idle==='spire')logF(`${e.n} питает Аула`);}
+
+/* ---------- уникальные предметы боссов шахты ---------- */
+const MINE_UNIQUES={
+  aul:[{n:'Восстание Аула',slot:'amulet',mods:[{k:'allAttr',v:20},{k:'lifeP',v:10},{k:'resAll',v:15},{k:'auraEff',v:15},{k:'u_freeAura',v:1}]},
+       {n:'Кристальный венец',slot:'helm',dt:'as',mods:[{k:'asL',v:110},{k:'life',v:80},{k:'resC',v:40},{k:'resMaxC',v:3},{k:'physRed',v:6}]}],
+  kurgal:[{n:'Взор Каргала',slot:'belt',mods:[{k:'str',v:30},{k:'lifeP',v:8},{k:'resCh',v:30},{k:'leech',v:1},{k:'chaosP',v:25}]},
+          {n:'Чернокровный клинок',slot:'weapon',wk:'sword',mods:[{k:'physL',v:120},{k:'addChaos',v:[10,22]},{k:'leech',v:1.5},{k:'atkP',v:12},{k:'chaosP',v:25}]}],
+  ahuat:[{n:'Око Слепого',slot:'helm',dt:'es',mods:[{k:'esL',v:90},{k:'int',v:30},{k:'critSpell',v:50},{k:'fireP',v:20},{k:'lightP',v:20}]},
+         {n:'Шаги во тьме',slot:'boots',dt:'eva',mods:[{k:'evaL',v:90},{k:'dex',v:30},{k:'extraAct',v:8},{k:'suppress',v:15},{k:'resF',v:30}]}],
+};
 
 /* =========================================================
    ИНТЕРФЕЙС: оболочка, персонажи, карта/убежище, бой, герой, древо, камни
@@ -4421,7 +4656,7 @@ function render(){
     flushFx();}
   if(screen==='main'&&tab==='tree'&&treeTab==='tree')bindTree();
 }
-function vSub(){return ({shop:vShop,stash:vStash,auction:vAuction,device:vDevice,bench:vBench,dummy:vDummy,lab:vLab,dungeon:vDungeon})[sub]();}
+function vSub(){return ({shop:vShop,stash:vStash,auction:vAuction,device:vDevice,bench:vBench,dummy:vDummy,lab:vLab,mine:vMine})[sub]();}
 function subHead(title,eyebrow){return `<div class="row"><button class="btn sm ghost" data-a="back">‹ ${S.done?'Убежище':'Лагерь'}</button><div class="sp"><div class="eyebrow">${eyebrow||''}</div><h2>${title}</h2></div></div>`;}
 function flushFx(){
   if(!C)return;
@@ -4521,6 +4756,7 @@ function vHideout(){
   const mc=mapCount();
   return `<div class="stack">
     ${S.mapRun?`<button class="cta" data-a="mapCont"><span class="sp"><span class="eyebrow">Карта ${S.mapRun.tier} тира · ${esc(S.mapRun.name)}</span><b>Продолжить: бой ${S.mapRun.step+1}/4</b><span class="small muted">Уровень области ${67+S.mapRun.tier}</span></span><span class="arrow">›</span></button>`:''}
+    ${S.mineRun&&S.mineRun.opts?`<button class="cta" data-a="mineCont"><span class="sp"><span class="eyebrow">Азуритовая шахта · глубина ${S.mineRun.depth}</span><b>Продолжить спуск</b><span class="small muted">Сульфур: ${fmt(MN().su)}</span></span></button>`:''}
     ${S.labRun?`<button class="cta" data-a="sub" data-s="lab"><span class="sp"><span class="eyebrow">${LABS[S.labRun.n].n}</span><b>Вернуться в лабиринт</b><span class="small muted">Комната ${Math.min(S.labRun.step+1,S.labRun.steps.length)}/${S.labRun.steps.length}</span></span><span class="arrow">›</span></button>`:''}
     <div class="panel framed"><div class="eyebrow">Эндгейм</div><h2 style="font-size:24px;margin:4px 0 6px">Убежище изгнанника</h2>
       <p class="muted" style="margin:0">Кампания пройдена, акты остались позади. Отсюда начинаются карты, лабиринты и торговля. Карты выпадают на картах: текущего тира и реже на тир выше; босс чаще роняет тир выше.</p></div>
@@ -4532,7 +4768,7 @@ function vHideout(){
       ${station('auction','Аукцион','Торговля')}
       ${station('stash','Тайник',`${ACC.stash.items.length}/${stashCap()}`)}
       ${station('lab','Лабиринт',`Пройдено ${S.labs.filter(Boolean).length}/4`)}
-      ${station('dungeon','Подземелье',S.dngBest?`Рекорд: волна ${S.dngBest}`:'Бесконечные волны')}
+      ${station('mine','Азуритовая шахта',MN().best?`Глубина ${MN().best} · сульфур ${fmt(MN().su)}`:'Сульфур с карт')}
     </div>
     <div class="panel"><div class="sheet"><div><span>Лучшая карта</span><span>${S.mapBest?S.mapBest+' тир':'—'}</span></div><div><span>${OFFER_N}</span><span>${S.offer}</span></div></div></div>
   </div>`;
@@ -4606,10 +4842,10 @@ function vCombat(){
     return `<button class="fl r-${it.rar} ${act?'on':''}" data-a="flask" data-k="${k}" ${uses<1||C.busy?'disabled':''} aria-label="${esc(it.name)}"><b>${it.rar==='unique'?it.name.split(' ')[0]:FSHORT[it.fk]}</b><small class="num">${uses}×</small><i style="width:${clamp(f.ch/st.max*100,0,100)}%"></i></button>`;}).join('');
   const hb=(h,n)=>h?`<button class="hexb" data-a="hex" data-n="${n}" ${C.busy||!h.ok||!affordable({},P,h.cost)?'disabled':''} aria-label="${h.n}"><b>${h.kind==='mark'?'◎':'☍'} ${h.n.replace('Метка ','')}</b><small>${!h.ok?'мало атрибута':`${h.cost} маны${h.kind==='mark'?' · без хода':''}`}</small></button>`:'';
   const hexBtn=hb(P.hex,0)+hb(P.hex2,1);
-  return `<div class="cb-head"><div class="sp"><div class="eyebrow">${I.sub} · ур. ${C.I.dng?dngLvl(C.wave):I.lvl} · волна ${C.wave}${C.I.dng?'':'/'+C.waves} · ход ${C.turn}</div><h2>${I.name}</h2></div>
+  return `<div class="cb-head"><div class="sp"><div class="eyebrow">${I.sub} · ур. ${I.lvl} · волна ${C.wave}/${C.waves} · ход ${C.turn}</div><h2>${I.name}</h2></div>
       ${S.inv.length>=INV_WARN?`<span class="invwarn" title="Инвентарь почти полон">! ${S.inv.length}/${INV_MAX}</span>`:''}<button class="btn sm ghost" data-a="journal">Журнал</button><button class="btn sm ghost" data-a="fightEdit" data-t="tree" ${C.busy?'disabled':''} aria-label="Древо и камни">Билд</button><button class="btn sm ghost" data-a="fleeAsk" ${C.busy?'disabled':''}>Уйти</button></div>
   <div class="cbxp"><span class="num">ур. ${S.lvl}</span><div class="xpbar"><i style="width:${S.lvl>=MAXLVL?100:clamp(S.xp/xpNeed(S.lvl)*100,0,100)}%"></i></div><span class="num dim">${S.lvl>=MAXLVL?'макс.':R(S.xp/xpNeed(S.lvl)*1000)/10+'%'}</span></div>
-  <div class="field">${lanes}${minionRow()}</div>
+  <div class="field">${C.vein?`<button class="vein" data-a="vein" ${C.busy?'disabled':''}><b>⛏ Жила сульфура</b><small>Нажмите, чтобы добыть · не тратит ход</small></button>`:''}${lanes}${minionRow()}</div>
   <div class="cb-bot"><div class="cb-in">
   <div class="me" id="mebox">
     ${P.es>0?bar('esb',C.es,P.es,`Щит ${fmt(C.es)} / ${fmt(P.es)}`):''}
@@ -4684,7 +4920,7 @@ function showAscChoice(){
       <p class="muted small" style="margin:4px 0 6px">${a.d}</p><div class="statl small">${ascList(a)}</div></div>`).join('')}</div>`,true);
 }
 function showDeath(loss){
-  if(C.B.type==='dng'){const w=C.wave-1;modal(`<h2>Подземелье</h2><p style="margin:0 0 8px">Вы пали на волне <b>${C.wave}</b>. Пройдено волн: <b>${w}</b>. Ваш рекорд: <b class="gold-t">${S.dngBest||0}</b>.</p><p class="muted small">В подземелье смерть не отнимает опыт. Добыча сохранена.</p><div class="row"><button class="btn sp" data-a="journal">Журнал</button><button class="btn pri sp" data-a="leave">В убежище</button></div>`,true);return;}
+  if(C.B.type==='mine'){modal(`<h2>Вы пали в шахте</h2><p style="margin:0 0 8px">Глубина <b>${C.I.depth}</b>. Потеряно ${fmt(loss)} опыта, спуск окончен. Добыча, азурит и ископаемые сохранены. Ваша глубина: <b class="gold-t">${MN().best||0}</b>.</p><div class="row"><button class="btn sp" data-a="journal">Журнал</button><button class="btn pri sp" data-a="leave">В убежище</button></div>`,true);return;}
   const map=C.B.type==='map',lab=C.B.type==='lab';
   modal(`<h2>Вы пали</h2><p class="muted" style="margin:0">${map?`Потеряно ${fmt(loss)} опыта и карта.`:lab?'Лабиринт потерян: он перестроится при следующем входе.':'В кампании смерть не отнимает опыт.'} Усильте билд: древо, камни, ауры, флаконы или снаряжение.</p>
     <p class="notice">Совет: ${pick(['проверьте сопротивления на вкладке «Герой».','следите за намерениями врагов: «Готовит…» означает сильный удар босса.','флаконы не тратят ход — пейте их до опасного удара.','проклятие «Бессилие» ослабляет удары врагов, метки не тратят ход.','холод замедляет врагов ближнего боя и ослабляет их удары.','проверьте урон умений на мишени в убежище.'])}</p>
@@ -5581,8 +5817,8 @@ const ACT={
   mv(d){move(+d.d);},
   flask(d){useFlask(+d.k);},
   journal(){modal(vJournal());const j=document.getElementById('journal');if(j)j.scrollTop=j.scrollHeight;if(C&&C.over)window._reopen=true;},
-  fleeAsk(){if(!C||C.over)return;modal(`<h2>Покинуть бой?</h2><p class="muted" style="margin:0">${C.B.type==='dng'?`Забег по подземелью закончится. Пройдено волн: ${C.wave-1}, ваш рекорд: ${S.dngBest||0}. Добыча сохранится.`:C.B.type==='map'?'Карта будет потеряна.':C.B.type==='lab'?'Лабиринт будет потерян.':'Прогресс сражения не сохранится.'}</p><div class="row"><button class="btn sp" data-a="close">Остаться</button><button class="btn sp danger" data-a="flee">Уйти</button></div>`);},
-  flee(){if(C){C.auto=false;if(C.B.type==='dng')S.dng=null;if(C.B.type==='map')S.mapRun=null;if(C.B.type==='lab')S.labRun=null;}goMain();closeModal();save();render();},
+  fleeAsk(){if(!C||C.over)return;modal(`<h2>Покинуть бой?</h2><p class="muted" style="margin:0">${C.B.type==='mine'?'Спуск в шахту закончится. Добыча, азурит и ископаемые сохранятся.':C.B.type==='map'?'Карта будет потеряна.':C.B.type==='lab'?'Лабиринт будет потерян.':'Прогресс сражения не сохранится.'}</p><div class="row"><button class="btn sp" data-a="close">Остаться</button><button class="btn sp danger" data-a="flee">Уйти</button></div>`);},
+  flee(){if(C){C.auto=false;if(C.B.type==='mine')mineEnd();if(C.B.type==='map')S.mapRun=null;if(C.B.type==='lab')S.labRun=null;}goMain();closeModal();save();render();},
   leave(){if(C)C.auto=false;window._reopen=false;closeModal();goMain();viewAct=actOfProg();render();offerReward();},
   next(d){const cont=JSON.parse(d.c);window._reopen=false;closeModal();
     if(cont.type==='labmap'){goMain();openSub('lab');return;}
@@ -5663,7 +5899,6 @@ const ACT={
   heroChip(d){const parts=(S.shopQ||'').split('|').map(x=>x.trim()).filter(Boolean),i=parts.indexOf(d.t);if(i>=0)parts.splice(i,1);else parts.push(d.t);S.shopQ=parts.join(' | ');QF.shop=S.shopQ;save();render();},
   heroShop(){if(inFight()){toast('Торговец доступен вне боя');return;}QF.shop=S.shopQ||'';shopTab='items';shopCat='all';openSub('shop');},
   invGo(){const f=window._invGo;window._invGo=null;closeModal();if(f)f();},
-  dngGo(){invGate(()=>startDungeon());},
   wiki(){modal(`<div class="row"><span class="eyebrow sp">Справочник изгнанника</span><button class="btn sm ghost" data-a="close">Закрыть</button></div><iframe class="wikif" src="wiki.html" title="Справочник изгнанника"></iframe>`);},
   stTab(d){stashTab=d.t;render();},
   stIn(d){if(toStash(d.u))render();},
@@ -5764,17 +5999,93 @@ function invGate(fn){if(S.inv.length<INV_WARN){fn();return;}window._invGo=fn;
 function roman(n){const r=[[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];let o='';for(const [v,c] of r)while(n>=v){o+=c;n-=v;}return o;}
 const mapTierCls=t=>t<=5?'mw':t<=10?'my':'mr';
 
-/* ---------- экран подземелья ---------- */
-function vDungeon(){dngFetch();
-  const loc=ACC.chars.filter(c=>c.dngBest>0).sort((a,b)=>b.dngBest-a.dngBest)[0];
-  const top=dngTop||(loc?{wave:loc.dngBest,nick:ACC.tgName?'@'+ACC.tgName:loc.name,char:loc.name}:null);
-  return `<div class="stack">${subHead('Подземелье','Убежище')}
-    <div class="panel framed dng"><div class="eyebrow">Dungeon master ♂</div>
-      <h2 style="margin:4px 0 2px;font-size:24px">${top?esc(top.nick||top.char):'пока никого'}</h2>
-      <div class="muted">${top?`${top.char&&top.nick!==top.char?esc(top.char)+' · ':''}победил <b class="gold-t">${top.wave}</b> волн${srvOn()&&dngTop?'':' <span class="dim small">(среди ваших персонажей)</span>'}`:'Станьте первым, кто спустится глубже всех'}</div></div>
-    <div class="panel"><div class="sheet"><div><span>Ваш рекорд</span><span class="gold-t">${S.dngBest||0} волн</span></div><div><span>Уровень монстров</span><span>с 83, растёт</span></div><div><span>Врагов в волне</span><span>3 → 15</span></div></div>
-      <p class="muted small" style="margin:10px 0 0">Волны идут без конца, пока вы живы, и с каждой волной монстры сильнее. Каждая 10-я волна — с боссом. Золото, вещи и сферы с монстров — около трети от обычного, зато каждые 5 волн — награда сферами, каждые 10 — карта. Смерть здесь не отнимает опыт.</p>
-      <button class="btn pri full" data-a="dngGo" style="margin-top:12px">Спуститься в подземелье</button></div></div>`;}
+
+/* =========================================================
+   ИНТЕРФЕЙС АЗУРИТОВОЙ ШАХТЫ: спуск, улучшения, станок ископаемых
+   ========================================================= */
+var mineTab='go',mineSel=null,mineFos=new Set(),mineDepthIn=null,mineTop=null,mineTopAt=0;
+function mineTopFetch(){if(typeof srvOn!=='function'||!srvOn()||Date.now()-mineTopAt<30000)return;mineTopAt=Date.now();
+  srvReq('/dungeon').then(r=>{mineTop=r.best||null;if(screen==='sub'&&sub==='mine')render();}).catch(()=>{});}
+const nodeChip=o=>`<span class="mnode ${o.node}">${o.node==='boss'?esc(MONS[o.boss].n):MINE_NODE[o.node].n}</span>`;
+function mineOptBtns(){const R0=S.mineRun,M=MN();if(!R0||!R0.opts)return '';
+  return `<div class="mopts">${R0.opts.map((o,i)=>{const c=mineCost(o.d),ok=M.su>=c;
+    return `<button class="mopt" data-a="mineGo" data-i="${i}" ${ok?'':'disabled'}><span class="eyebrow">${MINE_DIR[o.dir]}</span><b>Глубина ${o.d} · ур. ${mineLvl(o.d)}</b>${nodeChip(o)}<small class="${ok?'muted':'bad-t'}">${c} сульфура</small></button>`;}).join('')}</div>
+    <button class="btn full" data-a="mineQuit" style="margin-top:8px">Выйти из шахты</button>`;}
+function mineStats(){const M=MN();
+  return `<div class="sheet"><div><span>Сульфур</span><span class="num">${fmt(M.su)} / ${fmt(mineCap())}</span></div><div><span>Азурит</span><span class="num gold-t">${fmt(M.az)}</span></div>
+    <div><span>Глубочайший спуск</span><span class="num">${M.best||0}</span></div><div><span>Ископаемых</span><span class="num">${Object.values(M.fos).reduce((a,b)=>a+b,0)}</span></div></div>`;}
+function vMine(){const M=mineSync();mineTopFetch();
+  const loc=ACC.chars.filter(c=>c.mine&&c.mine.best>0).sort((a,b)=>b.mine.best-a.mine.best)[0];
+  const top=mineTop||(loc?{wave:loc.mine.best,nick:ACC.tgName?'@'+ACC.tgName:loc.name,char:loc.name}:null);
+  let h=`<div class="stack">${subHead('Азуритовая шахта','Убежище')}
+    <div class="panel framed mine"><div class="eyebrow">Глубочайший спуск</div>
+      <h2 style="margin:4px 0 2px;font-size:22px">${top?esc(top.nick||top.char):'пока никого'}</h2>
+      <div class="muted small">${top?`${top.char&&top.nick!==top.char?esc(top.char)+' · ':''}глубина <b class="gold-t">${top.wave}</b>${srvOn()&&mineTop?'':' <span class="dim">(среди ваших персонажей)</span>'}`:'Спуститесь первым'}</div></div>
+    <div class="panel">${mineStats()}</div>
+    <div class="mseg">${[['go','Спуститься в шахту'],['up','Улучшения шахты'],['bench','Станок ископаемых']].map(([k,n])=>`<button class="${mineTab===k?'on':''}" data-a="mineTab" data-t="${k}">${n}</button>`).join('')}</div>`;
+  if(mineTab==='go')h+=vMineGo(M);else if(mineTab==='up')h+=vMineUp(M);else h+=vMineBench(M);
+  return h+'</div>';}
+function vMineGo(M){
+  if(S.mineRun&&S.mineRun.opts)return `<div class="panel"><div class="eyebrow">Спуск идёт · глубина ${S.mineRun.depth}</div><p class="muted small" style="margin:4px 0 8px">Куда дальше? Каждый переход тратит сульфур; тип следующего узла виден заранее.</p>${mineOptBtns()}</div>`;
+  const mx=M.best+1,d=clamp(mineDepthIn||mx,1,mx),c=mineCost(d);
+  return `<div class="panel"><div class="eyebrow">Выбор глубины</div>
+    <div class="row" style="margin-top:6px;flex-wrap:nowrap"><input class="input" id="mineD" type="number" inputmode="numeric" min="1" max="${mx}" value="${d}" style="max-width:110px"><span class="sp small muted">от 1 до ${mx} · уровень монстров <b id="mineDl">${mineLvl(d)}</b></span></div>
+    <div class="tchips" style="margin-top:8px"><button class="tchip" data-a="mineD" data-v="1">1</button>${M.best>1?`<button class="tchip" data-a="mineD" data-v="${M.best}">Последняя: ${M.best}</button>`:''}<button class="tchip on" data-a="mineD" data-v="${mx}">Новая: ${mx}</button></div>
+    <button class="btn pri full" data-a="mineStart" style="margin-top:10px" ${M.su>=c?'':'disabled'}>Спуститься · <span id="mineDc">${c}</span> сульфура</button>
+    ${M.su<c?'<p class="dim small" style="margin:6px 0 0">Сульфур добывается из жил на картах: на каждой четвёртой карте их три, на высоких тирах в жилах больше сульфура.</p>':''}</div>
+    <div class="panel"><p class="muted small" style="margin:0">Глубина 1 — 68 уровень монстров, каждые 10 глубин +1, с 151 глубины — 83. Первый вход — с глубины вашей лучшей карты (тир 4 → глубина 31). После 160 глубины монстры с каждой глубиной крепче, бьют сильнее и получают дополнительные свойства. По пути: <b>азуритовые жилы</b> (азурит после боя), <b>сундуки с ископаемыми</b> после волны, <b>подземные города</b> (больше врагов и добычи), с 151 глубины — <b>боссы шахты</b>: Аул, Каргал и Ахуатотли. Смерть в шахте отнимает 10% опыта уровня и заканчивает спуск.</p></div>`;}
+function vMineUp(M){
+  return `<div class="list">${MINE_UP_IDS.map(k=>{const U=MINE_UP[k],l=upL(k),c=mineUpCost(k),mx=l>=U.max;
+    return `<div class="panel mup"><div class="row"><b class="sp">${U.n}</b><span class="num dim">${l}/${U.max}</span></div>
+      <div class="small muted">${l?U.d(l):'Не улучшено'}${mx?'':` → <span class="good-t">${U.d(l+1)}</span>`}</div>
+      ${mx?'<div class="small gold-t" style="margin-top:6px">Максимум</div>':`<button class="btn sm full" data-a="mineUp" data-k="${k}" style="margin-top:6px" ${M.az>=c?'':'disabled'}>Улучшить · ${fmt(c)} азурита</button>`}</div>`;}).join('')}</div>`;}
+function fosTile(f,M){const n=M.fos[f.id]||0,on=mineFos.has(f.id);
+  return `<button class="ftile ${on?'on':''} ${n?'':'none'}" data-a="mineFos" data-f="${f.id}" title="${esc(f.n+': '+f.d)}" aria-label="${esc(f.n)}" aria-pressed="${on}">${fosSvg(f.id,30)}<span class="num">${n}</span></button>`;}
+function vMineBench(M){
+  const all=[...EQ_SLOTS.map(s=>S.equip[s]).filter(Boolean),...S.inv].filter(x=>x.slot!=='flask'&&x.rar!=='unique'&&!x.mirrored);
+  const it=mineSel&&all.find(x=>x.uid===mineSel);
+  const groups=[['Простые',FOSSILS.filter(f=>f.kind==='mode')],['Метки',FOSSILS.filter(f=>f.kind==='tag')],['С боссов шахты',FOSSILS.filter(f=>f.boss)]];
+  const chk=fosRule(mineFos);
+  let h=`<div class="panel"><p class="muted small" style="margin:0 0 8px">Выберите предмет и набор ископаемых, затем сферу: она подействует только по правилам ископаемых. За каждое применение тратится сфера и по одному каждому выбранному ископаемому.</p>
+    ${groups.map(([n,l])=>`<div class="eyebrow" style="margin:6px 0 4px">${n}</div><div class="fgrid">${l.map(f=>fosTile(f,M)).join('')}</div>`).join('')}
+    <div class="fsel">${mineFos.size?[...mineFos].map(i=>`<div class="row small" style="flex-wrap:nowrap;gap:6px">${fosSvg(i,20)}<span><b>${FOS[i].n}</b> — <span class="muted">${FOS[i].d}</span></span></div>`).join(''):'<span class="dim small">Ископаемые не выбраны. Нажмите на квадратики выше; подробности — при выборе.</span>'}</div>
+    ${mineFos.size?`<p class="small ${chk.ok?'good-t':'bad-t'}" style="margin:6px 0 0">${chk.ok?'Набор подходит':chk.why}</p><button class="btn sm ghost" data-a="mineFosClr" style="margin-top:6px">Сбросить выбор</button>`:''}</div>`;
+  if(it){h+=`${itemCard(it)}<div class="row"><button class="btn sm ghost" data-a="mineSel" data-u="">‹ Другой предмет</button></div>
+    <div class="panel"><div class="eyebrow" style="margin-bottom:6px">Сферы</div><div class="list">${FOS_ORBS.map(k=>{const n=S.cur[k]||0,ok=chk.ok&&n>0&&fosOrbOk(it,k);
+      return `<button class="btn" data-a="mineCraft" data-o="${k}" ${ok?'':'disabled'} style="display:flex;justify-content:space-between;text-align:left;gap:8px"><span>${ORBS[k].n}<br><small class="muted" style="font-family:var(--ff-b);font-weight:400">${ORBS[k].d}</small></span><span class="num r-cur">×${n}</span></button>`;}).join('')}</div></div>`;}
+  else h+=`<div class="eyebrow">Выберите предмет</div><div class="bag">${all.map(x=>`<button class="irow" data-a="mineSel" data-u="${x.uid}"><span class="sl">${Object.values(S.equip).includes(x)?'надето · ':''}${slotLabel(x)}</span><span class="in r-${x.rar}">${esc(dispName(x))}</span></button>`).join('')||'<span class="dim">Нет подходящих предметов</span>'}</div>`;
+  return h;}
+/* итог узла шахты: добыча и выбор направления */
+function showMineWin(note){
+  const lootH=C.loot.length?C.loot.map(lootLine).join(''):'<div class="dim">Предметов нет</div>';
+  const orbs=Object.entries(C.orbs).map(([k,v])=>`<div class="r-cur">${ORBS[k].n} ×${v}</div>`).join('');
+  modal(`<div class="eyebrow">${C.I.sub} · ${C.I.name}</div><h2>Победа</h2>${note?`<p class="notice">${note}</p>`:''}
+    <div class="sheet"><div><span>Опыт</span><span>+${fmt(C.xp)}</span></div><div><span>Золото</span><span>+${fmt(C.gold)}</span></div><div><span>Сульфур</span><span>${fmt(MN().su)} / ${fmt(mineCap())}</span></div><div><span>Азурит</span><span>${fmt(MN().az)}</span></div></div>
+    <div><div class="eyebrow" style="margin-bottom:6px">Добыча</div><div class="list">${lootH}${orbs}</div></div>
+    ${C.loot.some(it=>!it.gem&&!it.map&&!it.offer&&!it.frag&&isUpgrade(it))?'<p class="notice" style="border-color:var(--good)">Среди добычи есть улучшения — загляните во «Вещи».</p>':''}
+    <div class="eyebrow">Куда дальше?</div>${mineOptBtns()}
+    <div class="row"><button class="btn sp" data-a="journal">Журнал</button><button class="btn sp" data-a="leave">В убежище</button></div>`,true);}
+Object.assign(ACT,{
+  mineTab(d){mineTab=d.t;render();},
+  mineD(d){mineDepthIn=+d.v;render();},
+  mineStart(){const el=document.getElementById('mineD'),v=el?+el.value:mineDepthIn;invGate(()=>{if(mineStart(v)){mineDepthIn=null;}});},
+  mineGo(d){window._reopen=false;closeModal();invGate(()=>{if(!mineGo(+d.i))render();});},
+  mineQuit(){window._reopen=false;closeModal();mineEnd();goMain();openSub('mine');toast('Вы поднялись из шахты');},
+  mineUp(d){if(mineUpgrade(d.k)){toast(`${MINE_UP[d.k].n}: уровень ${upL(d.k)}`);render();}},
+  mineSel(d){mineSel=d.u||null;render();},
+  mineFos(d){const id=d.f;if(mineFos.has(id))mineFos.delete(id);else{if(!(MN().fos[id]>0)){toast('Таких ископаемых нет');return;}
+    if(id==='same')mineFos.delete('not');if(id==='not')mineFos.delete('same');if(id==='pre')mineFos.delete('suf');if(id==='suf')mineFos.delete('pre');mineFos.add(id);}render();},
+  mineFosClr(){mineFos.clear();render();},
+  mineCraft(d){const all=[...EQ_SLOTS.map(s=>S.equip[s]).filter(Boolean),...S.inv],it=all.find(x=>x.uid===mineSel);if(!it)return;
+    fossilCraft(it,d.o,mineFos);[...mineFos].forEach(i=>{if(!(MN().fos[i]>0))mineFos.delete(i);});
+    if(it.pend){if(S.inv.includes(it))openItem('inv',it.uid);else openItem('slot',EQ_SLOTS.find(s=>S.equip[s]===it));return;}
+    render();},
+  vein(){mineVein();},
+  mineCont(){openSub('mine');},
+});
+/* поле ввода глубины: стоимость и уровень пересчитываются на лету */
+document.addEventListener('input',e=>{if(e.target&&e.target.id==='mineD'){const M=MN(),v=clamp(Math.round(+e.target.value)||1,1,M.best+1);mineDepthIn=v;
+  const c=document.getElementById('mineDc'),l=document.getElementById('mineDl');if(c)c.textContent=mineCost(v);if(l)l.textContent=mineLvl(v);}});
 
 
 </script>
