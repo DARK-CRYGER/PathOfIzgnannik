@@ -600,7 +600,7 @@ const GEMS={
   viper:{n:'Змеиный укус',c:'dex',cat:'melee',rl:1,tags:['attack','melee','chaos'],fn:'single0',rng:'Вплотную, 1 цель',
     d:'30% физического урона становится хаосом. Всегда отравляет, яд на 50% сильнее.',
     make(o,L){o.mult=atkM(1.1,L);o.cost=5;o.conv={chaos:.3};o.ail.poison+=100;o.poisonMore+=.5}},
-  molten:{n:'Расплавленный удар',c:'str',cat:'melee',rl:16,tags:['attack','melee','proj','fire','area'],fn:'molten',rng:'Вплотную + 3 сгустка',
+  molten:{n:'Расплавленный удар',c:'str',cat:'melee',rl:16,tags:['attack','melee','strike','proj','fire','area'],fn:'molten',rng:'Вплотную + 3 сгустка',
     d:'Удар вплотную, 60% физического урона становится огнём. 3 сгустка магмы падают на случайных врагов на любой дистанции (50% урона).',
     make(o,L){o.mult=atkM(1.1,L);o.cost=7;o.conv={fire:.6};o.n=3}},
   sunder:{n:'Раскол',c:'str',cat:'melee',rl:22,tags:['attack','melee','area','slam'],fn:'sunder',rng:'Вплотную + волна до 2',
