@@ -1869,6 +1869,8 @@ function keepTotems(P){if(!S)return;if(!C||!P.keys.has('k_bond')){S.tkeep=[];ret
 function restoreTotems(P){const keep=S.tkeep||[];S.tkeep=[];if(!keep.length||!P.keys.has('k_bond'))return;let n=0;
   keep.forEach(k=>{const sk=P.skills[k.slot];if(!sk||sk.gid!==k.gid||sk.bad)return;C.totems.push({...k,uid:'t'+(++EUID)});n++;});
   if(n){C.totemAt=C.turn;logC(`Связь предков: с вами остались тотемы (${n})`);}}
+/* все умения лука получают метку «лук»: к ним подходят «Тотем-баллиста» и «Прицельная баллиста» */
+Object.values(GEMS).forEach(g=>{if(g&&!g.sup&&g.cat==='ranged'&&g.tags&&!g.tags.includes('bow'))g.tags.push('bow');});
 
 /* =========================================================
    АККАУНТ, РАСЧЁТ ХАРАКТЕРИСТИК, ПРЕДМЕТЫ, БОЙ
@@ -3410,7 +3412,7 @@ function hurtPlayer(e,raw,el,kind,P,crit,mix){
   if(P.keys.has('k_ghostdance')&&C.shroud>0){C.shroud--;C.es=Math.min(P.es,C.es+P.eva*.03);}
   const shown=toHp+toEs;
   /* журнал урона по стихиям — для разбора смерти */
-  if(shown>0){C.dmgLog=C.dmgLog||[];const lp={};for(const k in pp)if(pp[k]>0)lp[k]=pp[k];C.dmgLog.push({t:C.turn,p:lp});if(C.dmgLog.length>40)C.dmgLog.shift();}
+  if(shown>0){C.dmgLog=C.dmgLog||[];const lp={};for(const k in pp)if(k!=='total'&&pp[k]>0)lp[k]=pp[k];C.dmgLog.push({t:C.turn,p:lp});if(C.dmgLog.length>40)C.dmgLog.shift();}
   fx('me',(crit?'✦ ':'')+'−'+fmt(shown),'hurt');haptic('heavy');
   C.log.push(`${e.n}: ${fmt(shown)}`);
   const pt=ELS.filter(k=>pp[k]>.5).map(k=>`${EL[k]} ${fmt(pp[k])}`).join(', ');
@@ -4049,7 +4051,7 @@ function applyOrb(it,k){
   if(it.legacy&&LEGACY_LOCK.has(k)){toast('Предмет Legacy: эта сфера недоступна, чтобы не менять старые свойства');return false;}
   if(!(S.cur[k]>0)||!ORBS[k].ok(it))return false;
   if(k==='regal'&&it.slot==='flask'){toast('Флакон не может быть редким');return false;}
-  if(k==='exalt'&&!afxFree(it)){toast('Нет места для свойства');return false;}
+  if(k==='exalt'&&!afxFree(it)){toast(`Нет места: префиксы ${afxUsed(it,'p')}/3, суффиксы ${afxUsed(it,'s')}/3`);return false;}
   S.cur[k]--;
   const flask=it.slot==='flask';
   if(k==='trans'){it.rar='magic';rollMods(it,ri(1,2));}
@@ -4266,7 +4268,7 @@ function benchBlock(it){
   if(it.rar!=='magic'&&it.rar!=='rare')return 'Только волшебные и редкие предметы';
   if(it.legacy)return 'Предмет Legacy: свойства старого образца не меняются. Сфера изменения, хаоса или очищения переделает его по новым правилам';
   if(it.mods.some(m=>m.cr))return 'Уже есть свойство мастера. Удалите его, чтобы добавить другое';
-  if(!afxFree(it))return 'Нет свободного места: все префиксы и суффиксы заняты';
+  if(!afxFree(it))return `Нет свободного места: префиксы ${afxUsed(it,'p')}/${afxLimit(it)}, суффиксы ${afxUsed(it,'s')}/${afxLimit(it)}`;
   if(it.mods.length>=maxMods(it))return `Нет свободного места: у ${it.rar==='magic'?'волшебного':'редкого'} предмета до ${maxMods(it)} свойств`;
   return null;
 }
@@ -5374,7 +5376,8 @@ function itemLines(it){
   if(um.length)body+=`<div class="sep"></div>`+um.map(m=>`<div class="umod">${lbl(m.k,m.v)}${mtagRow(m.k)}</div>`).join('');
   if(it.legacy&&it.rar==='unique')body+=`<div class="dim small" style="margin-top:4px">Legacy — уникальный предмет прежней версии: свойства сохранены как были. Новые экземпляры выпадают с обновлёнными свойствами.</div>`;
   else if(it.legacy)body+=`<div class="dim small" style="margin-top:4px">Legacy — предмет старого образца, свойства сохранены без изменений. Сферы возвышения, усиления, царей, божественная и верстак недоступны. Сфера изменения, хаоса или очищения переделает его по новым правилам.</div>`;
-  else if(R_&&it.rar!=='unique'&&it.slot!=='flask'){const L=afxLimit(it);body+=`<div class="dim small" style="margin-top:4px">${L?`Свободно: префиксов ${L-afxUsed(it,'p')}, суффиксов ${L-afxUsed(it,'s')}`:'Обычный предмет: основных свойств нет'}</div>`;}
+  else if(it.rar!=='unique'&&it.slot!=='flask'){const L=afxLimit(it),hy=it.mods.some(m=>isAfx(m)&&AFX_G[m.g]&&AFX_G[m.g].st.filter(Boolean).length>1);
+    body+=`<div class="dim small" style="margin-top:4px">${L?`Префиксы ${afxUsed(it,'p')}/${L} · суффиксы ${afxUsed(it,'s')}/${L}${hy?'<br>Гибридное свойство (несколько строк с одним тегом П/С) занимает одно место':''}`:'Обычный предмет: основных свойств нет'}</div>`;}
   return body;
 }
 function itemCard(it){
@@ -6282,7 +6285,7 @@ function nextStepHtml(){const n=nextStep();if(!n)return '';
 const EL_RU={phys:'физический урон',fire:'огонь',cold:'холод',light:'молния',chaos:'хаос'};
 const RES_RU={fire:'огню',cold:'холоду',light:'молнии',chaos:'хаосу'};
 function deathAdvice(){if(!C||!C.dmgLog||!C.dmgLog.length)return null;const from=C.turn-2,sum={};let tot=0;
-  C.dmgLog.filter(x=>x.t>=from).forEach(x=>{for(const k in x.p){sum[k]=(sum[k]||0)+x.p[k];tot+=x.p[k];}});if(tot<=0)return null;
+  C.dmgLog.filter(x=>x.t>=from).forEach(x=>{for(const k in x.p){if(!RES_RU[k]&&k!=='phys')continue;sum[k]=(sum[k]||0)+x.p[k];tot+=x.p[k];}});if(tot<=0)return null;
   const [el,v]=Object.entries(sum).sort((a,b)=>b[1]-a[1])[0],sh=R(v/tot*100);let P;try{P=calc();}catch(e){return null;}
   let s=`Вас убил ${EL_RU[el]||el} (${sh}% урона за последние 3 хода).`;
   if(el==='phys')s+=` Броня: ${fmt(P.armour||0)}, уклонение: ${fmt(P.eva||0)}. Помогут броня, уклонение, блок и больше здоровья.`;
