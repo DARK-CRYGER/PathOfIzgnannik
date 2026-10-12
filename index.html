@@ -3897,7 +3897,7 @@ function afxRoll(it){
   B.forEach(([g,tl])=>{const G=AFX_G[g];if(!G||G.old||have.has(g))return;if((G.a==='p'?np:ns)>=L)return;
     /* станок ископаемых: только префиксы/суффиксы, метки (чаще, только эти или без них), лучшие тиры */
     let mult=1;if(RU){if(RU.side&&G.a!==RU.side)return;if(RU.tags.length){const tg=afxGTags(g),any=RU.tags.some(t=>tg.includes(t));
-      if(RU.mode==='same'&&!any)return;if(RU.mode==='not'&&any)return;if(RU.mode==='more'&&any)mult=RU.tags.every(t=>tg.includes(t))?15:10;}}
+      if(RU.all&&!RU.tags.every(t=>tg.includes(t)))return;if(RU.mode==='same'&&!any)return;if(RU.mode==='not'&&any)return;if(RU.mode==='more'&&any)mult=RU.tags.every(t=>tg.includes(t))?15:10;}}
     let pool=afxTierPool(AFX_T[tl],it.ilvl);if(RU&&RU.perf)pool=pool.slice(0,2);
     pool.forEach(([row,w])=>{cand.push([g,row,w*mult]);tot+=w*mult;});});
   if(!cand.length)return false;
@@ -4500,7 +4500,7 @@ const FOSSILS=[
     ['es','Мерцающее',40,27],['fire','Опалённое',40,27],['cold','Ледяное',40,27],['light','Металлическое',40,27],
     ['spell','Эфирное',80,21],['chaos','Аберрантное',80,21],['flask','Стеклянное',80,19],['loot','Золотоносное',80,17],
     ['ail','Разъедающее',130,15],['speed','Дрожащее',180,12],['crit','Острое',240,9],['minion','Связующее',240,9],['gem','Гранёное',300,6]]
-    .map(([t,n,minD,w])=>({id:'t_'+t,tag:t,ic:t,n:n+' ископаемое',kind:'tag',minD,w,d:`Свойства с меткой «${MTAG_N[t]}» выпадают в 10 раз чаще`})),
+    .map(([t,n,minD,w])=>({id:'t_'+t,tag:t,ic:t,n:n+' ископаемое',kind:'tag',minD,w,d:`Свойства с меткой «${MTAG_N[t]}» выпадают в 10 раз чаще. Несколько ископаемых меток вместе: свойство будет со всеми выбранными метками`})),
   {id:'pre',n:'Ископаемое начала',ic:'pre',kind:'side',boss:1,minD:151,w:40,d:'Меняются только префиксы, суффиксы не трогаются'},
   {id:'suf',n:'Ископаемое окончания',ic:'suf',kind:'side',boss:1,minD:151,w:40,d:'Меняются только суффиксы, префиксы не трогаются'},
   {id:'sanct',n:'Освящённое ископаемое',ic:'sanct',kind:'val',boss:1,minD:200,w:22,d:'После сферы числовые значения свойств перебрасываются: из двух бросков остаётся лучший'},
@@ -4538,10 +4538,15 @@ function fosRule(sel){const ids=[...sel],tags=ids.filter(i=>FOS[i]&&FOS[i].kind=
   if(mode!=='not'&&tags.length>1&&!Object.keys(AFX_G).some(g=>!AFX_G[g].old&&tags.every(t=>afxGTags(g).includes(t))))
     return {ok:false,why:`Нет свойств, у которых есть все метки: ${tags.map(t=>MTAG_N[t]).join(' + ')}`};
   const M=MN();const lack=ids.filter(i=>!(M.fos[i]>0));if(lack.length)return {ok:false,why:'Не хватает: '+lack.map(i=>FOS[i].n).join(', ')};
-  return {ok:true,rule:{tags,mode,side:has('pre')?'p':has('suf')?'s':null,perf:has('perf'),sanct:has('sanct')}};}
+  return {ok:true,rule:{tags,mode,side:has('pre')?'p':has('suf')?'s':null,perf:has('perf'),sanct:has('sanct'),multi:mode!=='not'&&tags.length>1}};}
+/* несколько ископаемых меток: свойство должно иметь ВСЕ выбранные метки. Есть ли такое свойство у основы предмета */
+function fosItemOk(it,RU){if(!RU||!RU.multi)return true;const B=AFX_P[afxBase(it)];if(!B)return false;
+  return B.some(([g,tl])=>{const G=AFX_G[g];if(!G||G.old)return false;if(RU.side&&G.a!==RU.side)return false;const tg=afxGTags(g);
+    return RU.tags.every(t=>tg.includes(t))&&afxTierPool(AFX_T[tl],it.ilvl).length>0;});}
+const fosTagsTxt=RU=>RU.tags.map(t=>MTAG_N[t]).join(' + ');
 /* фильтр свойств, на которые действует набор (для сфер, которые убирают или меняют значения) */
 function fosMatch(m,RU){if(!isAfx(m)||m.cr)return false;if(RU.side&&m.a!==RU.side)return false;
-  if(!RU.tags.length)return true;const tg=afxGTags(m.g),any=RU.tags.some(t=>tg.includes(t));return RU.mode==='not'?!any:any;}
+  if(!RU.tags.length)return true;const tg=afxGTags(m.g),any=RU.tags.some(t=>tg.includes(t));if(RU.multi)return RU.tags.every(t=>tg.includes(t));return RU.mode==='not'?!any:any;}
 const FOS_ORBS=['trans','alt','aug','regal','alch','chaos','exalt','scour','annul','divine','crutch'];
 function fosOrbOk(it,k){if(!it||it.slot==='flask'||it.rar==='unique'||it.mirrored)return false;if(it.legacy&&LEGACY_LOCK.has(k))return false;return ORBS[k].ok(it);}
 function sanctVals(it,ms){ms.forEach(m=>{const T=afxTiers(afxBase(it),m.g),row=T&&T.find(x=>x[0]===m.t);if(!row)return;const G=AFX_G[m.g];
@@ -4550,16 +4555,21 @@ function fossilCraft(it,k,sel){
   const chk=fosRule(sel);if(!chk.ok){toast(chk.why);return false;}const RU=chk.rule,M=MN();
   if(it.pend){toast('Сначала выберите свойство для сферы временного костыля');return false;}
   if(!(S.cur[k]>0)||!fosOrbOk(it,k)){toast('Эту сферу сейчас нельзя применить');return false;}
+  const ADD=['trans','aug','exalt','regal','alch','alt','chaos','crutch'];
+  if(RU.multi&&ADD.includes(k)&&!fosItemOk(it,RU)){toast(`У этого предмета нет свойств с метками ${fosTagsTxt(RU)}`);return false;}
+  /* несколько меток: добавляемое свойство имеет все метки; если сфера даёт несколько свойств — первое гарантированно со всеми метками */
+  const rollN=(it,n)=>{if(RU.multi){RU.all=true;const ok=afxRoll(it);RU.all=false;if(!ok)return false;n--;}afxRollN(it,n);return true;};
+  if(RU.multi)RU.all=true;
   const before=JSON.stringify(it.mods);let done=true;AFX_RULE=RU;
   try{
-    if(k==='trans'){it.rar='magic';it.afx=1;delete it.legacy;afxRollN(it,ri(1,2));}
-    else if(k==='aug'||k==='exalt')done=afxRoll(it);
+    if(k==='trans'){it.rar='magic';it.afx=1;delete it.legacy;rollN(it,ri(1,2));}
+    else if(k==='aug'||k==='exalt'){done=afxRoll(it);if(!done)toast(RU.multi?`Свойства с метками ${fosTagsTxt(RU)} на предмете уже есть или для них нет места`:'Под ископаемые не подходит ни одно свободное свойство');}
     else if(k==='regal'){it.rar='rare';delete it.rname;afxRoll(it);}
-    else if(k==='alch'){it.rar='rare';it.afx=1;delete it.rname;delete it.legacy;afxRollN(it,rareN(it.ilvl));}
+    else if(k==='alch'){it.rar='rare';it.afx=1;delete it.rname;delete it.legacy;rollN(it,rareN(it.ilvl));}
     else if(k==='alt'||k==='chaos'){
       /* без «начала/окончания» перебрасываются все свойства; с ними — только префиксы или только суффиксы */
       it.mods=it.mods.filter(m=>m.cr||(RU.side&&isAfx(m)&&m.a!==RU.side));it.afx=1;delete it.legacy;delete it.rname;
-      const want=k==='alt'?ri(1,2):rareN(it.ilvl),n=Math.max(1,want-it.mods.filter(m=>!m.cr).length);afxRollN(it,n);}
+      const want=k==='alt'?ri(1,2):rareN(it.ilvl),n=Math.max(1,want-it.mods.filter(m=>!m.cr).length);rollN(it,n);}
     else if(k==='scour'){if(RU.side){it.mods=it.mods.filter(m=>m.cr||!isAfx(m)||m.a!==RU.side);if(!it.mods.some(m=>!m.cr)){it.mods=[];it.rar='normal';}}else{it.mods=[];it.rar='normal';}delete it.rname;}
     else if(k==='annul'){const pool=it.mods.filter(m=>fosMatch(m,RU));if(!pool.length){done=false;toast('Нет свойств, подходящих под ископаемые');}else it.mods.splice(it.mods.indexOf(pick(pool)),1);}
     else if(k==='divine'){const ms=it.mods.filter(m=>fosMatch(m,RU));if(!ms.length){done=false;toast('Нет свойств, подходящих под ископаемые');}else if(RU.sanct)sanctVals(it,ms);else ms.forEach(m=>{const T=afxTiers(afxBase(it),m.g),row=T&&T.find(x=>x[0]===m.t);if(row)m.r=afxVals(row,AFX_G[m.g]);});}
@@ -6143,7 +6153,7 @@ function vMineBench(M){
   let h=`<div class="panel"><p class="muted small" style="margin:0 0 8px">Выберите предмет и набор ископаемых, затем сферу: она подействует только по правилам ископаемых. За каждое применение тратится сфера и по одному каждому выбранному ископаемому.</p>
     ${groups.map(([n,l])=>`<div class="eyebrow" style="margin:6px 0 4px">${n}</div><div class="fgrid">${l.map(f=>fosTile(f,M)).join('')}</div>`).join('')}
     <div class="fsel">${mineFos.size?[...mineFos].map(i=>`<div class="row small" style="flex-wrap:nowrap;gap:6px">${fosSvg(i,20)}<span><b>${FOS[i].n}</b> — <span class="muted">${FOS[i].d}</span></span></div>`).join(''):'<span class="dim small">Ископаемые не выбраны. Нажмите на квадратики выше; подробности — при выборе.</span>'}</div>
-    ${mineFos.size?`<p class="small ${chk.ok?'good-t':'bad-t'}" style="margin:6px 0 0">${chk.ok?'Набор подходит':chk.why}</p><button class="btn sm ghost" data-a="mineFosClr" style="margin-top:6px">Сбросить выбор</button>`:''}</div>`;
+    ${mineFos.size?`<p class="small ${chk.ok&&(!it||fosItemOk(it,chk.rule))?'good-t':'bad-t'}" style="margin:6px 0 0">${!chk.ok?chk.why:it&&!fosItemOk(it,chk.rule)?`У этого предмета нет свойств с метками ${fosTagsTxt(chk.rule)}`:chk.rule.multi?`Набор подходит: свойство будет со всеми метками — ${fosTagsTxt(chk.rule)}`:'Набор подходит'}</p><button class="btn sm ghost" data-a="mineFosClr" style="margin-top:6px">Сбросить выбор</button>`:''}</div>`;
   if(it){h+=`${itemCard(it)}<div class="row"><button class="btn sm ghost" data-a="mineSel" data-u="">‹ Другой предмет</button></div>
     <div class="panel"><div class="eyebrow" style="margin-bottom:6px">Сферы</div><div class="list">${FOS_ORBS.map(k=>{const n=S.cur[k]||0,ok=chk.ok&&n>0&&fosOrbOk(it,k);
       return `<button class="btn" data-a="mineCraft" data-o="${k}" ${ok?'':'disabled'} style="display:flex;justify-content:space-between;text-align:left;gap:8px"><span>${ORBS[k].n}<br><small class="muted" style="font-family:var(--ff-b);font-weight:400">${ORBS[k].d}</small></span><span class="num r-cur">×${n}</span></button>`;}).join('')}</div></div>`;}
