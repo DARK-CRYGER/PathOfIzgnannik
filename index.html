@@ -502,6 +502,17 @@ button.sigil{padding:0;cursor:pointer;color:var(--gold2)}
 @keyframes vglow{from{box-shadow:0 0 0 rgba(255,210,80,0)}to{box-shadow:0 0 12px rgba(255,210,80,.45)}}
 .mup .row b{font-family:var(--ff-d)}
 
+/* обучение */
+.hl-pulse{position:relative;z-index:3;animation:hlp 1.2s ease-in-out infinite;outline:2px solid var(--gold2);outline-offset:2px}
+@keyframes hlp{50%{outline-color:transparent;box-shadow:0 0 14px rgba(231,196,122,.55)}}
+.tipbar{display:flex;gap:8px;align-items:center;margin:4px 0;padding:8px 10px;background:#2c2216;border:1px solid var(--gold2);color:var(--fg)}
+.tipbar b{display:block;font:700 13px var(--ff-d);color:var(--gold2)}.tipbar span{font-size:12px;line-height:1.35}
+.cb-bot.tipwait .skills,.cb-bot.tipwait .act-row,.cb-bot.tipwait .flasks{opacity:.45;pointer-events:none}
+.nextstep{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:10px 12px;background:linear-gradient(90deg,#2c2216,#1a1410);border:1px solid var(--gold);color:var(--fg)}
+.nextstep b{font:700 15px var(--ff-d);color:var(--gold2)}.nextstep small{color:var(--muted)}
+.newchip{display:inline-block;font:600 10px/16px var(--ff-b);padding:0 6px;border-radius:8px;background:#3a5a2a;color:#cfeec0;vertical-align:1px}
+.gloss{border-bottom:1px dotted var(--line);padding:6px 0}.gloss summary{cursor:pointer;font-weight:600}
+
 </style>
 </head><body>
 <div id="app"></div>
@@ -2676,6 +2687,8 @@ function spawnWave(){
     for(let i=0;i<(I.pin?0:I.act===0?1:2);i++)C.enemies.push(mkEnemy(pick(I.pool),I.lvl,{map:I.mt}));
     logC(`<span class="boss-t">${b.n}</span> преграждает путь!`);}
   else for(let i=0;i<n;i++)C.enemies.push(mkEnemy(pick(I.pool),I.lvl+(Math.random()<.25?1:0),{rar:roll3(),map:I.mt}));
+  /* обучение: первая волна первого боя слабее */
+  if(C.B.type==='camp'&&C.B.g===0&&C.wave===1&&!(ACC.tips&&ACC.tips.fb_done))C.enemies.forEach(e=>{e.maxHp=e.hp=Math.max(1,R(e.hp*.6));e.dmg*=.6;});
   logC(`<b>Волна ${C.wave}/${C.waves}</b>: ${C.enemies.map(e=>e.n).join(', ')}`);
   if(I.map)veinCheck();
   C.target=null;autoTarget();
@@ -3268,7 +3281,7 @@ function enemyAct(e,P){
   if(e.boss){if(e.mineBoss&&mineBossPre(e,P))return;e.turn++;
     const ph=e.boss.phases&&e.boss.phases[e.phase||0];
     if(ph&&e.hp<e.maxHp*ph.at){e.phase=(e.phase||0)+1;logC(`<span class="boss-t">${ph.name}!</span>`);
-      if(ph.summon)ph.summon.forEach(id=>{const m=mkEnemy(id,e.lvl-2,{d:ri(1,3),map:C.I.mt});m.maxHp=m.hp=R(m.hp*.28);m.dmg*=.75;m.summoned=1;m.boss={...m.boss,spec:m.boss.spec.slice(0,1)};C.enemies.push(m);});
+      if(ph.summon)ph.summon.forEach(id=>{const m=mkEnemy(id,e.lvl-2,{d:ri(1,3),map:C.I.mt});if(m.boss){m.maxHp=m.hp=R(m.hp*.28);m.dmg*=.75;m.boss={...m.boss,spec:m.boss.spec.slice(0,1)};}else if(C.I.mine){const dp=mineDeep(C.I.depth);m.maxHp=m.hp=R(m.hp*dp.hp);m.dmg*=dp.dmg;}m.summoned=1;C.enemies.push(m);});
       if(ph.ward){e.st.ward=ph.ward+1;}
       if(ph.hex)C.fb.push({slot:'hx'+e.uid+e.phase,name:ph.name,eff:hexYou(ph.hex,P),turns:ph.t||3,bad:1});
       if(e.mineBoss)minePhase(e,ph);
@@ -3396,6 +3409,8 @@ function hurtPlayer(e,raw,el,kind,P,crit,mix){
   if(P.keys.has('k_troll')&&C.hp>0&&!P.keys.has('vaal')){const rg=R(P.life*P.regen/100+(P.regenF||0));if(rg>0){C.hp=Math.min(P.life,C.hp+rg);C._troll=rg;}}
   if(P.keys.has('k_ghostdance')&&C.shroud>0){C.shroud--;C.es=Math.min(P.es,C.es+P.eva*.03);}
   const shown=toHp+toEs;
+  /* журнал урона по стихиям — для разбора смерти */
+  if(shown>0){C.dmgLog=C.dmgLog||[];const lp={};for(const k in pp)if(pp[k]>0)lp[k]=pp[k];C.dmgLog.push({t:C.turn,p:lp});if(C.dmgLog.length>40)C.dmgLog.shift();}
   fx('me',(crit?'✦ ':'')+'−'+fmt(shown),'hurt');haptic('heavy');
   C.log.push(`${e.n}: ${fmt(shown)}`);
   const pt=ELS.filter(k=>pp[k]>.5).map(k=>`${EL[k]} ${fmt(pp[k])}`).join(', ');
@@ -3482,6 +3497,7 @@ async function battleWon(){
   C.busy=true;C.over=true;notifyH();keepTotems(calc());
   const B=C.B;let note='',cont=null;
   if(B.type==='camp'){
+    if(B.g===0&&ACC){ACC.tips=ACC.tips||{};ACC.tips.fb_done=1;}
     const b=BATTLES[B.g],A=ACTS[b.act];
     if(B.g===S.prog){S.prog++;
       const rw=A.rewards[b.ix+1];
@@ -4628,12 +4644,12 @@ function initTG(){
   srvLoad();cloudLoad();syncBack();render();
   setTimeout(()=>{if(!srvReady)srvLoad();},6000);
 }
-function syncBack(){try{if(!tg||!tg.BackButton)return;(modalHtml&&!modalLock)||inFight()||screen==='sub'||screen==='combat'||screen==='settings'||(screen==='select'&&ACC.chars.length)?tg.BackButton.show():tg.BackButton.hide();}catch(e){}}
+function syncBack(){try{if(!tg||!tg.BackButton)return;(modalHtml&&!modalLock)||inFight()||screen==='sub'||screen==='combat'||screen==='settings'||screen==='help'||(screen==='select'&&ACC.chars.length)?tg.BackButton.show():tg.BackButton.hide();}catch(e){}}
 function onBack(){
   if(modalHtml&&!modalLock){closeModal();return;}
   if(inFight()){ACT.backFight();return;}
   if(screen==='sub'){ACT.back();return;}
-  if(screen==='select'&&ACC.chars.length||screen==='settings'){screen='roster';render();return;}
+  if(screen==='select'&&ACC.chars.length||screen==='settings'||screen==='help'){screen='roster';render();return;}
   if(screen==='combat'&&C&&!C.over)ACT.fleeAsk();
 }
 if(/tgWebApp/.test(location.hash)||window.TelegramWebviewProxy||/Telegram/i.test(navigator.userAgent)){
@@ -4681,7 +4697,7 @@ function topBar(){
     <div class="gold num">${fmt(S.gold)} зол.</div></div>`;
 }
 function renderTabs(){
-  if(!S||screen==='select'||screen==='roster'||screen==='settings'||screen==='combat'){tabsEl.innerHTML='';return;}
+  if(!S||screen==='select'||screen==='roster'||screen==='settings'||screen==='help'||screen==='combat'){tabsEl.innerHTML='';return;}
   const T=inFight()?[['fight','В бой'],['char','Герой'],['tree','Древо'],['gems','Камни']]:[['map',S.done?'Убежище':'Карта'],['char','Герой'],['tree','Древо'],['gems','Камни'],['items','Снаряжение']];
   const newItems=S.inv.some(x=>x.isNew),lack=gemsLacking().length;
   tabsEl.innerHTML=`<nav class="tabs"><div class="in">${T.map(([k,n])=>`<button class="${tab===k&&screen==='main'?'on':''}" data-a="tab" data-t="${k}">${ICONS[k]}${n}${k==='gems'&&lack?`<span class="warn" title="Камням не хватает атрибутов">!</span>`:''}${(k==='tree'&&(pointsFree()>0||(S.asc&&ascFree()>=1)))||(k==='items'&&newItems&&S.inv.length<INV_WARN)?'<span class="dot"></span>':''}${k==='items'&&S.inv.length>=INV_WARN?`<span class="warn" title="Инвентарь почти полон">!</span>`:''}</button>`).join('')}</div></nav>`;
@@ -4691,6 +4707,7 @@ function render(){
   let h='';
   if(screen==='roster')h=vRoster();
   else if(screen==='settings')h=vSettings();
+  else if(screen==='help')h=vHelp();
   else if(screen==='select')h=vSelect();
   else if(screen==='combat')h=vCombat();
   else if(screen==='sub')h=topBar()+vSub();
@@ -4702,6 +4719,7 @@ function render(){
     const fe=app.querySelector('.field');if(fe&&u.cbFill&&cb){fe.classList.add('fill');const top=fe.getBoundingClientRect().top+window.scrollY,avail=window.innerHeight-cb.offsetHeight-6-top;fe.style.minHeight=Math.max(0,avail/z)+'px';}
     flushFx();}
   if(screen==='main'&&tab==='tree'&&treeTab==='tree')bindTree();
+  if(typeof tutAfter==='function')try{tutAfter();}catch(e){console.error(e);}
 }
 function vSub(){return ({shop:vShop,stash:vStash,auction:vAuction,device:vDevice,bench:vBench,dummy:vDummy,lab:vLab,mine:vMine})[sub]();}
 function subHead(title,eyebrow){return `<div class="row"><button class="btn sm ghost" data-a="back">‹ ${S.done?'Убежище':'Лагерь'}</button><div class="sp"><div class="eyebrow">${eyebrow||''}</div><h2>${title}</h2></div></div>`;}
@@ -4731,7 +4749,7 @@ function vRoster(){
     ${(()=>{const bc=backupChars();return bc.length?`<div class="panel"><div class="eyebrow" style="margin-bottom:6px">Резервные копии на этом устройстве</div>
       ${bc.map(c=>`<div class="row" style="justify-content:space-between;padding-block:4px"><span>${esc(c.name)} · ${CLASSES[c.cls].n}, ур. ${c.lvl}</span><button class="btn sm" data-a="restoreChar" data-id="${c.id}" ${ACC.chars.length<MAX_CHARS?'':'disabled'}>Вернуть</button></div>`).join('')}</div>`:'';})()}
     <button class="btn full" data-a="leaders">Таблица лидеров</button>
-    <button class="btn full" data-a="settings">Настройки</button>
+    <div class="row"><button class="btn sp" data-a="help">Как играть</button><button class="btn sp" data-a="settings">Настройки</button></div>
     <div class="panel"><div class="sheet"><div><span>Золото (общее)</span><span>${fmt(ACC.gold||0)} зол.</span></div><div><span>Тайник</span><span>${ACC.stash.items.length}/${30*ACC.stash.tabs}</span></div><div><span>Выручка аукциона</span><span>${fmt(ACC.aucGold||0)} зол.</span></div></div></div>
   </div>`;
 }
@@ -4745,6 +4763,7 @@ const CB_SCALES=[[80,'Мелкий'],[90,'Компактный'],[100,'Обыч�
 function vSettings(){const u=ACC.ui||{},sc=u.cbScale||100;
   return `<div class="row"><button class="btn sm ghost" data-a="roster">‹ Персонажи</button><div class="sp"><h2>Настройки</h2></div></div>
   <div class="stack">
+    ${ACC?tutSettingsPanel():''}
     <div class="panel"><div class="ph"><h2>Поле боя</h2></div><p class="dim small" style="margin:0 0 8px">Размер экрана боя под ваше устройство: поле с монстрами и панель умений.</p>
       <div class="seg2 cbsc">${CB_SCALES.map(([v,n])=>`<button class="${sc===v?'on':''}" data-a="cbScale" data-v="${v}" title="${n}">${v}%</button>`).join('')}</div>
       <label class="row" style="min-height:40px;flex-wrap:nowrap;margin-top:8px"><input type="checkbox" data-a="uiSet" data-k="cbFill" ${u.cbFill?'checked':''} style="width:22px;height:22px;flex:none"> <span>Растянуть поле боя на весь свободный экран</span></label></div>
@@ -4786,7 +4805,7 @@ function vMap(){
   if(S.done)return vHideout();
   const cur=actOfProg();if(viewAct<cur)viewAct=cur;
   const A=ACTS[viewAct],next=S.prog<BATTLES.length?BATTLES[S.prog]:null;
-  let h=`<div class="stack">`;
+  let h=`<div class="stack">${nextStepHtml()}`;
   if(next){const NA=ACTS[next.act],l=NA.locs[next.loc];
     h+=`<button class="cta" data-a="go"><span class="sp"><span class="eyebrow">${NA.n} · бой ${next.ix+1} из ${NA.total}</span><b>${next.boss?'Босс: '+MONS[next.boss].n:l[0]}</b><span class="small muted">Уровень области ${next.lvl} · 4 волны${S.lvl+5+next.act<next.lvl?' · <span class="bad-t">штраф опыта: вы слишком слабы</span>':''}</span></span><span class="arrow">›</span></button>`;}
   h+=`<div class="seg">${ACTS.map((a,i)=>i<cur?'':`<button class="${i===viewAct?'on':''}" data-a="act" data-i="${i}" ${i<=cur?'':'disabled'}>${a.n}</button>`).join('')}</div>`;
@@ -4804,10 +4823,10 @@ function vMap(){
   });
   return h+'</div>';
 }
-function station(id,n,d){return `<button class="station" data-a="sub" data-s="${id}"><b>${n}</b><small>${d}</small></button>`;}
+function station(id,n,d){const dot=id==='shop'&&typeof anyNewGem==='function'&&anyNewGem();return `<button class="station" data-a="sub" data-s="${id}"><b>${n}${dot?' <span class="newchip">новые камни</span>':''}</b><small>${d}</small></button>`;}
 function vHideout(){
   const mc=mapCount();
-  return `<div class="stack">
+  return `<div class="stack">${nextStepHtml()}
     ${S.mapRun?`<button class="cta" data-a="mapCont"><span class="sp"><span class="eyebrow">Карта ${S.mapRun.tier} тира · ${esc(S.mapRun.name)}</span><b>Продолжить: бой ${S.mapRun.step+1}/4</b><span class="small muted">Уровень области ${67+S.mapRun.tier}</span></span><span class="arrow">›</span></button>`:''}
     ${S.mineRun&&S.mineRun.opts?`<button class="cta" data-a="mineCont"><span class="sp"><span class="eyebrow">Азуритовая шахта · глубина ${S.mineRun.depth}</span><b>Продолжить спуск</b><span class="small muted">Сульфур: ${fmt(MN().su)}</span></span></button>`:''}
     ${S.labRun?`<button class="cta" data-a="sub" data-s="lab"><span class="sp"><span class="eyebrow">${LABS[S.labRun.n].n}</span><b>Вернуться в лабиринт</b><span class="small muted">Комната ${Math.min(S.labRun.step+1,S.labRun.steps.length)}/${S.labRun.steps.length}</span></span><span class="arrow">›</span></button>`:''}
@@ -4896,17 +4915,17 @@ function vCombat(){
   const hb=(h,n)=>h?`<button class="hexb" data-a="hex" data-n="${n}" ${C.busy||!h.ok||!affordable({},P,h.cost)?'disabled':''} aria-label="${h.n}"><b>${h.kind==='mark'?'◎':'☍'} ${h.n.replace('Метка ','')}</b><small>${!h.ok?'мало атрибута':`${h.cost} маны${h.kind==='mark'?' · без хода':''}`}</small></button>`:'';
   const hexBtn=hb(P.hex,0)+hb(P.hex2,1);
   return `<div class="cb-head"><div class="sp"><div class="eyebrow">${I.sub} · ур. ${I.lvl} · волна ${C.wave}/${C.waves} · ход ${C.turn}</div><h2>${I.name}</h2></div>
-      ${S.inv.length>=INV_WARN?`<span class="invwarn" title="Инвентарь почти полон">! ${S.inv.length}/${INV_MAX}</span>`:''}<button class="btn sm ghost" data-a="journal">Журнал</button><button class="btn sm ghost" data-a="fightEdit" data-t="tree" ${C.busy?'disabled':''} aria-label="Древо и камни">Билд</button><button class="btn sm ghost" data-a="fleeAsk" ${C.busy?'disabled':''}>Уйти</button></div>
+      ${S.inv.length>=INV_WARN?`<span class="invwarn" title="Инвентарь почти полон">! ${S.inv.length}/${INV_MAX}</span>`:''}<button class="btn sm ghost" data-a="helpFight" aria-label="Как идёт бой">?</button><button class="btn sm ghost" data-a="journal">Журнал</button><button class="btn sm ghost" data-a="fightEdit" data-t="tree" ${C.busy?'disabled':''} aria-label="Древо и камни">Билд</button><button class="btn sm ghost" data-a="fleeAsk" ${C.busy?'disabled':''}>Уйти</button></div>
   <div class="cbxp"><span class="num">ур. ${S.lvl}</span><div class="xpbar"><i style="width:${S.lvl>=MAXLVL?100:clamp(S.xp/xpNeed(S.lvl)*100,0,100)}%"></i></div><span class="num dim">${S.lvl>=MAXLVL?'макс.':R(S.xp/xpNeed(S.lvl)*1000)/10+'%'}</span></div>
   <div class="field">${C.vein?`<button class="vein" data-a="vein" ${C.busy?'disabled':''}><b>⛏ Жила сульфура</b><small>Нажмите, чтобы добыть · не тратит ход</small></button>`:''}${lanes}${minionRow()}</div>
-  <div class="cb-bot"><div class="cb-in">
+  <div class="cb-bot ${C.tipCur?'tipwait':''}"><div class="cb-in">
   <div class="me" id="mebox">
     ${P.es>0?bar('esb',C.es,P.es,`Щит ${fmt(C.es)} / ${fmt(P.es)}`):''}
     ${bar('hpb',C.hp,P.life,`Здоровье ${fmt(C.hp)} / ${fmt(P.life)}`)}
     ${P.mana>0?bar('mpb',C.mana,P.mana,`Мана ${fmt(C.mana)} / ${fmt(P.mana)}`):''}
   </div>
   ${buffRow(P)}
-  <div class="skills n${sks.length}">${sks.join('')}</div>
+  ${tutBanner()}<div class="skills n${sks.length}">${sks.join('')}</div>
   ${flasks||hexBtn?`<div class="flasks ${P.hex2?'hx2':hexBtn?'hx':''}">${hexBtn}${flasks}</div>`:''}
   <div class="act-row ${cb.hide.b?'two':''}">
     <button class="btn" data-a="mv" data-d="1" ${C.busy?'disabled':''}>↓ Назад</button>
@@ -4976,7 +4995,7 @@ function showDeath(loss){
   if(C.B.type==='mine'){modal(`<h2>Вы пали в шахте</h2><p style="margin:0 0 8px">Глубина <b>${C.I.depth}</b>. Потеряно ${fmt(loss)} опыта, спуск окончен. Добыча, азурит и ископаемые сохранены. Ваша глубина: <b class="gold-t">${MN().best||0}</b>.</p><div class="row"><button class="btn sp" data-a="journal">Журнал</button><button class="btn pri sp" data-a="leave">В убежище</button></div>`,true);return;}
   const map=C.B.type==='map',lab=C.B.type==='lab';
   modal(`<h2>Вы пали</h2><p class="muted" style="margin:0">${map?`Потеряно ${fmt(loss)} опыта и карта.`:lab?'Лабиринт потерян: он перестроится при следующем входе.':'В кампании смерть не отнимает опыт.'} Усильте билд: древо, камни, ауры, флаконы или снаряжение.</p>
-    <p class="notice">Совет: ${pick(['проверьте сопротивления на вкладке «Герой».','следите за намерениями врагов: «Готовит…» означает сильный удар босса.','флаконы не тратят ход — пейте их до опасного удара.','проклятие «Бессилие» ослабляет удары врагов, метки не тратят ход.','холод замедляет врагов ближнего боя и ослабляет их удары.','проверьте урон умений на мишени в убежище.'])}</p>
+    <p class="notice">${deathAdvice()||'Совет: '+pick(['проверьте сопротивления на вкладке «Герой».','следите за намерениями врагов: «Готовит…» означает сильный удар босса.','флаконы не тратят ход — пейте их до опасного удара.','проклятие «Бессилие» ослабляет удары врагов, метки не тратят ход.','холод замедляет врагов ближнего боя и ослабляет их удары.','проверьте урон умений на мишени в убежище.'])}</p>
     <div class="row"><button class="btn sp" data-a="journal">Журнал</button><button class="btn pri sp" data-a="leave">${S.done?'В убежище':'В лагерь'}</button></div>`,true);
 }
 function offerReward(after){
@@ -5027,6 +5046,7 @@ function vChar(){
     <div class="panel"><div class="ph"><h2>Прогресс</h2></div><div class="sheet"><div><span>Кампания</span><span>${S.done?'пройдена':`${S.prog}/${BATTLES.length}`}</span></div><div><span>Лучшая карта</span><span>${S.mapBest||'—'}</span></div>
       <div><span>Лабиринты</span><span>${S.labs.filter(Boolean).length}/4</span></div><div><span>Карт в запасе</span><span>${mapCount()}</span></div>
       <div><span>Убито врагов</span><span>${fmt(S.kills)}</span></div><div><span>Смертей</span><span>${S.deaths}</span></div></div></div>
+    ${glossaryPanel()}
     <div class="panel"><div class="ph"><h2>Справочник изгнанника</h2></div><p class="dim small" style="margin:0 0 8px">Все базы предметов, свойства с тирами, уникальные предметы и сферы с шансом выпадения.</p><button class="btn full" data-a="wiki">Открыть справочник</button></div>
   </div>`;
 }
@@ -5511,6 +5531,7 @@ function vShop(){
       <div class="panel"><div class="eyebrow" style="margin-bottom:8px">Сумка · ${S.inv.length}/${INV_MAX}</div>
       <div class="list">${sortInv(S.inv).map(x=>`<div class="sellrow"><button class="irow" data-a="itemInv" data-u="${x.uid}"><span class="sl">${x.fav?'<b class="gold-t">★</b> ':''}${slotLabel(x)} · ${x.ilvl}</span><span class="in r-${x.rar}">${esc(dispName(x))}</span></button><button class="btn sm" data-a="sellOne" data-u="${x.uid}">${fmt(sellPrice(x))}</button></div>`).join('')||'<span class="dim">Сумка пуста</span>'}</div></div>`;
   }else if(shopTab==='gems'){
+    setTimeout(()=>{if(S&&screen==='sub'&&sub==='shop'&&shopTab==='gems')S.gemSeen=S.lvl;},0);
     const all=[['melee','Ближний бой',ACTIVE_IDS.filter(id=>GEMS[id].cat==='melee')],['ranged','Дальний бой',ACTIVE_IDS.filter(id=>GEMS[id].cat==='ranged')],['spell','Заклинания',ACTIVE_IDS.filter(id=>GEMS[id].cat==='spell'&&!GEMS[id].minion)],['totem','Тотемы',ACTIVE_IDS.filter(id=>GEMS[id].cat==='totem')],['minion','Приспешники',ACTIVE_IDS.filter(id=>GEMS[id].cat==='minion'||GEMS[id].minion)],['hex','Метки и порчи',HEX_IDS],['aura','Ауры',AURA_IDS],['sup','Поддержка',SUPPORT_IDS]];
     if(!shopGem)shopGem=GEMS[CLASSES[S.cls].gem].cat;
     const SH={melee:'Ближний',ranged:'Дальний',spell:'Чары',totem:'Тотемы',minion:'Призыв'};
@@ -5523,7 +5544,7 @@ function vShop(){
         <div class="dim small" style="margin-top:6px">Найдено: <b id="supL_n"></b> · ★ — ваши умения</div></div>`;}
     groups.forEach(([n,ids])=>{const list=ids.slice().sort((a,b)=>(obtainable(b)?1:0)-(obtainable(a)?1:0)||(allowed(b)?1:0)-(allowed(a)?1:0));if(!list.length)return;
       h+=`<div class="panel"><div class="ph"><h2>${n}</h2></div><div class="list" ${shopGem==='sup'?'id="supL"':''}>${list.map(id=>{const G=gdef(id),p=gemPrice(id),L=shopGemLvl(id);
-        return `<div class="gemb" ${shopGem==='sup'?`data-qt="${esc((G.n+' '+(G.d||'')).toLowerCase())}" data-fit="${supFitList(id).join(' ')}"`:''}><button class="gemi" data-a="gemInfo" data-id="${id}">${gemIcon(id)}<span class="gt"><b>${G.n}</b><small>ур. ${L} · ${gemWeaponShort(id)}${allowed(id)?'':' · <span class="bad-t">после кампании</span>'} · <span class="gold-t">подробнее</span></small></span></button><button class="btn sm" data-a="buyGem" data-id="${id}" ${S.gold>=p?'':'disabled'}>${fmt(p)}</button></div>`}).join('')}</div></div>`;});
+        return `<div class="gemb" ${shopGem==='sup'?`data-qt="${esc((G.n+' '+(G.d||'')).toLowerCase())}" data-fit="${supFitList(id).join(' ')}"`:''}><button class="gemi" data-a="gemInfo" data-id="${id}">${gemIcon(id)}<span class="gt"><b>${G.n}${isNewGem(id)?' <span class="newchip">новый</span>':''}</b><small>ур. ${L} · ${gemWeaponShort(id)}${allowed(id)?'':' · <span class="bad-t">после кампании</span>'} · <span class="gold-t">подробнее</span></small></span></button><button class="btn sm" data-a="buyGem" data-id="${id}" ${S.gold>=p?'':'disabled'}>${fmt(p)}</button></div>`}).join('')}</div></div>`;});
   }else{
     h+=`<div class="panel"><p class="muted" style="margin:0 0 10px">Сбросить все пассивные умения и вернуть очки. Отдельный узел можно забыть прямо в древе.</p>
       <button class="btn full" data-a="resetTree" ${S.gold>=treeResetCost()&&S.alloc.length>1?'':'disabled'}>Сбросить древо · ${fmt(treeResetCost())} зол.</button></div>
@@ -6007,10 +6028,6 @@ document.addEventListener('click',ev=>{const el=ev.target.closest('[data-a]');if
   showDeath=l=>{window._lastOver=()=>sd(l);sd(l);};
   showLabWin=()=>{window._lastOver=()=>sl();sl();};}
 
-/* старт */
-load();
-screen=S?'main':ACC.chars.length?'roster':'select';tab='map';if(S)viewAct=actOfProg();
-render();
 
 /* ---------- поиск без перерисовки: поле .qf фильтрует строки [data-qt] в списке data-for ---------- */
 const QF={};
@@ -6142,6 +6159,183 @@ Object.assign(ACT,{
 /* поле ввода глубины: стоимость и уровень пересчитываются на лету */
 document.addEventListener('input',e=>{if(e.target&&e.target.id==='mineD'){const M=MN(),v=clamp(Math.round(+e.target.value)||1,1,M.best+1);mineDepthIn=v;
   const c=document.getElementById('mineDc'),l=document.getElementById('mineDl');if(c)c.textContent=mineCost(v);if(l)l.textContent=mineLvl(v);}});
+
+/* =========================================================
+   ОБУЧЕНИЕ: знакомство, первый бой с подсказками, подсказки по событиям,
+   вехи кампании, «Следующий шаг», разбор смерти, словарь, раздел «Как играть».
+   Подсказка показывается один раз на аккаунт (ACC.tips), её можно перечитать в «Как играть».
+   ========================================================= */
+var tutIntro=0,tutBusy=false;
+const TIP_SEC={fight:'Бой',gems:'Камни и умения',tree:'Древо',items:'Снаряжение и сферы',shop:'Торговец',labs:'Лабиринты и возвышение',end:'Убежище, карты и шахта'};
+const tipAlive=()=>C&&C.enemies?C.enemies.filter(e=>e.hp>0):[];
+const firstFight=()=>C&&C.B&&C.B.type==='camp'&&C.B.g===0;
+/* combat:1 — полоска в бою над умениями; basic:1 — основы, скрываются в режиме «Я уже играл в PoE» */
+const TIPS=[
+  /* ---- первый бой ---- */
+  {id:'fb_field',sec:'fight',combat:1,basic:1,hl:'.intent',t:'Поле боя',x:'Враги стоят на четырёх дистанциях: внизу — вплотную к вам, вверху — далеко. У каждого видно здоровье и намерение: что он сделает в свой ход.',c:()=>firstFight()},
+  {id:'fb_target',sec:'fight',combat:1,basic:1,hl:'.en',t:'Цель',x:'Нажмите на врага, чтобы выбрать цель. Золотая рамка — текущая цель. Умения бьют её, а если она недоступна — ближайшую подходящую.',c:()=>firstFight()&&tipSeen('fb_field')},
+  {id:'fb_skill',sec:'fight',combat:1,basic:1,hl:'.sk',t:'Умение',x:'На кнопке умения — средний урон, цена в мане и кого оно достаёт. Нажмите, чтобы ударить. После вашего действия ходят враги, затем снова вы.',c:()=>firstFight()&&tipSeen('fb_target')},
+  {id:'fb_range',sec:'fight',combat:1,basic:1,hl:'[data-a=mv][data-d="-1"]',t:'Дистанция',x:'Удары ближнего боя достают только вплотную, стрелы и чары — дальше. «Вперёд ↑» делает шаг к врагам, «↓ Назад» отодвигает всех врагов на одну дистанцию. Шаг тратит ход.',
+    c:P=>tipAlive().length&&P.skills.some(s=>s&&!s.bad&&MELEE_FN.includes(s.fn))&&tipAlive().every(e=>e.d>0)},
+  {id:'fb_back',sec:'fight',combat:1,basic:1,hl:'[data-a=mv][data-d="1"]',t:'Отступить',x:'Враг вплотную! Стрелкам и магам выгодно держать дистанцию: «↓ Назад» отодвигает всех врагов на шаг. Шаг тратит ход.',
+    c:P=>!P.skills.some(s=>s&&MELEE_FN.includes(s.fn))&&tipAlive().some(e=>e.d===0&&e.k==='melee')},
+  {id:'fb_basic',sec:'fight',combat:1,basic:1,hl:'[data-a=skill][data-i="-1"]',t:'Атака оружием',x:'Атака оружием бесплатна — она выручает, когда закончилась мана. Мана восстанавливается каждый ход и между волнами.',
+    c:P=>P.mana>0&&P.skills.some(s=>s&&!s.bad)&&P.skills.filter(s=>s&&!s.bad).every(s=>!affordable(s,P))},
+  {id:'fb_flask',sec:'fight',combat:1,basic:1,hl:'.fl',t:'Флаконы',x:'Флакон здоровья не тратит ход. Заряды копятся за убийства. Пейте его до опасного удара, а не после.',c:P=>C.fl&&C.fl.some(Boolean)&&C.hp<P.life*.5},
+  {id:'fb_boss',sec:'fight',combat:1,basic:1,hl:'.intent.bad',t:'Опасный удар',x:'«Готовит: …» красным — сильный удар босса в следующий ход. Выпейте флакон заранее или отойдите, если он бьёт вплотную.',
+    c:P=>tipAlive().some(e=>e.boss&&(intent(e,P)||{}).c==='bad')},
+  {id:'fb_wave',sec:'fight',combat:1,basic:1,t:'Волны',x:'Бой состоит из нескольких волн: зачистили одну — идёт следующая. Между волнами восстанавливается часть маны.',c:()=>C.wave>=2},
+  {id:'fb_event',sec:'fight',combat:1,t:'События на картах',x:'На картах после волны может появиться ларец или алтарь. Событие можно пропустить: ларец охраняют 2 волны, а очищенный алтарь даёт усиление до конца карты.',c:()=>C.I&&C.I.map&&C.evDone&&!C.ev},
+  {id:'fb_buttons',sec:'fight',combat:1,basic:1,hl:'.cb-head .btn',t:'Кнопки сверху',x:'«Журнал» — всё, что произошло в бою. «Билд» — древо и камни прямо в бою. «Уйти» — покинуть бой: в кампании его можно пройти заново, а карта или лабиринт при уходе теряются. «?» — эти подсказки.',c:()=>C.turn>=4},
+  /* ---- камни ---- */
+  {id:'tree',sec:'tree',basic:1,hl:'[data-t=tree]',t:'Очки древа',x:'У вас есть свободные очки. На вкладке «Древо» берите узлы рядом со стартом своего класса: крупные круги — значимые умения, у краёв — ключевые. Узел можно забыть за золото.',c:()=>pointsFree()>0},
+  {id:'gemreward',sec:'gems',basic:1,hl:'[data-t=gems]',t:'Камни умений',x:'За задания вы выбираете камень. Остальные камни своего класса продаёт торговец на вкладке «Камни», а после кампании — камни всех классов. Новые камни открываются постепенно с уровнем.',c:()=>S.gems.length>2||S.prog>=2},
+  {id:'support',sec:'gems',basic:1,hl:'[data-t=gems]',t:'Поддержки',x:'В гнёзда под умением вставляются камни поддержки: они усиливают именно это умение. Подходит ли поддержка — видно по меткам умения. Урон проверяют на мишени в убежище.',c:()=>S.gems.some(g=>GEMS[g.id]&&GEMS[g.id].sup)},
+  {id:'slot2',sec:'gems',basic:1,hl:'[data-t=gems]',t:'Второе умение',x:'Открылся слот для ещё одного умения. Новые камни появляются у торговца по мере роста уровня — загляните на вкладку «Камни».',c:()=>S.lvl>=SKILL_SLOTS[1][0]},
+  {id:'aura',sec:'gems',basic:1,hl:'[data-t=gems]',t:'Ауры',x:'Аура действует постоянно, пока вы в бою, но резервирует часть маны. Слоты аур открываются на 4, 16, 32 и 50 уровне.',c:()=>S.lvl>=AURA_SLOTS[0]},
+  {id:'hex',sec:'gems',basic:1,hl:'[data-t=gems]',t:'Проклятия и метки',x:'Открыт слот проклятия: оно ослабляет врагов, а метка ставится без траты хода. Кнопка появится в бою рядом с флаконами.',c:()=>S.lvl>=HEX_LVL},
+  {id:'slot3',sec:'gems',basic:1,hl:'[data-t=gems]',t:'Третье умение',x:'Открыт третий слот умения. Удобно держать одно умение по одной цели, одно по области и одно на передвижение или защиту.',c:()=>S.lvl>=SKILL_SLOTS[2][0]},
+  {id:'slot4',sec:'gems',basic:1,hl:'[data-t=gems]',t:'Четвёртое умение',x:'Открыт четвёртый слот умения. Порядок кнопок и какие из них показывать в бою — в «Настройках» → «Панель боя».',c:()=>S.lvl>=SKILL_SLOTS[3][0]},
+  {id:'attr',sec:'gems',basic:1,hl:'[data-t=gems]',t:'Не хватает атрибута',x:'«!» на вкладке «Камни»: камню не хватает силы, ловкости или интеллекта, и он слабее. Атрибуты дают узлы древа и предметы.',c:()=>gemsLacking().length>0},
+  /* ---- снаряжение ---- */
+  {id:'upgrade',sec:'items',basic:1,hl:'[data-t=items]',t:'Улучшение',x:'Зелёная полоска у предмета — он лучше надетого. Нажмите на него во «Снаряжении», сравните и наденьте. Звёздочка ★ защищает вещь от продажи оптом.',c:()=>S.inv.some(x=>x.slot!=='flask'&&isUpgrade(x))},
+  {id:'flask',sec:'items',basic:1,hl:'[data-t=items]',t:'Флаконы',x:'До 5 флаконов: здоровье, мана и полезные с особым эффектом на несколько ходов. Ставятся в нижний ряд куклы во «Снаряжении».',c:()=>S.inv.some(x=>x.slot==='flask')},
+  {id:'orb',sec:'items',basic:1,hl:'[data-t=items]',t:'Сферы',x:'Сферы улучшают предметы: нажмите на вещь → «Ремесло». Превращение делает обычный предмет волшебным, алхимия — сразу редким, хаос перебрасывает свойства редкого.',c:()=>ORB_IDS.some(k=>(S.cur[k]||0)>0)},
+  {id:'bag',sec:'items',basic:1,hl:'[data-t=items]',t:'Сумка почти полна',x:'Когда сумка заполнится, новая добыча пропадёт. Продайте лишнее у торговца или настройте лутфильтр: меню персонажей → «Настройки».',c:()=>S.inv.length>=INV_WARN},
+  {id:'unique',sec:'items',t:'Уникальный предмет',x:'У уникальных предметов особые свойства, их нельзя менять сферами. Все уникальные с описанием — в справочнике (вкладка «Герой»).',c:()=>S.inv.some(x=>x.rar==='unique')||Object.values(S.equip).some(x=>x&&x.rar==='unique')},
+  {id:'res',sec:'items',t:'Сопротивления',x:'С IV акта сопротивления снижены на 10% (в V на 20%, на картах на 30%). Держите огонь, холод и молнию ближе к 75% — смотрите на вкладке «Герой».',c:()=>actOfProg()>=3},
+  /* ---- торговец ---- */
+  {id:'shop',sec:'shop',basic:1,t:'Торговец',x:'«Купить» — вещи (товар обновляется с каждым уровнем или за золото). «Продать» — лишнее за золото. «Камни» — умения и поддержки. «Сброс» — вернуть очки древа. Покупайте вещи, когда видите зелёную полоску улучшения.',c:()=>screen==='sub'&&sub==='shop'},
+  /* ---- вехи ---- */
+  {id:'lab1',sec:'labs',t:'Открыт Лабиринт испытаний',x:'III акт пройден. Лабиринт испытаний (34 уровень, 6 комнат): за первое прохождение — возвышение вашего класса и 2 его очка. Вход — на вкладке «Карта».',go:'lab',c:()=>labUnlock(0)===null&&!S.done},
+  {id:'lab2',sec:'labs',t:'Открыт Жестокий лабиринт',x:'IV акт пройден. Жестокий лабиринт (50 уровень) даёт ещё 2 очка возвышения. Сначала нужно пройти Лабиринт испытаний.',go:'lab',c:()=>(S.done||S.prog>ACTS[3].last)},
+  {id:'asc',sec:'labs',t:'Возвышение',x:'Каждый лабиринт даёт 2 очка возвышения на вкладке «Древо» → «Возвышение». Сменить возвышение на другое своего класса можно в конце любого лабиринта за золото.',c:()=>!!S.asc},
+  {id:'done',sec:'end',t:'Кампания пройдена!',x:'Открыты убежище, устройство картографа (2 карты 1 тира) и Беспощадный лабиринт (68 уровень). Теперь доступны камни всех классов.',go:'device',c:()=>S.done},
+  {id:'hideout',sec:'end',t:'Убежище',x:'Устройство картографа — карты. Верстак — свойство мастера на предмет. Мишень — проверка урона. Тайник — общий для всех персонажей. Аукцион — торговля. Шахта — бесконечный спуск за сульфур.',c:()=>S.done&&tab==='map'&&screen==='main'},
+  {id:'maps',sec:'end',t:'Карты',x:'Карта — 4 боя по 3 волны, в конце босс. Тир 1 — 68 уровень, тир 16 — 83. Карты выпадают на картах; 5 карт одного тира перековываются в одну следующего.',c:()=>S.done&&mapCount()>0},
+  {id:'vein',sec:'end',t:'Сульфур',x:'Сульфур из жил на картах нужен для спуска в Азуритовую шахту в убежище. Жилу в бою нажимают — это не тратит ход.',c:()=>S.mine&&S.mine.su>0},
+  {id:'guard',sec:'end',t:'Карты защитников',x:'Стражи дают фрагменты; четыре фрагмента одной группы открывают бой с пинакл-боссом в устройстве картографа.',c:()=>gmapCount()>0},
+  {id:'offer',sec:'labs',t:'Вечный лабиринт',x:'Подношение богине открывает Вечный лабиринт (76 уровень) — последние 2 очка возвышения.',go:'lab',c:()=>S.offer>0},
+];
+const TIP=Object.fromEntries(TIPS.map(t=>[t.id,t]));
+/* советы классов */
+const CLS_TIP={duelist:'Дуэлянт силён в ближнем бою: удары по одной цели и по области, ловкость и сила. Держите врагов вплотную, берите уклонение и броню.',
+  marauder:'Дикарь — сила и здоровье: тяжёлое оружие, броня, ярость и тотемы. Подходите вплотную, регенерация и большой запас здоровья прощают ошибки.',
+  ranger:'Охотница стреляет издалека: лук, снаряды, уклонение. Держите врагов на дистанции, отходите «↓ Назад», когда кто-то подходит вплотную.',
+  shadow:'Бандит — ловкость и интеллект: крит, яд, ловушки и кинжалы. Наносит урон со временем — поражайте нескольких врагов сразу.',
+  witch:'Ведьма — чары, стихии и приспешники. Держите дистанцию, следите за маной, берите энергетический щит.',
+  templar:'Жрец — сила и интеллект: чары, молния и огонь, тотемы, броня и щит. Хорошо держит удар и бьёт по области.',
+  scion:'Дворянка стоит в центре древа и может пойти в любую сторону. Начните с ветвей рядом и выберите стиль: оружие, лук или чары.'};
+function tipSeen(id){return !!(ACC&&ACC.tips&&ACC.tips[id]);}
+function tipMark(id){ACC.tips=ACC.tips||{};ACC.tips[id]=1;}
+function tutInit(){if(!ACC)return;if(!ACC.tips){ACC.tips={};ACC.tipsAt=Date.now();
+  /* уже играющие: подсказки до текущего прогресса считаются прочитанными */
+  if(ACC.chars.some(c=>(c.lvl||1)>1||(c.prog||0)>0)){ACC.tipsOld=1;ACC.tips.intro=1;TIPS.filter(t=>t.id.startsWith('fb_')).forEach(t=>ACC.tips[t.id]=1);}}}
+function tutMigrate(){if(!S||S.tutMig)return;S.tutMig=1;if(!ACC.tipsOld||(S.created||0)>=(ACC.tipsAt||0))return;
+  let P=null;try{P=calc();}catch(e){}TIPS.forEach(t=>{if(t.combat)return;try{if(t.c(P))tipMark(t.id);}catch(e){}});tipMark('cls_'+S.cls);}
+const tipsOn=()=>!(ACC&&ACC.ui&&ACC.ui.tipsOff);
+function tipAllowed(t){return !(t.basic&&ACC.ui&&ACC.ui.tipsPoe);}
+/* после каждой отрисовки: выбрать одну подсказку и подсветить её цель */
+function tutAfter(){
+  if(!ACC||!S||tutBusy)return;tutInit();
+  document.querySelectorAll('.hl-pulse').forEach(el=>el.classList.remove('hl-pulse'));
+  if(screen==='combat'&&C){if(C.tipCur){tipHl(TIP[C.tipCur]);return;}if(!tipsOn()||C.busy||C.over||modalHtml)return;
+    let P=null;try{P=calc();}catch(e){return;}
+    const t=TIPS.find(t=>t.combat&&!tipSeen(t.id)&&tipAllowed(t)&&(()=>{try{return t.c(P);}catch(e){return false;}})());
+    if(t){C.tipCur=t.id;tutBusy=true;render();tutBusy=false;tipHl(t);}return;}
+  tutMigrate();
+  if(modalHtml||inFight()||(screen!=='main'&&screen!=='sub'))return;
+  if(!tipSeen('intro')){tutIntro=0;showIntro();return;}
+  if(!tipsOn())return;
+  /* до первого боя кнопка боя пульсирует */
+  if(!tipSeen('fb_field')&&screen==='main'&&tab==='map'&&!S.done&&S.prog===0){const b=document.querySelector('[data-a=go]')||document.querySelector('[data-a=loc].pri');if(b)b.classList.add('hl-pulse');}
+  if(!tipSeen('cls_'+S.cls)){tipMark('cls_'+S.cls);save();modal(`<div class="eyebrow">Ваш класс · ${CLASSES[S.cls].n}</div><h2>С чего начать</h2><p style="margin:0">${CLS_TIP[S.cls]||''}</p><div class="row"><button class="btn pri sp" data-a="close">Понятно</button></div>`);return;}
+  let P=null;try{P=calc();}catch(e){}
+  const t=TIPS.find(t=>!t.combat&&!tipSeen(t.id)&&tipAllowed(t)&&(()=>{try{return t.c(P);}catch(e){return false;}})());
+  if(!t)return;tipMark(t.id);save();
+  modal(`<div class="eyebrow">Подсказка · ${TIP_SEC[t.sec]}</div><h2>${t.t}</h2><p style="margin:0">${t.x}</p>
+    <div class="row">${t.go?`<button class="btn sp" data-a="close">Позже</button><button class="btn pri sp" data-a="tipGo" data-s="${t.go}">${t.go==='lab'?'К лабиринту ›':t.go==='device'?'К картам ›':'Открыть ›'}</button>`:'<button class="btn pri sp" data-a="close">Понятно</button>'}</div>`);
+  setTimeout(()=>tipHl(t),30);}
+function tipHl(t){if(!t||!t.hl)return;const el=document.querySelector(t.hl);if(el)el.classList.add('hl-pulse');}
+function tutBanner(){if(!C||!C.tipCur)return '';const t=TIP[C.tipCur];if(!t)return '';
+  return `<div class="tipbar"><div class="sp"><b>${t.t}</b><span>${t.x}</span></div><button class="btn sm pri" data-a="tipOk">Понятно</button></div>`;}
+/* ---- знакомство ---- */
+const INTRO=[
+  ['Цель','Вы — изгнанник, выброшенный на берег Райкласта. Пройдите пять актов, откройте убежище и карты, соберите свой билд: древо, камни и снаряжение.'],
+  ['Где что','Внизу пять вкладок: «Карта» — бои и лагерь, «Герой» — характеристики, «Древо» — очки умений, «Камни» — умения и ауры, «Снаряжение» — вещи и флаконы. Точка на вкладке — там есть что-то новое.'],
+  ['Как идёт бой','Бой пошаговый: вы действуете, потом враги. Враги стоят на четырёх дистанциях — от «Вплотную» до «Далеко». Бой — это несколько волн; после победы открывается следующий. Начните с кнопки боя на вкладке «Карта».']];
+function showIntro(){const i=tutIntro,c=INTRO[i];
+  modal(`<div class="eyebrow">Добро пожаловать · ${i+1}/${INTRO.length}</div><h2>${c[0]}</h2><p style="margin:0">${c[1]}</p>
+    <div class="row">${i===0?'<button class="btn sm ghost sp" data-a="introPoe">Я уже играл в PoE</button>':''}<button class="btn sp" data-a="introSkip">Пропустить</button><button class="btn pri sp" data-a="introNext">${i<INTRO.length-1?'Дальше ›':'Начать'}</button></div>`,true);}
+/* ---- «Следующий шаг» в лагере ---- */
+function nextStep(){if(!S||inFight())return null;let P;try{P=calc();}catch(e){return null;}
+  const pf=pointsFree();if(pf>0)return {t:`Свободные очки древа: ${pf}`,d:'Возьмите узлы рядом со стартом класса',tab:'tree'};
+  for(let i=0;i<4;i++)if(slotOpen(i)&&!gem(S.skills[i].a)&&S.gems.some(g=>GEMS[g.id]&&!GEMS[g.id].sup&&!S.skills.some(s=>s.a===g.uid)))return {t:`Пустой слот умения ${i+1}`,d:'Вставьте камень на вкладке «Камни»',tab:'gems'};
+  if(S.lvl>=AURA_SLOTS[0]&&!S.auras.some(Boolean)&&S.gems.some(g=>isAura(g.id)))return {t:'Пустой слот ауры',d:'Аура усиливает героя постоянно',tab:'gems'};
+  if(S.inv.some(x=>x.slot!=='flask'&&isUpgrade(x)))return {t:'В сумке есть улучшение',d:'Зелёная полоска — лучше надетого',tab:'items'};
+  if(actOfProg()>=3||S.done){const low=['fire','cold','light'].map(k=>[k,R(P.res[k]||0)]).sort((a,b)=>a[1]-b[1])[0];
+    if(low&&low[1]<40)return {t:`Сопротивление ${{fire:'огню',cold:'холоду',light:'молнии'}[low[0]]}: ${low[1]}%`,d:'Ищите его на предметах или сделайте на верстаке',tab:'char'};}
+  return null;}
+function nextStepHtml(){const n=nextStep();if(!n)return '';
+  return `<button class="nextstep" data-a="tab" data-t="${n.tab}"><span class="eyebrow">Следующий шаг</span><b>${n.t}</b><small>${n.d} ›</small></button>`;}
+/* ---- разбор смерти по журналу урона ---- */
+const EL_RU={phys:'физический урон',fire:'огонь',cold:'холод',light:'молния',chaos:'хаос'};
+const RES_RU={fire:'огню',cold:'холоду',light:'молнии',chaos:'хаосу'};
+function deathAdvice(){if(!C||!C.dmgLog||!C.dmgLog.length)return null;const from=C.turn-2,sum={};let tot=0;
+  C.dmgLog.filter(x=>x.t>=from).forEach(x=>{for(const k in x.p){sum[k]=(sum[k]||0)+x.p[k];tot+=x.p[k];}});if(tot<=0)return null;
+  const [el,v]=Object.entries(sum).sort((a,b)=>b[1]-a[1])[0],sh=R(v/tot*100);let P;try{P=calc();}catch(e){return null;}
+  let s=`Вас убил ${EL_RU[el]||el} (${sh}% урона за последние 3 хода).`;
+  if(el==='phys')s+=` Броня: ${fmt(P.armour||0)}, уклонение: ${fmt(P.eva||0)}. Помогут броня, уклонение, блок и больше здоровья.`;
+  else s+=` Сопротивление ${RES_RU[el]}: ${R(P.res[el]||0)}%${el==='chaos'?'':' (предел 75%)'}. Поищите его на предметах или сделайте на верстаке.`;
+  return s;}
+/* ---- словарь терминов ---- */
+const GLOSSARY=[
+  ['Здоровье и энергощит','Энергетический щит принимает урон первым и восстанавливается, если вас не били. Здоровье восполняют регенерация, флаконы и вампиризм.'],
+  ['Броня','Снижает физический урон от ударов: чем слабее удар относительно брони, тем сильнее снижение.'],
+  ['Уклонение','Шанс, что атака врага промахнётся. От чар не спасает (кроме «Акробатики»).'],
+  ['Блок','Шанс полностью отразить удар щитом или оружием.'],
+  ['Сопротивления','Снижают урон огнём, холодом, молнией и хаосом. Предел — 75%. С IV акта действует штраф.'],
+  ['Меткость','Шанс попасть атакой. Чары попадают всегда.'],
+  ['Критический удар','Шанс нанести урон, умноженный на множитель крита (обычно ×1,5).'],
+  ['Заряды','Выносливости, ярости, энергии: копятся в бою и дают защиту, урон или крит.'],
+  ['Лишнее действие','Шанс после своего действия походить ещё раз до врагов.'],
+  ['Метки на свойствах','Цветные значки у свойств предмета показывают их группу: здоровье, защита, огонь, приспешники и т. д.']];
+function glossaryPanel(){return `<div class="panel"><div class="ph"><h2>Словарь</h2></div>${GLOSSARY.map(([n,d])=>`<details class="gloss"><summary>${n}</summary><p class="small muted" style="margin:4px 0 6px">${d}</p></details>`).join('')}</div>`;}
+/* ---- раздел «Как играть» ---- */
+function vHelp(){
+  const secs=Object.keys(TIP_SEC);
+  return `<div class="row"><button class="btn sm ghost" data-a="roster">‹ Персонажи</button><div class="sp"><h2>Как играть</h2></div></div><div class="stack">
+    <div class="panel">${INTRO.map(([n,x])=>`<p style="margin:0 0 8px"><b>${n}.</b> ${x}</p>`).join('')}</div>
+    ${secs.map(k=>`<div class="panel"><div class="ph"><h2>${TIP_SEC[k]}</h2></div>${TIPS.filter(t=>t.sec===k).map(t=>tipSeen(t.id)
+      ?`<details class="gloss"><summary>${t.t}</summary><p class="small" style="margin:4px 0 6px">${t.x}</p></details>`
+      :`<div class="gloss dim small">${t.t} · <i>откроется позже</i></div>`).join('')}</div>`).join('')}
+    ${glossaryPanel()}</div>`;}
+function helpCombat(){modal(`<div class="row"><h2 class="sp" style="font-size:19px">Как идёт бой</h2><button class="btn sm ghost" data-a="close">Закрыть</button></div>
+  ${TIPS.filter(t=>t.sec==='fight').map(t=>`<p style="margin:0 0 8px"><b>${t.t}.</b> ${t.x}</p>`).join('')}`);}
+function tutSettingsPanel(){const u=ACC.ui||{};
+  return `<div class="panel"><div class="ph"><h2>Обучение</h2></div>
+    <label class="row" style="min-height:40px;flex-wrap:nowrap"><input type="checkbox" data-a="tipsSet" data-k="tipsOff" ${u.tipsOff?'':'checked'} style="width:22px;height:22px;flex:none"> <span>Показывать подсказки</span></label>
+    <label class="row" style="min-height:40px;flex-wrap:nowrap"><input type="checkbox" data-a="tipsSet" data-k="tipsPoe" ${u.tipsPoe?'checked':''} style="width:22px;height:22px;flex:none"> <span>Я уже играл в PoE — без подсказок об основах</span></label>
+    <button class="btn sm full" data-a="tipsReset" style="margin-top:6px">Показать подсказки заново</button></div>`;}
+/* новые камни у торговца: открылись по уровню и ещё не просмотрены */
+const isNewGem=id=>S&&obtainable(id)&&gemRl(id)>(S.gemSeen||0)&&!S.gems.some(g=>g.id===id);
+const anyNewGem=()=>S&&[...ACTIVE_IDS,...SUPPORT_IDS,...AURA_IDS,...HEX_IDS].some(isNewGem);
+Object.assign(ACT,{
+  tipOk(){if(C&&C.tipCur){tipMark(C.tipCur);C.tipCur=null;save();}render();},
+  tipGo(d){closeModal();if(d.s==='lab'||d.s==='device')openSub(d.s);else render();},
+  introNext(){tutIntro++;if(tutIntro>=INTRO.length){tipMark('intro');closeModal();save();render();return;}showIntro();},
+  introSkip(){tipMark('intro');closeModal();save();render();},
+  introPoe(){ACC.ui=ACC.ui||{};ACC.ui.tipsPoe=1;tipMark('intro');closeModal();save();toast('Подсказки об основах отключены');render();},
+  help(){screen='help';render();window.scrollTo(0,0);},
+  helpFight(){helpCombat();},
+  tipsSet(d,el){ACC.ui=ACC.ui||{};ACC.ui[d.k]=d.k==='tipsOff'?(el.checked?0:1):(el.checked?1:0);save();},
+  tipsReset(){ACC.tips={intro:1};ACC.tipsOld=0;save();toast('Подсказки будут показаны заново');render();},
+});
+
+/* старт: после загрузки всех модулей, чтобы все константы уже были объявлены */
+load();
+screen=S?'main':ACC.chars.length?'roster':'select';tab='map';if(S)viewAct=actOfProg();
+render();
 
 
 </script>
