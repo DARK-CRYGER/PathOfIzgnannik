@@ -549,7 +549,7 @@ const CLASSES={
   duelist:{n:'Дуэлянт',attr:[24,24,10],weapon:'sword',dt:'armour',gem:'cleave',sup:'s_leech',
     lore:'Бывший чемпион арены. Клинок, вампиризм и выпады в гущу врагов.',
     list:['cleave','heavy','leap','flicker','lstrike','viper','cyclone','dstrike','sunder','split','barrage','escape','vuln','warlord','assassin'],
-    auras:['pride','determination','grace','precision','hatred','heraldAsh','haste']},
+    auras:['pride','determination','grace','precision','hatred','heraldAsh','haste','malevolence']},
   shadow:{n:'Бандит',attr:[10,24,24],weapon:'dagger',off:'dagger',dt:'eva',gem:'viper',sup:'s_poison',
     lore:'Вор и отравитель. Яды, хаос, молнии и смертельные криты.',
     list:['viper','dstrike','lstrike','leap','caustic','larrow','escape','spark','arc','blight','edrain','ethknives','flamedash','despair','eweak','tchains','assassin','poacher'],
@@ -557,7 +557,7 @@ const CLASSES={
   marauder:{n:'Дикарь',attr:[36,11,11],weapon:'axe2',dt:'armour',gem:'heavy',sup:'s_mpd',
     lore:'Варвар северных племён. Броня, здоровье и сокрушительные удары вплотную.',
     list:['heavy','cleave','slam','infernal','cyclone','leap','molten','sunder','icecrash','vuln','enfeeble','warlord'],
-    auras:['determination','vitality','pride','anger','purity','heraldAsh','arctic']},
+    auras:['determination','vitality','pride','anger','purity','heraldAsh','arctic','malevolence']},
   witch:{n:'Ведьма',attr:[11,11,36],weapon:'wand',dt:'es',mana:1,gem:'fireball',sup:'s_burn',
     lore:'Изгнана за запретную магию. Огонь, лёд и хаос с безопасной дистанции.',
     list:['fireball','firestorm','pulse','nova','arc','spark','blight','icespear','balllight','edrain','flamedash','ethknives','sk_warrior','sk_archer','sk_mage','spectre','absol','eweak','despair','enfeeble','tchains'],
@@ -565,15 +565,15 @@ const CLASSES={
   ranger:{n:'Охотница',attr:[11,36,11],weapon:'bow',off:'quiver',dt:'eva',gem:'split',sup:'s_vicious',
     lore:'Следопыт пограничных лесов. Лук, уклонение и бой на расстоянии.',
     list:['split','iceshot','barrage','rain','caustic','larrow','escape','tornado','galvanic','explosive','snipe','shrapnel','tchains','sniper','poacher'],
-    auras:['grace','hatred','precision','purity','clarity','haste','heraldIce','heraldThunder']},
+    auras:['grace','hatred','precision','purity','clarity','haste','heraldIce','heraldThunder','malevolence']},
   templar:{n:'Жрец',attr:[24,10,24],weapon:'sceptre',off:'shield',dt:'armour',mana:1,gem:'arc',sup:'s_alight',
     lore:'Отступник церкви. Стихии, ауры, стойкость в ближнем бою и молитвы на расстоянии.',
     list:['infernal','slam','heavy','lstrike','molten','icecrash','leap','arc','spark','firestorm','fireball','balllight','flamedash','absol','sk_warrior','sk_archer','sk_mage','spectre','eweak','vuln','enfeeble','warlord'],
-    auras:['anger','wrath','zealotry','purity','determination','vitality','discipline','heraldAsh','heraldThunder']},
+    auras:['anger','wrath','zealotry','purity','determination','vitality','discipline','heraldAsh','heraldThunder','malevolence']},
   scion:{n:'Дворянка',attr:[20,20,20],weapon:'staff',dt:'armour',gem:'spark',sup:'s_insp',
     lore:'Наследница опального рода. Начинает в центре древа и может пойти в любую ветвь.',
     list:['heavy','cleave','cyclone','leap','flicker','split','sk_warrior','absol','iceshot','tornado','explosive','escape','spark','fireball','pulse','icespear','flamedash','eweak','vuln','tchains','sniper','assassin'],
-    auras:['anger','hatred','wrath','clarity','grace','determination','haste']},
+    auras:['anger','hatred','wrath','clarity','grace','determination','haste','malevolence']},
 };
 const CLASS_ORDER=['duelist','shadow','marauder','witch','ranger','templar','scion'];
 
@@ -1936,7 +1936,7 @@ function migrate3(o){
 function load(){
   try{const s=localStorage.getItem(KEY);if(s)ACC=JSON.parse(s);}catch(e){ACC=null;}
   if(!ACC){ACC=newAcc();try{const s3=localStorage.getItem(KEY3);if(s3){const o=JSON.parse(s3);if(o&&o.v===3){ACC.u=(o.u||0)+10;const c=migrate3(o);ACC.chars.push(c);ACC.cur=c.id;}}}catch(e){}}
-  ACC.chars.forEach(fixChar);ACC.del=ACC.del||{};(ACC.stash&&ACC.stash.items||[]).forEach(afxMigrate);ACC.ui=ACC.ui||{aura:1,flask:1,ability:1};ACC.stash=ACC.stash||{items:[],tabs:1};ACC.auc=ACC.auc||{lots:[],seq:0};
+  ACC.chars.forEach(fixChar);ACC.del=ACC.del||{};(ACC.stash&&ACC.stash.items||[]).forEach(afxMigrate);ACC.ui=ACC.ui||{aura:1,flask:1,ability:1};ACC.stash=ACC.stash||{items:[],tabs:1};ACC.stash.gems=ACC.stash.gems||[];ACC.auc=ACC.auc||{lots:[],seq:0};
   S=ACC.chars.find(c=>c.id===ACC.cur)||null;
 }
 /* =========================================================
@@ -1964,13 +1964,13 @@ function mergeAcc(a,b){
   if(a.gold!=null||b.gold!=null){m.gold=a.gold!=null&&b.gold!=null?m.gold:(a.gold!=null?a.gold:b.gold);
     m.chars=m.chars.map(c=>{if(c.goldIn)return c;const o=Object.getOwnPropertyDescriptor(c,'gold');if(o&&o.get)return c;const x={...c};delete x.gold;x.goldIn=1;return x;});}
   if(!m.chars.some(c=>c.id===m.cur))m.cur=(a.chars.some(c=>c.id===a.cur&&map[c.id])?a.cur:null)||(m.chars[0]&&m.chars[0].id)||null;
-  m.stash=m.stash&&m.stash.items?m.stash:{items:[],tabs:1};m.auc=m.auc&&m.auc.lots?m.auc:{lots:[],seq:0};
+  m.stash=m.stash&&m.stash.items?m.stash:{items:[],tabs:1};m.stash.gems=m.stash.gems||[];m.auc=m.auc&&m.auc.lots?m.auc:{lots:[],seq:0};
   return m;
 }
 function sameChars(a,b){const k=x=>(x&&x.chars||[]).map(c=>c.id+':'+(c.t||0)).sort().join('|');return k(a)===k(b);}
 function adoptAcc(d,note){
-  if(C&&!C.over&&S){const cur=S;ACC=d;ACC.del=ACC.del||{};const i=ACC.chars.findIndex(c=>c.id===cur.id);if(i>=0)ACC.chars[i]=cur;else ACC.chars.push(cur);ACC.cur=cur.id;return true;}
-  const before=ACC;ACC=d;ACC.chars.forEach(fixChar);(ACC.stash&&ACC.stash.items||[]).forEach(afxMigrate);ACC.ui=ACC.ui||{aura:1,flask:1,ability:1};ACC.del=ACC.del||{};
+  if(C&&!C.over&&S){const cur=S;ACC=d;ACC.stash=ACC.stash||{items:[],tabs:1};ACC.stash.gems=ACC.stash.gems||[];ACC.del=ACC.del||{};const i=ACC.chars.findIndex(c=>c.id===cur.id);if(i>=0)ACC.chars[i]=cur;else ACC.chars.push(cur);ACC.cur=cur.id;return true;}
+  const before=ACC;ACC=d;ACC.stash=ACC.stash||{items:[],tabs:1};ACC.stash.gems=ACC.stash.gems||[];ACC.chars.forEach(fixChar);(ACC.stash&&ACC.stash.items||[]).forEach(afxMigrate);ACC.ui=ACC.ui||{aura:1,flask:1,ability:1};ACC.del=ACC.del||{};
   S=ACC.chars.find(c=>c.id===ACC.cur)||null;C=null;
   if(!sameChars(before,ACC)){screen=S?'main':ACC.chars.length?'roster':'select';tab='map';if(note)toast(note);}
   return true;
@@ -2225,12 +2225,12 @@ function calc(){
   let used=0;P.auras=[];const MA={};P.mAura=MA;
   /* одинаковые ауры не складываются: работает камень наибольшего уровня */
   const bestA={};S.auras.forEach((uid,i)=>{const gm=gem(uid);if(!gm||S.lvl<AURA_SLOTS[0])return;const A=AURAS[gm.id];
-    if(!allowed(gm.id)||attr[A.c]<gemAttrReq(gm.lvl))return;const b=bestA[gm.id];if(!b||gem(b).lvl<gm.lvl)bestA[gm.id]=uid;});
+    if(attr[A.c]<gemAttrReq(gm.lvl))return;const b=bestA[gm.id];if(!b||gem(b).lvl<gm.lvl)bestA[gm.id]=uid;});
   const aurL=[];
   S.auras.forEach((uid,i)=>{const gm=gem(uid);if(!gm||S.lvl<AURA_SLOTS[0])return;const A=AURAS[gm.id];
     const L=gemLevel(gm,P,null).L,r=(i===0&&U.u_freeAura)?0:A.res*(1-resE/100)*(ego?1.4:1);
     const dup=bestA[gm.id]&&bestA[gm.id]!==uid;
-    const ok=!dup&&allowed(gm.id)&&attr[A.c]>=gemAttrReq(gm.lvl)&&used+r<=100.01;
+    const ok=!dup&&attr[A.c]>=gemAttrReq(gm.lvl)&&used+r<=100.01;
     P.auras.push({uid,id:gm.id,L,res:r,on:ok,dup});if(ok){used+=r;aurL.push([A,L]);}});
   /* «Высшее эго»: +1% эффекта аур за каждые 2% резерва */
   const auraF=1+(g('auraEff')+(ego?used/2:0))/100;
@@ -2301,7 +2301,7 @@ function hexInfo(P,uid){
   const gm=gem(uid===undefined?S.hex:uid);if(!gm||S.lvl<HEX_LVL)return null;const H=HEXES[gm.id];if(!H)return null;
   const L=gemLevel(gm,P,null).L,curse=H.kind==='curse';
   const f=(1+(curse?(P.t.ex_curseEff||0):(P.t.ex_markEff||0))/100)*(curse&&P.keys.has('hexmaster')?.8:1);
-  const ok=P.attr[H.c]>=gemAttrReq(gm.lvl)&&allowed(gm.id);
+  const ok=P.attr[H.c]>=gemAttrReq(gm.lvl);
   return {id:gm.id,uid:gm.uid,n:H.n,kind:H.kind,L,f,eff:H.eff(L,f),cost:Math.max(1,R((6+L*.6)*P.costM)),ok,lvl:gm.lvl,
     dur:P.keys.has('hexmaster')?99:R((4+(P.t.curseDur||0))*(1+(P.t.skillDur||0)/100)),n2:1+(P.t.curseN||0)};
 }
@@ -2350,11 +2350,11 @@ function calcSkill(i,P){
   const o=baseO();A.make(o,L);if(A.tags.includes('move'))o.move=1;
   const reqOk=P.attr[A.c]>=gemAttrReq(gm.lvl);
   sups.forEach(s=>{if(s.fits&&s.ok&&!s.dup&&A.fn!=='summon')GEMS[s.id].ap(o,s.L);});
-  if(A.fn==='summon'){const sk=summonSkill(i,A,gm,L,P,sups,reqOk);sk.LV=LV;sk.locked=!allowed(gm.id);if(sk.locked)sk.bad='Доступно после кампании';return sk;}
+  if(A.fn==='summon'){const sk=summonSkill(i,A,gm,L,P,sups,reqOk);sk.LV=LV;sk.locked=false;if(sk.locked)sk.bad='Доступно после кампании';return sk;}
   if(!reqOk)o.more*=.5;
   const sk=buildSkill(o,A,P,L);
   sk.name=A.n;sk.gid=gm.id;sk.lvl=L;sk.LV=LV;sk.reqOk=reqOk;sk.sups=sups;sk.slot=i;
-  sk.locked=!allowed(gm.id);
+  sk.locked=false;
   if(A.minion){sk.mn=minionTpl(A,L,minionO(A,L,sups,P),P);if(!reqOk)sk.mn.mult*=.5;}
   if(!(A.cat==='totem'&&A.noWeapon)&&!P.weapons.some(w=>SKILL_WEAPON[A.wcat||A.cat](w.it)))sk.bad='Нужен '+SKILL_WEAPON_N[A.wcat||A.cat];
   if(sk.locked)sk.bad='Доступно после кампании';
@@ -4334,10 +4334,17 @@ function dummySim(i,preset,d,o){
 /* ---------- тайник (общий для всех персонажей аккаунта) ---------- */
 const stashCap=()=>30*ACC.stash.tabs;
 const stashCost=()=>[0,2000,10000,40000][ACC.stash.tabs]||null;
-function toStash(uid){const it=S.inv.find(x=>x.uid===uid);if(!it)return false;if(ACC.stash.items.length>=stashCap()){toast('Тайник полон');return false;}
+function toStash(uid){const it=S.inv.find(x=>x.uid===uid);if(!it)return false;if(stashUsed()>=stashCap()){toast('Тайник полон');return false;}
   S.inv=S.inv.filter(x=>x!==it);delete it.isNew;ACC.stash.items.push(it);ACC.stash.t=Date.now();save();return true;}
 function fromStash(uid){const it=ACC.stash.items.find(x=>x.uid===uid);if(!it)return false;if(S.inv.length>=INV_MAX){toast('Сумка полна');return false;}
   ACC.stash.items=ACC.stash.items.filter(x=>x!==it);S.inv.push(it);ACC.stash.t=Date.now();save();return true;}
+const stashUsed=()=>ACC.stash.items.length+(ACC.stash.gems||[]).length;
+/* камни в тайнике: свободный (не вставленный) камень переходит между персонажами со своим уровнем и опытом */
+function gemToStash(uid){const g=S.gems.find(x=>x.uid===uid);if(!g)return false;if(socketed().has(uid)){toast('Сначала выньте камень из гнезда');return false;}
+  if(stashUsed()>=stashCap()){toast('Тайник полон');return false;}
+  S.gems=S.gems.filter(x=>x!==g);ACC.stash.gems.push(g);ACC.stash.t=Date.now();save();return true;}
+function gemFromStash(uid){const g=ACC.stash.gems.find(x=>x.uid===uid);if(!g)return false;
+  ACC.stash.gems=ACC.stash.gems.filter(x=>x!==g);if(S.gems.some(x=>x.uid===g.uid))g.uid=newUid();S.gems.push(g);ACC.stash.t=Date.now();save();return true;}
 function expandStash(){const c=stashCost();if(!c||S.gold<c)return false;S.gold-=c;ACC.stash.tabs++;ACC.stash.t=Date.now();save();return true;}
 
 /* ---------- аукцион ----------
@@ -5270,7 +5277,7 @@ function gemLine(gm,extra=''){
   const nxt=gm.lvl<20?gemAttrReq(gm.lvl+1,sup):0;
   const xp=gm.lvl>=20?'макс.':S.lvl<GEM_REQ[gm.lvl]?`след. ур. с ${GEM_REQ[gm.lvl]} ур. героя`:gm.xp>=gemXpNeed(gm.lvl)&&P.attr[G.c]<nxt?`<span class="bad-t">не растёт: для ур. ${gm.lvl+1} нужно ${ATTR[G.c].toLowerCase()} ${nxt}</span>`:R(gm.xp/gemXpNeed(gm.lvl)*100)+'%';
   const LV=P.ti?gemLevel(gm,P,GEMS[gm.id]&&!sup?GEMS[gm.id]:null):{L:gm.lvl};
-  return `${gemIcon(gm.id)}<span class="gt">${ok?'':'<span class="na">Не хватает атрибутов</span>'}<b>${G.n}</b><small class="num">ур. ${LV.L}${LV.L!==gm.lvl?` (свой ${gm.lvl})`:''} · ${xp}${ok?'':` · <span class="bad-t">нужно ${ATTR[G.c].toLowerCase()} ${req}</span>`}${allowed(gm.id)?'':' · <span class="bad-t">после кампании</span>'}${extra}</small></span>`;
+  return `${gemIcon(gm.id)}<span class="gt">${ok?'':'<span class="na">Не хватает атрибутов</span>'}<b>${G.n}</b><small class="num">ур. ${LV.L}${LV.L!==gm.lvl?` (свой ${gm.lvl})`:''} · ${xp}${ok?'':` · <span class="bad-t">нужно ${ATTR[G.c].toLowerCase()} ${req}</span>`}${extra}</small></span>`;
 }
 const gemSell=g=>5+g.lvl*4;
 function manaWarn(P){if(P.keys.has('blood'))return '';const mx=Math.max(0,...P.skills.filter(s=>s&&!s.bad&&!s.lifeCost).map(s=>s.cost));
@@ -5310,7 +5317,7 @@ function vGems(){
     else{const filled=S.auras.map((u,i)=>[u,i]).filter(([u])=>u),empty=S.auras.indexOf(null)>=0?S.auras.indexOf(null):S.auras.length;
     h+=filled.map(([uid,i],n)=>{const g=gem(uid),a=P.auras.find(x=>x.uid===uid);
       return `<div class="slot"><span class="eyebrow">Аура ${n+1}</span><button class="gemb ${a&&a.on?'':'off'} ${gemAttrOk(g,P)?'':'noattr'}" data-a="pick" data-k="aura" data-i="${i}">${gemLine(g)}</button>
-        <div class="summary">${a&&a.on?`${AURAS[g.id].e(a.L,P.auraF)} · резерв ${R(a.res)}%`:`<span class="bad-t">Не активна: ${a&&a.dup?'такая же аура большего уровня уже действует — одинаковые ауры не складываются':!allowed(g.id)?'доступна после кампании':P.attr[AURAS[g.id].c]<gemAttrReq(g.lvl)?'мало атрибута':'не хватает маны для резерва'}</span>`}</div></div>`;}).join('');
+        <div class="summary">${a&&a.on?`${AURAS[g.id].e(a.L,P.auraF)} · резерв ${R(a.res)}%`:`<span class="bad-t">Не активна: ${a&&a.dup?'такая же аура большего уровня уже действует — одинаковые ауры не складываются':P.attr[AURAS[g.id].c]<gemAttrReq(g.lvl)?'мало атрибута':'не хватает маны для резерва'}</span>`}</div></div>`;}).join('');
     h+=`<div class="slot"><span class="eyebrow">Аура ${filled.length+1}</span><button class="gemb" data-a="pick" data-k="aura" data-i="${empty}"><span class="gem aura" style="background:var(--line2)"></span><span class="gt"><b class="dim">Пустой слот ауры</b><small>${P.reserved>=99.5?'Мана для резерва закончилась — новая аура не включится':'Аур сколько угодно, пока хватает маны на резерв'}</small></span></button></div>`;}
   }else{
     h+=`<div class="panel"><p class="dim small" style="margin:0 0 8px">Опыт получают только вставленные камни. Уровень камня ограничен уровнем героя: к концу кампании — около 15, на картах — до 20.</p>
@@ -5329,7 +5336,7 @@ function openPicker(d){
   modal(`<div class="row"><h2 class="sp" style="font-size:19px">${title}</h2><button class="btn sm ghost" data-a="close">Закрыть</button></div>
     ${cur?`<div class="panel"><div class="list"><div class="gemb">${gemLine(gem(cur))}</div><p class="small muted" style="margin:0">${desc(gem(cur).id,gem(cur).lvl)}</p><div class="row"><button class="btn sm sp" data-a="gemInfo" data-id="${gem(cur).id}" data-u="${cur}">Подробнее</button><button class="btn sm sp" data-a="unsock">Извлечь камень</button></div></div></div>`:''}
     <div class="eyebrow">Камни в сумке</div>
-    <div class="list">${want.length?want.map(g=>{const fit=!A||supFits(GEMS[g.id],fitOf(slotGemA(i)||GEMS[A.id])),dup=k==='s'&&S.skills[i].s.some((u,jj)=>jj!==j&&gem(u)&&gem(u).id===g.id),ok=allowed(g.id)&&!dup;
+    <div class="list">${want.length?want.map(g=>{const fit=!A||supFits(GEMS[g.id],fitOf(slotGemA(i)||GEMS[A.id])),dup=k==='s'&&S.skills[i].s.some((u,jj)=>jj!==j&&gem(u)&&gem(u).id===g.id),ok=!dup;
       return `<button class="gemb ${fit&&ok?'':'bad'}" data-a="insert" data-u="${g.uid}" ${ok?'':'disabled'}>${gemLine(g)}</button><p class="small muted" style="margin:-2px 0 4px 8px">${dup?'<span class="bad-t">Уже есть в этом умении. </span>':''}${!fit?'Не подходит к этому умению. ':''}${desc(g.id,g.lvl)}</p>`}).join(''):'<span class="dim">Подходящих камней нет. Их дают за задания, продаёт торговец, иногда роняют враги.</span>'}</div>`);
 }
 
@@ -5508,6 +5515,8 @@ function openItem(where,key){
 
 /* ---------- торговец ---------- */
 /* торговец продаёт все камни 1 уровня; камни, открытые герою по ходу прокачки (свой класс и уровень героя), — уровнем выше, до 15 (конец актов) */
+/* в кампании камни открываются постепенно: по уровню камня (как в PoE — по квестам актов) */
+const gemLocked=id=>S&&!S.done&&gemRl(id)>S.lvl;
 function shopGemLvl(id){return obtainable(id)?Math.min(15,newGemLvl()):1;}
 function gemPrice(id){const L=shopGemLvl(id);return R((30+12*L)*(1+S.lvl*.03)*(GEMS[id]&&GEMS[id].sup?.8:1));}
 const treeResetCost=()=>R(15*S.lvl*(1+S.lvl*.16));
@@ -5536,18 +5545,20 @@ function vShop(){
   }else if(shopTab==='gems'){
     setTimeout(()=>{if(S&&screen==='sub'&&sub==='shop'&&shopTab==='gems')S.gemSeen=S.lvl;},0);
     const all=[['melee','Ближний бой',ACTIVE_IDS.filter(id=>GEMS[id].cat==='melee')],['ranged','Дальний бой',ACTIVE_IDS.filter(id=>GEMS[id].cat==='ranged')],['spell','Заклинания',ACTIVE_IDS.filter(id=>GEMS[id].cat==='spell'&&!GEMS[id].minion)],['totem','Тотемы',ACTIVE_IDS.filter(id=>GEMS[id].cat==='totem')],['minion','Приспешники',ACTIVE_IDS.filter(id=>GEMS[id].cat==='minion'||GEMS[id].minion)],['hex','Метки и порчи',HEX_IDS],['aura','Ауры',AURA_IDS],['sup','Поддержка',SUPPORT_IDS]];
-    if(!shopGem)shopGem=GEMS[CLASSES[S.cls].gem].cat;
+    /* в кампании торговец продаёт только камни своего класса (и поддержки); чужие — после кампании или через тайник */
+    all.forEach(g=>{g[2]=g[2].filter(id=>S.done||allowed(id));});for(let i=all.length-1;i>=0;i--)if(!all[i][2].length)all.splice(i,1);
+    if(!shopGem||!all.some(g=>g[0]===shopGem))shopGem=GEMS[CLASSES[S.cls].gem].cat;
     const SH={melee:'Ближний',ranged:'Дальний',spell:'Чары',totem:'Тотемы',minion:'Призыв'};
-    h+=`<div class="seg3">${all.map(([k,n,ids])=>`<button class="${shopGem===k?'on':''}" data-a="sgem" data-t="${k}" aria-label="${n}">${SH[k]||n} · ${ids.length}</button>`).join('')}</div>`;
+    h+=`<div class="seg3">${all.map(([k,n,ids])=>`<button class="${shopGem===k?'on':''}" data-a="sgem" data-t="${k}" aria-label="${n}">${SH[k]||n} · ${ids.filter(i=>!gemLocked(i)).length}</button>`).join('')}</div>`;
     const groups=all.filter(g=>g[0]===shopGem).map(g=>[g[1],g[2]]);
-    h+=`<p class="muted small" style="margin:0">Все камни продаются 1 уровня. Камни, открытые вашему герою по ходу прокачки, — уровня ${Math.min(15,newGemLvl())} (до 15 к концу актов).${S.done?'':' Умения другого класса заработают после кампании.'}</p>`;
+    h+=`<p class="muted small" style="margin:0">${S.done?'Все камни открыты.':'Новые камни открываются по мере роста уровня героя.'} Камни уровня ${Math.min(15,newGemLvl())} (до 15 к концу актов)${S.done?', камни других классов — 1 уровня.':'. Камни других классов торговец продаёт после кампании; раньше их можно передать через тайник с другого персонажа.'}</p>`;
     if(shopGem==='sup'){const acts=ACTIVE_IDS.filter(id=>allowed(id)),mine=new Set(S.skills.map(x=>gem(x.a)).filter(Boolean).map(g=>g.id));
       h+=`<div class="panel"><input class="input qf" type="search" data-k="sup" data-for="supL" placeholder="Поиск по названию и описанию" autocomplete="off">
         <label class="stack" style="gap:4px;margin-top:8px"><span class="eyebrow">Подходит к умению</span><select class="input qf" data-k="sup"><option value="">любому</option>${[...acts].sort((a,b)=>(mine.has(b)?1:0)-(mine.has(a)?1:0)).map(id=>`<option value="${id}" ${QF.supFit===id?'selected':''}>${mine.has(id)?'★ ':''}${gdef(id).n}</option>`).join('')}</select></label>
         <div class="dim small" style="margin-top:6px">Найдено: <b id="supL_n"></b> · ★ — ваши умения</div></div>`;}
-    groups.forEach(([n,ids])=>{const list=ids.slice().sort((a,b)=>(obtainable(b)?1:0)-(obtainable(a)?1:0)||(allowed(b)?1:0)-(allowed(a)?1:0));if(!list.length)return;
+    groups.forEach(([n,ids])=>{const list=ids.slice().sort((a,b)=>(gemLocked(a)?1:0)-(gemLocked(b)?1:0)||(gemLocked(a)?gemRl(a)-gemRl(b):0)||(obtainable(b)?1:0)-(obtainable(a)?1:0)||(allowed(b)?1:0)-(allowed(a)?1:0));if(!list.length)return;
       h+=`<div class="panel"><div class="ph"><h2>${n}</h2></div><div class="list" ${shopGem==='sup'?'id="supL"':''}>${list.map(id=>{const G=gdef(id),p=gemPrice(id),L=shopGemLvl(id);
-        return `<div class="gemb" ${shopGem==='sup'?`data-qt="${esc((G.n+' '+(G.d||'')).toLowerCase())}" data-fit="${supFitList(id).join(' ')}"`:''}><button class="gemi" data-a="gemInfo" data-id="${id}">${gemIcon(id)}<span class="gt"><b>${G.n}${isNewGem(id)?' <span class="newchip">новый</span>':''}</b><small>ур. ${L} · ${gemWeaponShort(id)}${allowed(id)?'':' · <span class="bad-t">после кампании</span>'} · <span class="gold-t">подробнее</span></small></span></button><button class="btn sm" data-a="buyGem" data-id="${id}" ${S.gold>=p?'':'disabled'}>${fmt(p)}</button></div>`}).join('')}</div></div>`;});
+        return `<div class="gemb" ${shopGem==='sup'?`data-qt="${esc((G.n+' '+(G.d||'')).toLowerCase())}" data-fit="${supFitList(id).join(' ')}"`:''}><button class="gemi" data-a="gemInfo" data-id="${id}">${gemIcon(id)}<span class="gt"><b>${G.n}${isNewGem(id)?' <span class="newchip">новый</span>':''}</b><small>ур. ${L} · ${gemWeaponShort(id)}${allowed(id)?'':' · <span class="bad-t">после кампании</span>'} · <span class="gold-t">подробнее</span></small></span></button>${gemLocked(id)?`<button class="btn sm" disabled>с ${gemRl(id)} ур.</button>`:`<button class="btn sm" data-a="buyGem" data-id="${id}" ${S.gold>=p?'':'disabled'}>${fmt(p)}</button>`}</div>`}).join('')}</div></div>`;});
   }else{
     h+=`<div class="panel"><p class="muted" style="margin:0 0 10px">Сбросить все пассивные умения и вернуть очки. Отдельный узел можно забыть прямо в древе.</p>
       <button class="btn full" data-a="resetTree" ${S.gold>=treeResetCost()&&S.alloc.length>1?'':'disabled'}>Сбросить древо · ${fmt(treeResetCost())} зол.</button></div>
@@ -5596,19 +5607,24 @@ function gemInfo(id,uid){
     <div class="row" style="flex-wrap:nowrap">${gemIcon(id)}<h2 style="font-size:20px">${G.n}</h2></div>
     ${act?`<p class="muted" style="margin:0">${G.d}</p>`:''}
     <div class="sheet">${rows}</div>${body}
-    ${own?'':`<button class="btn pri full" data-a="buyGem" data-id="${id}" ${S.gold>=p?'':'disabled'}>Купить · ${fmt(p)} зол.</button>${!allowed(id)?'<p class="dim small" style="margin:0">Умение другого класса: заработает после кампании.</p>':''}`}`);
+    ${own?'':gemLocked(id)?`<button class="btn pri full" disabled>Откроется с ${gemRl(id)} уровня героя</button>`:`<button class="btn pri full" data-a="buyGem" data-id="${id}" ${S.gold>=p?'':'disabled'}>Купить · ${fmt(p)} зол.</button>${!allowed(id)?'<p class="dim small" style="margin:0">Камень другого класса: в кампании продаётся только через тайник, работает при нужных атрибутах.</p>':''}`}`);
 }
 
 /* ---------- тайник ---------- */
+function stashGemsView(){
+  const used=socketed(),mine=S.gems.filter(g=>!used.has(g.uid)),st=ACC.stash.gems;
+  const row=(g,a,t)=>`<div class="gemb">${gemLine(g)}<button class="btn sm" data-a="${a}" data-u="${g.uid}">${t}</button></div>`;
+  return `<div class="panel"><div class="eyebrow" style="margin-bottom:8px">В тайнике</div><div class="list">${st.map(g=>row(g,'stGemOut','← взять')).join('')||'<span class="dim">Камней нет</span>'}</div></div>
+    <div class="panel"><div class="eyebrow" style="margin-bottom:8px">Свободные камни героя</div><p class="dim small" style="margin:0 0 8px">Вставленные камни сначала выньте из гнезда. Камень другого класса работает сразу, если хватает атрибутов.</p><div class="list">${mine.map(g=>row(g,'stGemIn','→ в тайник')).join('')||'<span class="dim">Свободных камней нет</span>'}</div></div>`;}
 function vStash(){
   const cap=stashCap(),c=stashCost();
   const st=sortInv(ACC.stash.items),inv=sortInv(S.inv);
   return `<div class="stack">${subHead('Тайник','Общий для всех персонажей')}
-    <div class="panel"><div class="row"><span class="sp">Занято <b class="num">${ACC.stash.items.length}/${cap}</b> · вкладок ${ACC.stash.tabs}/4</span>
+    <div class="panel"><div class="row"><span class="sp">Занято <b class="num">${stashUsed()}/${cap}</b> · вкладок ${ACC.stash.tabs}/4</span>
       ${c?`<button class="btn sm" data-a="stExp" ${S.gold>=c?'':'disabled'}>+30 мест · ${fmt(c)} зол.</button>`:'<span class="tag ok">Максимум</span>'}</div>
-      <p class="dim small" style="margin:6px 0 0">Положите вещь одним персонажем и заберите другим. Удаление персонажа не трогает тайник.</p></div>
-    <div class="seg"><button class="${stashTab==='stash'?'on':''}" data-a="stTab" data-t="stash">Тайник · ${ACC.stash.items.length}</button><button class="${stashTab==='inv'?'on':''}" data-a="stTab" data-t="inv">Сумка · ${S.inv.length}/${INV_MAX}</button></div>
-    <div class="bag">${stashTab==='stash'?(st.map(x=>irow(x,'stOut',' · ← взять')).join('')||'<span class="dim">Тайник пуст</span>'):(inv.map(x=>irow(x,'stIn',' · → в тайник')).join('')||'<span class="dim">Сумка пуста</span>')}</div>
+      <p class="dim small" style="margin:6px 0 0">Положите вещь или камень одним персонажем и заберите другим. Удаление персонажа не трогает тайник.</p></div>
+    <div class="seg"><button class="${stashTab==='stash'?'on':''}" data-a="stTab" data-t="stash">Тайник · ${ACC.stash.items.length}</button><button class="${stashTab==='inv'?'on':''}" data-a="stTab" data-t="inv">Сумка · ${S.inv.length}/${INV_MAX}</button><button class="${stashTab==='gems'?'on':''}" data-a="stTab" data-t="gems">Камни · ${ACC.stash.gems.length}</button></div>
+    ${stashTab==='gems'?stashGemsView():`<div class="bag">${stashTab==='stash'?(st.map(x=>irow(x,'stOut',' · ← взять')).join('')||'<span class="dim">Тайник пуст</span>'):(inv.map(x=>irow(x,'stIn',' · → в тайник')).join('')||'<span class="dim">Сумка пуста</span>')}</div>`}
   </div>`;
 }
 
@@ -5961,7 +5977,7 @@ const ACT={
   buy(d){const it=S.shop.items.find(x=>x.uid===d.u);if(!it)return;const p=buyPrice(it);if(S.gold<p)return;S.gold-=p;S.shop.items=S.shop.items.filter(x=>x!==it);it.isNew=1;S.inv.push(it);save();closeModal();render();toast(`Куплено: ${it.name}`);},
   shopRefresh(){const c=shopRefreshCost();if(S.gold<c)return;S.gold-=c;shopStock(true);save();render();},
   gemInfo(d){gemInfo(d.id,d.u);},
-  buyGem(d){const p=gemPrice(d.id);if(S.gold<p)return;S.gold-=p;addGem(d.id,shopGemLvl(d.id));save();closeModal();render();toast(`Куплен камень: ${gdef(d.id).n}`);},
+  buyGem(d){const p=gemPrice(d.id);if(S.gold<p||gemLocked(d.id)||(!S.done&&!allowed(d.id)))return;S.gold-=p;addGem(d.id,shopGemLvl(d.id));save();closeModal();render();toast(`Куплен камень: ${gdef(d.id).n}`);},
   resetTree(){const c=treeResetCost();if(S.gold<c)return;S.gold-=c;S.alloc=[startNode(S.cls)];S.attrPick={};S.mast={};save();render();toast('Древо сброшено');},
   resetAsc(){const c=ascResetCost();if(S.gold<c)return;S.gold-=c;S.ascAlloc=[];save();render();toast('Очки возвышения возвращены');},
   sellOne(d){const it=S.inv.find(x=>x.uid===d.u);if(!it)return;const v=sellPrice(it);S.gold+=v;S.inv=S.inv.filter(x=>x!==it);save();render();toast(`Продано за ${v} зол.`);},
@@ -5983,6 +5999,8 @@ const ACT={
   stTab(d){stashTab=d.t;render();},
   stIn(d){if(toStash(d.u))render();},
   stOut(d){if(fromStash(d.u))render();},
+  stGemIn(d){if(gemToStash(d.u))render();},
+  stGemOut(d){if(gemFromStash(d.u))render();},
   stExp(){if(expandStash()){toast('Тайник расширен');render();}},
   aucTab(d){aucTab=d.t;render();},
   aucLoad(){aucData.buy=null;aucData.mine=null;aucLoad();render();},
@@ -6192,7 +6210,7 @@ const TIPS=[
   {id:'fb_buttons',sec:'fight',combat:1,basic:1,hl:'.cb-head .btn',t:'Кнопки сверху',x:'«Журнал» — всё, что произошло в бою. «Билд» — древо и камни прямо в бою. «Уйти» — покинуть бой: в кампании его можно пройти заново, а карта или лабиринт при уходе теряются. «?» — эти подсказки.',c:()=>C.turn>=4},
   /* ---- камни ---- */
   {id:'tree',sec:'tree',basic:1,hl:'[data-t=tree]',t:'Очки древа',x:'У вас есть свободные очки. На вкладке «Древо» берите узлы рядом со стартом своего класса: крупные круги — значимые умения, у краёв — ключевые. Узел можно забыть за золото.',c:()=>pointsFree()>0},
-  {id:'gemreward',sec:'gems',basic:1,hl:'[data-t=gems]',t:'Камни умений',x:'За задания вы выбираете камень. Остальные камни своего класса продаёт торговец на вкладке «Камни», а после кампании — камни всех классов. Новые камни открываются постепенно с уровнем.',c:()=>S.gems.length>2||S.prog>=2},
+  {id:'gemreward',sec:'gems',basic:1,hl:'[data-t=gems]',t:'Камни умений',x:'За задания вы выбираете камень. Остальные камни своего класса продаёт торговец на вкладке «Камни», а после кампании — камни всех классов. Новые камни открываются постепенно с уровнем. Камень другого класса можно передать через тайник с другого персонажа — работает, если хватает атрибутов.',c:()=>S.gems.length>2||S.prog>=2},
   {id:'support',sec:'gems',basic:1,hl:'[data-t=gems]',t:'Поддержки',x:'В гнёзда под умением вставляются камни поддержки: они усиливают именно это умение. Подходит ли поддержка — видно по меткам умения. Урон проверяют на мишени в убежище.',c:()=>S.gems.some(g=>GEMS[g.id]&&GEMS[g.id].sup)},
   {id:'slot2',sec:'gems',basic:1,hl:'[data-t=gems]',t:'Второе умение',x:'Открылся слот для ещё одного умения. Новые камни появляются у торговца по мере роста уровня — загляните на вкладку «Камни».',c:()=>S.lvl>=SKILL_SLOTS[1][0]},
   {id:'aura',sec:'gems',basic:1,hl:'[data-t=gems]',t:'Ауры',x:'Аура действует постоянно, пока вы в бою, но резервирует часть маны. Слоты аур открываются на 4, 16, 32 и 50 уровне.',c:()=>S.lvl>=AURA_SLOTS[0]},
