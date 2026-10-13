@@ -1605,6 +1605,7 @@ const GMAP_MIN_TIER=14;
 UNIQUE_FLASKS.push({n:'Умирающее солнце',fk:'ruby',eff:{aoeP:25,plusProj:2},d:'+2 снаряда и +25% к урону по области на время действия',pin:1});
 Object.assign(FLASK_EFF_N,{aoeP:'урон по области',plusProj:'снаряды',dmgTaken:'получаемый урон',dmgMore:'больше урона'});
 
+
 /* Свойства предметов: префиксы и суффиксы с тирами (адаптация PoE 1, craftofexile, патч 3.29).
    Сгенерировано tools/affix_gen.py — правки адаптации вносятся там.
    AFX_G: группы {n: текст PoE, a: p|s, st: [[ключ, множитель]|null на каждый #], arr: «от # до #»}
@@ -1982,7 +1983,7 @@ function load(){
   try{const s=localStorage.getItem(KEY);if(s)ACC=JSON.parse(s);}catch(e){ACC=null;}
   if(!ACC){ACC=newAcc();try{const s3=localStorage.getItem(KEY3);if(s3){const o=JSON.parse(s3);if(o&&o.v===3){ACC.u=(o.u||0)+10;const c=migrate3(o);ACC.chars.push(c);ACC.cur=c.id;}}}catch(e){}}
   ACC.chars.forEach(fixChar);ACC.del=ACC.del||{};(ACC.stash&&ACC.stash.items||[]).forEach(afxMigrate);ACC.ui=ACC.ui||{aura:1,flask:1,ability:1};ACC.stash=ACC.stash||{items:[],tabs:1};ACC.stash.gems=ACC.stash.gems||[];ACC.auc=ACC.auc||{lots:[],seq:0};
-  S=ACC.chars.find(c=>c.id===ACC.cur)||null;
+  S=ACC.chars.find(c=>c.id===ACC.cur)||null;revInit();
 }
 /* =========================================================
    ХРАНЕНИЕ АККАУНТА
@@ -1997,11 +1998,40 @@ const tgUser=()=>{try{return tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user||null
 function hash32(str){let h=0x811c9dc5;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h.toString(16);}
 function backupLocal(){try{const cur=localStorage.getItem(KEY);if(!cur)return;const b1=localStorage.getItem(KEY+'_bak1');if(b1&&b1!==cur)localStorage.setItem(KEY+'_bak2',b1);localStorage.setItem(KEY+'_bak1',cur);}catch(e){}}
 /* слияние двух аккаунтов без потерь */
+/* версия персонажа: rev растёт при каждом сохранении, в котором персонаж реально изменился; base — rev, известный серверу */
+const charScore=c=>(c.kills||0)+(c.xp||0)/1e9+(c.lvl||0)*1e6;
+function charBetter(x,y){if(notBehind(x,y)&&!notBehind(y,x))return true;if(notBehind(y,x)&&!notBehind(x,y))return false;const rx=x.rev||0,ry=y.rev||0;if(rx!==ry)return rx>ry;if((x.t||0)!==(y.t||0))return (x.t||0)>(y.t||0);return charScore(x)>charScore(y);}
+function charDiverged(x,y){const d=(p,q)=>p.base!=null&&(q.rev||0)>p.base&&(p.rev||0)>p.base;return d(x,y)||d(y,x);}
+const REV_H={};
+const charHash=c=>hash32(JSON.stringify(c,(k,v)=>k==='t'||k==='rev'||k==='base'||k==='dev'||k==='created'||k==='econ'?undefined:v));
+/* econ — счётчик «необратимых» действий: потрачена сфера или ископаемое, предмет или камень ушёл от персонажа (продажа, тайник, аукцион, рецепт).
+   Вместе с убийствами (kills) он только растёт. Версию персонажа нельзя заменить версией, где этих счётчиков меньше, — так нельзя откатить неудачный крафт или размножить предмет */
+const ECON={};
+function econSnap(c){const fos=(c.mine&&c.mine.fos)||{};let cs=0;for(const k in (c.cur||{}))cs+=c.cur[k]||0;for(const k in fos)cs+=fos[k]||0;
+  return {cs,it:new Set([...Object.values(c.equip||{}),...(c.inv||[])].filter(Boolean).map(x=>x.uid)),gm:new Set((c.gems||[]).map(g=>g.uid))};}
+function econCheck(c){const n=econSnap(c),o=ECON[c.id];ECON[c.id]=n;if(!o)return false;
+  let lost=n.cs<o.cs;if(!lost)for(const u of o.it)if(!n.it.has(u)){lost=true;break;}if(!lost)for(const u of o.gm)if(!n.gm.has(u)){lost=true;break;}
+  if(lost){c.econ=(c.econ||0)+1;return true;}return false;}
+/* версия cand не «откатывает» персонажа: убийств и необратимых действий в ней не меньше, чем в cur */
+const notBehind=(cand,cur)=>!cur||(cand.kills||0)>=(cur.kills||0)&&(cand.econ||0)>=(cur.econ||0);
+/* крафт и обмен — только со связью с сервером, чтобы результат сразу попал на сервер */
+function craftOnline(){if(srvOn()&&(!srvReady||srvErr)){toast('Нет связи с сервером: сферы, крафт и обмен недоступны, пока связь не восстановится');return false;}return true;}
+/* устройство, которое последним меняло персонажа: сервер не даёт одному устройству затереть изменения другого, которых оно не видело */
+const DEV=(()=>{try{let d=localStorage.getItem('izg_dev');if(!d){d='d'+Math.random().toString(36).slice(2,10);localStorage.setItem('izg_dev',d);}return d;}catch(e){return 'd0';}})();
+function revInit(){if(ACC)ACC.chars.forEach(c=>{REV_H[c.id]=charHash(c);ECON[c.id]=econSnap(c);});}
+let econNow=false;
+function revBump(){if(!ACC)return;ACC.chars.forEach(c=>{if(econCheck(c))econNow=true;const h=charHash(c);if(REV_H[c.id]==null){REV_H[c.id]=h;return;}if(REV_H[c.id]!==h){REV_H[c.id]=h;c.rev=(c.rev||0)+1;c.t=Date.now();c.dev=DEV;}});}
 function mergeAcc(a,b){
   if(!a||!a.chars)return b;if(!b||!b.chars)return a;
   const del={...(a.del||{}),...(b.del||{})};
-  const map={};[...a.chars,...b.chars].forEach(c=>{if(!c||!c.id||(del[c.id]&&del[c.id]>=(c.t||0)))return;const o=map[c.id];if(!o||(c.t||0)>(o.t||0)||((c.t||0)===(o.t||0)&&(c.kills||0)+(c.xp||0)/1e9+(c.lvl||0)*1e6>(o.kills||0)+(o.xp||0)/1e9+(o.lvl||0)*1e6))map[c.id]=c;});
+  /* выбор версии персонажа: побеждает та, в которой больше изменений (rev), а не та, что сохранена позже.
+     Если обе версии менялись независимо от общей точки (игра на двух устройствах), проигравшая не теряется — она уходит в ACC.alt */
+  const map={},alt={...(a.alt||{}),...(b.alt||{})};
+  [...a.chars,...b.chars].forEach(c=>{if(!c||!c.id||(del[c.id]&&del[c.id]>=(c.t||0)))return;const o=map[c.id];if(!o){map[c.id]=c;return;}if(o===c)return;
+    const win=charBetter(c,o)?c:o,lose=win===c?o:c;map[c.id]=win;
+    if(charDiverged(c,o)&&JSON.stringify(lose)!==JSON.stringify(win))alt[c.id]={c:lose,at:Date.now()};});
   const newer=(x,y)=>((x&&x.t)||0)>=((y&&y.t)||0)?x:y;
+  for(const id in alt)if(!map[id]||(alt[id].c.rev||0)===(map[id].rev||0)&&alt[id].c.t===map[id].t)delete alt[id];
   const accNew=newer(a,b);
   const m={...accNew,chars:Object.values(map).sort((x,y)=>(x.created||0)-(y.created||0)).slice(0,MAX_CHARS),del,u:Math.max(a.u||0,b.u||0),
     gold:(newer(a,b).gold!=null?newer(a,b).gold:Math.max(a.gold||0,b.gold||0)),stash:newer(a.stash||{},b.stash||{}),auc:newer(a.auc||{},b.auc||{}),aucGold:(newer(a.auc||{},b.auc||{})===(a.auc||{})?a:b).aucGold||0,t:Math.max(a.t||0,b.t||0)};
@@ -2016,16 +2046,17 @@ function sameChars(a,b){const k=x=>(x&&x.chars||[]).map(c=>c.id+':'+(c.t||0)).so
 function adoptAcc(d,note){
   if(C&&!C.over&&S){const cur=S;ACC=d;ACC.stash=ACC.stash||{items:[],tabs:1};ACC.stash.gems=ACC.stash.gems||[];ACC.del=ACC.del||{};const i=ACC.chars.findIndex(c=>c.id===cur.id);if(i>=0)ACC.chars[i]=cur;else ACC.chars.push(cur);ACC.cur=cur.id;return true;}
   const before=ACC;ACC=d;ACC.stash=ACC.stash||{items:[],tabs:1};ACC.stash.gems=ACC.stash.gems||[];ACC.chars.forEach(fixChar);(ACC.stash&&ACC.stash.items||[]).forEach(afxMigrate);ACC.ui=ACC.ui||{aura:1,flask:1,ability:1};ACC.del=ACC.del||{};
-  S=ACC.chars.find(c=>c.id===ACC.cur)||null;C=null;
+  S=ACC.chars.find(c=>c.id===ACC.cur)||null;C=null;revInit();
   if(!sameChars(before,ACC)){screen=S?'main':ACC.chars.length?'roster':'select';tab='map';if(note)toast(note);}
   return true;
 }
 function save(now){
-  if(!ACC)return;const t=Date.now();ACC.t=t;ACC.ver=GAME_VER;if(S){S.t=t;S.created=S.created||t;}
+  if(!ACC)return;const t=Date.now();ACC.t=t;ACC.ver=GAME_VER;revBump();if(S){S.t=S.t||t;S.created=S.created||t;}
   const uid=tgUid();if(uid){ACC.tgId=uid;const u=tgUser();if(u)ACC.tgName=u.username||u.first_name||'';}
   const str=JSON.stringify(ACC);
   try{localStorage.setItem(KEY,str);}catch(e){}
   /* копии: устройство и сервер игры. Облако Telegram больше не используется (только разовый перенос старых сохранений) */
+  if(econNow){econNow=false;now=true;}
   if(srvReady){clearTimeout(srvTimer);if(now)srvSave(str);else srvTimer=setTimeout(()=>srvSave(str),1500);}
 }
 /* облако Telegram: два слота (a/b) кусками по 3800 символов. Сначала пишется запасной слот, потом указатель —
@@ -2085,11 +2116,25 @@ function cloudLoad(){
 function srvOn(){return !!(AUCTION_URL&&tg&&tg.initData);}
 function srvReq(path,opt={}){return fetch(AUCTION_URL.replace(/\/$/,'')+path,{method:opt.method||'GET',headers:{'Content-Type':'application/json','X-Tg-Init-Data':tg.initData},body:opt.body}).then(r=>r.ok?r.json():Promise.reject(r.status));}
 let srvLoading=false;
-function srvLoad(){if(!srvOn()||srvReady||srvLoading)return;srvLoading=true;srvReq('/save').finally(()=>{srvLoading=false;}).then(j=>{if(j&&j.acc&&j.acc.chars){const m=mergeAcc(ACC,j.acc);if(!sameChars(ACC,m))backupLocal();adoptAcc(m,'Аккаунт синхронизирован с сервером');}
+function srvLoad(){if(!srvOn()||srvReady||srvLoading)return;srvLoading=true;srvReq('/save').finally(()=>{srvLoading=false;}).then(j=>{if(j&&j.acc&&j.acc.chars){const m=mergeAcc(ACC,j.acc);if(!sameChars(ACC,m))backupLocal();adoptAcc(m,'Аккаунт синхронизирован с сервером');
+    const sr=new Map(j.acc.chars.map(c=>[c.id,c.rev||0]));ACC.chars.forEach(c=>{if(sr.has(c.id))c.base=sr.get(c.id);});altNote();}
   srvReady=true;save(true);render();}).catch(()=>{srvReady=false;srvTries++;if(srvTries<4)setTimeout(srvLoad,5000*srvTries);});}
 let srvTries=0;
 let boardAt=0;
-function srvSave(str){if(!srvOn())return;srvReq('/save',{method:'POST',body:str}).then(()=>{srvAt=Date.now();srvErr='';if(screen==='settings')render();if(Date.now()-boardAt>30000){boardAt=Date.now();srvReq('/board',{method:'POST',body:JSON.stringify(boardOf())}).catch(()=>{});}}).catch(e=>{srvErr='ошибка '+e;if(screen==='settings')render();});}
+/* сервер отказался затирать свою версию: берём её, а свою кладём в «другие версии», чтобы игрок выбрал сам */
+function srvKeep(j){backupLocal();ACC.alt=ACC.alt||{};
+  j.kept.forEach(id=>{const sc=j.acc.chars.find(c=>c.id===id),i=ACC.chars.findIndex(c=>c.id===id);if(!sc)return;
+    if(i>=0){const mine=ACC.chars[i];if(charHash(mine)!==charHash(sc))ACC.alt[id]={c:mine,at:Date.now()};ACC.chars[i]=fixChar(sc);}else ACC.chars.push(fixChar(sc));
+    sc.base=sc.rev||0;});
+  for(const id in (j.acc.alt||{}))if(!ACC.alt[id])ACC.alt[id]=j.acc.alt[id];
+  S=ACC.chars.find(c=>c.id===ACC.cur)||S;revInit();try{localStorage.setItem(KEY,JSON.stringify(ACC));}catch(e){}
+  toast('На сервере более новая версия персонажа — она загружена. Ваша сохранена в «Другие версии»');render();}
+function altNote(){const n=Object.keys(ACC.alt||{}).length;if(n)setTimeout(()=>toast(`Найдена другая версия персонажа (игра на двух устройствах). Выбрать: Настройки → Сохранения`),600);}
+function srvSave(str){if(!srvOn())return;const sent=JSON.parse(str).chars.map(c=>[c.id,c.rev||0]);srvReq('/save',{method:'POST',body:str}).then(j=>{srvAt=Date.now();srvErr='';
+    /* сервер принял: эти версии теперь известны серверу. Если на сервере была версия новее — сервер её сохранил и вернул */
+    sent.forEach(([id,r])=>{const c=ACC.chars.find(x=>x.id===id);if(c&&(c.rev||0)===r)c.base=r;});
+    if(j&&j.kept&&j.kept.length&&j.acc&&j.acc.chars&&!(C&&!C.over))srvKeep(j);
+    if(screen==='settings')render();if(Date.now()-boardAt>30000){boardAt=Date.now();srvReq('/board',{method:'POST',body:JSON.stringify(boardOf())}).catch(()=>{});}}).catch(e=>{srvErr='ошибка '+e;if(screen==='settings')render();});}
 /* сводка персонажей для таблицы лидеров: уровень и умение с наибольшим уроном */
 /* сводка персонажа для лидеров и статистики администратора */
 function charInfo(c){const pS=S,pC=C;const o={top:null,b:null};try{S=c;C=null;const P=calc();
@@ -2112,7 +2157,7 @@ function newGame(cls,name){
   const c=CLASSES[cls];
   S={id:'c'+Date.now().toString(36)+ri(10,99),v:4,t:Date.now(),created:Date.now(),name:name||'Изгнанник',cls,lvl:1,xp:0,goldIn:1,alloc:[startNode(cls)],attrPick:{},mast:{},treeV:3,attrDef:mainAttr(cls),bonus:0,
      gems:[],skills:[{a:null,s:[]},{a:null,s:[]},{a:null,s:[]},{a:null,s:[]}],auras:[null,null,null,null],hex:null,
-     equip:{},inv:[],cur:{},prog:0,done:false,deaths:0,kills:0,lf:lfDefault(),shop:null,maps:{},gmaps:{},frag:{},pinK:{},offer:0,mapBest:0,labs:[0,0,0,0],asc:null,ascAlloc:[]};
+     equip:{},inv:[],cur:{},prog:0,done:false,deaths:0,kills:0,lfs:[lfNew('Фильтр 1'),lfNew('Фильтр 2'),lfNew('Фильтр 3')],lfOn:0,shop:null,maps:{},gmaps:{},frag:{},pinK:{},offer:0,mapBest:0,labs:[0,0,0,0],asc:null,ascAlloc:[]};
   goldLink(S);if(!ACC.chars.length&&!ACC.gold)ACC.gold=30;
   ACC.chars.push(S);ACC.cur=S.id;
   const g1={uid:newUid(),id:c.gem,lvl:1,xp:0},g2={uid:newUid(),id:c.sup,lvl:1,xp:0};
@@ -2204,9 +2249,10 @@ function calc(){
     const d=itemDef(it);if(d){const sd=it.slot==='shield'?(t.shieldDef||0):0;
       if(d.armour)d.armour=R(d.armour*(1+(eqInc(it.slot,'armourP')+sd)/100));if(d.eva)d.eva=R(d.eva*(1+(eqInc(it.slot,'evaP')+sd)/100));if(d.es)d.es=R(d.es*(1+(eqInc(it.slot,'esP')+sd)/100));
       if(!(keys.has('aegis')&&it.slot==='shield'))add(d,ti);}
-    if(it.slot!=='weapon')add(it.imp||{},ti);else{const im={...it.imp};delete im.physL;add(im,ti);}
+    const cm=typeof catMult==='function'?catMult(it):null;
+    if(it.slot!=='weapon')add(cm?Object.fromEntries(Object.entries(it.imp||{}).map(([k,v])=>[k,typeof v==='number'?cm(k,v):v])):(it.imp||{}),ti);else{const im={...it.imp};delete im.physL;add(im,ti);}
     if(it.block){const bl=R(it.block*(1+itStat(it,'blockL')/100));if(keys.has('aegis')&&it.slot==='shield')P.shieldBlock=bl;else P.block+=bl;}
-    it.mods.forEach(m=>modStats(m).forEach(([k,v])=>{if(LOCAL_W.has(k)||AFX_LOCAL.has(k)||(MODS[k]&&MODS[k].loc))return;
+    it.mods.forEach(m=>modStats(m).forEach(([k,v])=>{if(LOCAL_W.has(k)||AFX_LOCAL.has(k)||(MODS[k]&&MODS[k].loc))return;if(cm&&typeof v==='number')v=cm(k,v);else if(cm&&Array.isArray(v))v=v.map(x=>cm(k,x));
       if(String(k).startsWith('u_k_')){keys.add(k.slice(4));return;}
       if(String(k).startsWith('u_')){U[k]=(U[k]||0)+v;return;}
       if(String(k).includes(':'))addK(k,v);else add1(k,v,ti);}));});
@@ -2276,13 +2322,13 @@ function calc(){
     if(attr[A.c]<gemAttrReq(gm.lvl))return;const b=bestA[gm.id];if(!b||gem(b).lvl<gm.lvl)bestA[gm.id]=uid;});
   const aurL=[];
   S.auras.forEach((uid,i)=>{const gm=gem(uid);if(!gm||S.lvl<AURA_SLOTS[0])return;const A=AURAS[gm.id];
-    const L=gemLevel(gm,P,null).L,r=(i===0&&U.u_freeAura)?0:A.res*(1-resE/100)*(ego?1.4:1);
+    const L=gemLevel(gm,P,null).L,r=(i===0&&U.u_freeAura)||(gm.id==='arctic'&&U.u_arcticFree)?0:A.res*(1-resE/100)*(ego?1.4:1);
     const dup=bestA[gm.id]&&bestA[gm.id]!==uid;
     const ok=!dup&&attr[A.c]>=gemAttrReq(gm.lvl)&&used+r<=100.01;
-    P.auras.push({uid,id:gm.id,L,res:r,on:ok,dup});if(ok){used+=r;aurL.push([A,L]);}});
+    P.auras.push({uid,id:gm.id,L,res:r,on:ok,dup});if(ok){used+=r;aurL.push([A,L,gm.id==='arctic'&&U.u_arcticFree?1.5:1]);}});
   /* «Высшее эго»: +1% эффекта аур за каждые 2% резерва */
   const auraF=1+(g('auraEff')+(ego?used/2:0))/100;
-  aurL.forEach(([A,L])=>{A.ap(t,L,auraF);if(!ego)A.ap(MA,L,auraF);});
+  aurL.forEach(([A,L,xf])=>{A.ap(t,L,auraF*(xf||1));if(!ego)A.ap(MA,L,auraF*(xf||1));});
   P.reserved=used;P.auraF=auraF;
   if(keys.has('blood')){P.life=Math.max(1,R(P.lifeMax*(1-used/100)));P.mana=0;}else{P.life=P.lifeMax;P.mana=R(P.manaMax*(1-used/100));}
   /* защита */
@@ -2328,6 +2374,7 @@ function calc(){
   P.totemMax=1+g('totemN')+(keys.has('k_bond')?1:0)-(keys.has('k_runebinder')?1:0)+(keys.has('k_chief_tukohama')?1:0)+(keys.has('k_hiero_faith')?1:0);
   P.orbMax=keys.has('k_runebinder')?2:1;
   P.hex=hexInfo(P);P.hex2=g('curseN')>0?hexInfo(P,S.hex2):null;
+  if(typeof calcHook==='function')calcHook(P,g);
   P.skills=[0,1,2,3].map(i=>calcSkill(i,P));
   P.basic=basicSkill(P);
   return P;
@@ -2693,7 +2740,7 @@ function mkEnemy(type,lvl,o={}){
       if(em.id==='cleave')e.splash=.5;if(em.id==='deadly'){e.critC=15;e.critM=.5;}if(em.id==='warded')['fire','cold','light'].forEach(k=>e.res[k]=(e.res[k]||0)+30);
       if(em.id==='aFury')e.aura={fury:20};if(em.id==='aWard')e.aura={ward:20};if(em.id==='aMend')e.aura={mend:3};
       if(em.id==='stunner')e.stunner=true;if(em.id==='cblood')e.cblood=1;if(em.id==='impaler')e.impaler=1;if(em.id==='guard')e.block=Math.max(e.block,30);});}
-  if(M.boss){hp*=M.boss.hp;dmg*=1.6;e.boss=M.boss;e.turn=0;e.rar='boss';e.splash=Math.max(e.splash||0,.6);['fire','cold','light','chaos'].forEach(k=>e.res[k]=Math.max(e.res[k]||0,20));}
+  if(M.boss){hp*=M.boss.hp;if(M.boss.fixHp)hp=M.boss.fixHp;dmg*=1.6;e.boss=M.boss;e.turn=0;e.rar='boss';e.splash=Math.max(e.splash||0,.6);['fire','cold','light','chaos'].forEach(k=>e.res[k]=Math.max(e.res[k]||0,20));}
   e.ailC=AIL_C[e.rar]||8;
   e.eva=R(monEva(lvl)*(M.ev||1)*(e.mods.includes('Быстрый')?1.3:1)*(mt?1+.02*mt:1));
   e.maxHp=e.hp=R(hp);e.dmg=dmg;e.arm=arm;
@@ -2714,6 +2761,7 @@ function battleInfo(B){
     return {lvl:LD.lvl,boss:B.boss?'izaro':null,pool:LAB_MOBS,name:B.boss?'Тронный зал Изаро':ROOMS.fight.n,sub:`${LD.n} · ${B.boss?'финал':'комната '+(L.step+1)+'/'+L.steps.length}`,act:4,lab:L.n,waves:B.boss?1:(L.n>=2?3:2)};}
   if(B.type==='mine')return mineInfo(B);
   const m=S.mapRun,lvl=67+m.tier;
+  if(m.brD&&typeof breachInfo==='function')return breachInfo(m);
   if(m.pin)return {lvl:86,boss:m.pin,pool:m.pool,name:PIN_GROUPS[m.pin].arena,sub:`Пинакл-босс · ${PIN_GROUPS[m.pin].n}`,act:5,map:1,mt:19,mtier:16,waves:1,pin:1};
   if(m.guard)return {lvl:lvl+1,boss:B.step===3?m.guard:null,pool:m.pool,name:m.name,sub:`${PIN_GROUPS[GUARD[m.guard].g].map} ${m.tier} · бой ${B.step+1}/4`,act:5,map:1,mt:m.tier+3,mtier:m.tier,waves:3,hard:1};
   return {lvl,boss:B.step===3?m.boss:null,pool:m.pool,name:m.name,sub:`Карта ${m.tier} · бой ${B.step+1}/4`,act:5,map:1,mt:m.tier,waves:3};
@@ -2723,7 +2771,7 @@ function startBattle(B){
   C=null;const I=battleInfo(B);C={B,I,fb:[]};const P0=calc();
   const lab=B.type==='lab'?S.labRun:null;
   C={B,I,enemies:[],log:[],full:[],fx:[],hp:lab?Math.max(1,R(P0.life*lab.hp)):P0.life,es:P0.es,mana:P0.mana,rage:0,fort:0,eo:0,nextCrit:false,target:null,busy:false,
-     poison:[],burn:null,cure:0,fb:[],xp:0,gold:0,loot:[],orbs:{},over:false,turn:1,ruth:{},wave:0,waves:I.waves,actor:'hero',kills:0,
+     poison:[],burn:null,cure:0,fb:[],xp:0,gold:0,loot:[],cdrop:{},over:false,turn:1,ruth:{},wave:0,waves:I.waves,actor:'hero',kills:0,
      waveActs:0,evaBuff:0,blockBuff:0,free:false,freeCast:false,hitLast:false,hitThis:false,stepCD:0,auto:!!prevAuto,
      ch:{end:P0.chMin.end,frz:P0.chMin.frz,pow:P0.chMin.pow},chT:{end:0,frz:0,pow:0},fortN:0,fortT:0,um:0,adren:0,bleed:[],cb:null,chill:0,shock:0,impH:[],
      stunned:0,stunImm:false,stunAt:-9,totems:[],orbs:[],totemAt:null,arcane:0,shroud:0,phPrev:[0,0],spellTurns:0,lastSpell:-9,moved:false,saved:false};
@@ -2754,6 +2802,7 @@ function spawnWave(){
   if(C.B.type==='camp'&&C.B.g===0&&C.wave===1&&!(ACC.tips&&ACC.tips.fb_done))C.enemies.forEach(e=>{e.maxHp=e.hp=Math.max(1,R(e.hp*.6));e.dmg*=.6;});
   logC(`<b>Волна ${C.wave}/${C.waves}</b>: ${C.enemies.map(e=>e.n).join(', ')}`);
   if(I.map)veinCheck();
+  if(typeof onSpawnWave==='function')onSpawnWave();
   C.target=null;autoTarget();
 }
 
@@ -2908,13 +2957,13 @@ function rollHit(sk,P,e,m,proj,force){
   if(e.totemAura)dm*=1+e.totemAura/100;
   let total=0;const parts={},raw={};const pen=sk.pen||{};
   if(sk.noDmg)return {total:0,crit:false,parts:{},raw:{}};
-  for(const el in sk.dmg){let v=rnd(sk.dmg[el][0],sk.dmg[el][1])*dm;
+  for(const el in sk.dmg){let v=rnd(sk.dmg[el][0],sk.dmg[el][1]);if(el==='light'&&!crit&&P.U.u_luckyLight)v=Math.max(v,rnd(sk.dmg[el][0],sk.dmg[el][1]));v*=dm;
     if(C&&C.eo>0&&el!=='phys'&&el!=='chaos')v*=1.4;
     raw[el]=v;
     if(el==='phys'){if(e.st.maim)v*=1.1;v*=1+(hx.physT||0)/100;const arm=e.arm*(1-(P.t.ex_armBreak||0)/100);v*=1-Math.min(.6,arm/(arm+10*v));}
     else{if(el==='chaos'&&e.st.wither)v*=1+.06*e.st.wither.n*(1+(P.t.witherEff||0)/100);
       if(el==='cold'&&P.keys.has('k_bitter')&&e.st.chill)v*=1.15;
-      v*=1-enemyRes(e,el,hx,pen[el])/100;}
+      v*=1-enemyRes(e,el,hx,(pen[el]||0)+(el==='cold'&&e.st.chill?(P.U.u_coldPenChill||0):0)+(el==='fire'&&e.d<=1&&P.U.u_ashNear?10:0))/100;}
     v=Math.max(0,v);parts[el]=v;total+=v;}
   total=isFinite(total)?Math.max(1,R(total)):1;
   return {total,crit,parts,raw};
@@ -2998,6 +3047,7 @@ function dealHit(sk,e,m,proj,P){
     if(sk.type==='attack'&&P.rage)C.rage=Math.min(P.rageMax,C.rage+3+(P.t.rageOnHit||0));}
   if(sk.knock&&!e.boss&&e.hp>0&&e.d<3&&roll(sk.knock)){e.d++;e.moved=true;ail.push('отброшен');}
   if(sk.cull&&!e.boss&&e.hp>0&&e.hp<e.maxHp*sk.cull/100){e.hp=0;ail.push('добит');}
+  if(hero&&typeof onHeroHit==='function')onHeroHit(sk,e,P,{crit,parts,ail,total});
   logF(`&nbsp;&nbsp;→ ${e.n} [${DIST[e.d].toLowerCase()}]: <b>${fmt(total)}</b> (${ELS.filter(k=>parts[k]>.5).map(k=>`${EL[k]} ${fmt(parts[k])}`).join(', ')}${impD?`, прокол ${fmt(impD)}`:''})${crit?' <span class="gold-t">крит</span>':''}${ail.length?' · '+ail.join(', '):''}`);
   if(e.hp<=0)killEnemy(e,P,sk);
   return r;
@@ -3050,6 +3100,7 @@ function killEnemy(e,P,sk,mk_){
   if(!C.I.map&&Math.random()<(e.boss?.5:.02*(1+.5*m))){const pool=[...ACTIVE_IDS,...SUPPORT_IDS,...AURA_IDS,...HEX_IDS].filter(obtainable);if(pool.length){const id=pick(pool);
     addGem(id,Math.max(1,maxGemLvl(S.lvl)-3));logC(`Выпал камень: <span class="r-gem">${gdef(id).n}</span>`);C.loot.push({gem:true,name:gdef(id).n});}}
   if(!C.I.mine)dropMaps(e,m);else mineKill(e,m);
+  if(typeof onKillHook==='function')onKillHook(e,P,sk,mk_);
   if(e.guardian){const G=GUARD[e.guardian];S.frag[e.guardian]=(S.frag[e.guardian]||0)+1;C.loot.push({frag:1,name:G.frag});logC(`Выпал <span class="r-unique">${G.frag}</span>`);
     if(roll(25)){const it=makeUnique(e.lvl);addLoot(it);}}
   if(e.pinnacle){S.pinK[e.pinnacle]=(S.pinK[e.pinnacle]||0)+1;const pool=PIN_UNIQUES[e.pinnacle],n=roll(35)?2:1;
@@ -3058,7 +3109,7 @@ function killEnemy(e,P,sk,mk_){
     if(roll(50))addMap(16);}
 }
 function rollOrb(){const tot=ORB_IDS.reduce((a,k)=>a+ORBS[k].w,0);let r=Math.random()*tot;for(const k of ORB_IDS){r-=ORBS[k].w;if(r<=0)return k;}return ORB_IDS[0];}
-function addOrb(id,n=1){S.cur[id]=(S.cur[id]||0)+n;if(C&&C.orbs){C.orbs[id]=(C.orbs[id]||0)+n;logC(`Выпала <span class="r-cur">${ORBS[id].n}</span>`);}}
+function addOrb(id,n=1){S.cur[id]=(S.cur[id]||0)+n;if(C&&C.cdrop){C.cdrop[id]=(C.cdrop[id]||0)+n;logC(`Выпала <span class="r-cur">${ORBS[id].n}</span>`);}}
 /* карты: выпадают с V акта; на карте — текущего тира и реже на тир выше; босс чаще роняет тир выше */
 function addGMap(g,t){if(GUARD[g])g=GUARD[g].g;const k=g+'|'+t;S.gmaps[k]=(S.gmaps[k]||0)+1;const nm=`${PIN_GROUPS[g].map} (${t} тир)`;C.loot.push({map:t,name:nm,g:1});logC(`Выпала <span class="r-unique">${nm}</span>`);}
 function addMap(t){t=clamp(t,1,16);S.maps[t]=(S.maps[t]||0)+1;C.loot.push({map:t,name:`Карта ${t} тира`});logC(`Выпала <span class="r-map">карта ${t} тира</span>`);}
@@ -3402,12 +3453,13 @@ function enemyAct(e,P){
   if(e.k==='melee'){
     if(e.d>0){const spd=enemySpeed(e,P);if(spd<=0){logF(`${e.n} скован льдом`);return;}
       e.mv+=spd;const st=Math.floor(e.mv);e.mv-=st;
-      if(st>0){const d0=e.d;e.d=Math.max(0,e.d-st);logF(`${e.n} идёт: ${DIST[d0].toLowerCase()} → ${DIST[e.d].toLowerCase()}`);}else logF(`${e.n} замедлен и медленно подходит`);return;}
+      /* боссы ходят на 2 линии (если ближе места нет — на одну) */
+      if(st>0){const d0=e.d;e.d=Math.max(0,e.d-st*(e.boss?2:1));logF(`${e.n} идёт: ${DIST[d0].toLowerCase()} → ${DIST[e.d].toLowerCase()}`);}else logF(`${e.n} замедлен и медленно подходит`);return;}
     for(let h=0;h<e.hits;h++)enemyHit(e,e.dmg,e.el,'melee',P);return;
   }
   /* не больше 3 отступлений подряд, затем 2 хода без отступлений */
   if(e.retCD>0)e.retCD--;
-  else if(e.d===0&&!e.st.chill&&!e.st.maim&&roll(e.k==='ranged'?55:40)){e.d=1;e.retN=(e.retN||0)+1;if(e.retN>=3){e.retN=0;e.retCD=2;}logF(`${e.n} отходит назад`);return;}
+  else if(e.d===0&&!e.st.chill&&!e.st.maim&&roll(e.k==='ranged'?55:40)){e.d=e.boss?2:1;e.retN=(e.retN||0)+1;if(e.retN>=3){e.retN=0;e.retCD=2;}logF(`${e.n} отходит назад`);return;}
   e.retN=0;
   for(let h=0;h<e.hits;h++)enemyHit(e,e.dmg*(e.k==='ranged'?.9:1),e.el,e.k,P);
 }
@@ -3425,7 +3477,7 @@ function mitigate(raw,el,P,kind,out){
   if(el==='phys'){const arm=P.armour*(imb?2:1);let red=Math.min(.75,arm/(arm+10*d))+(1-Math.min(.75,arm/(arm+10*d)))*P.physRed/100;if(imb)red=Math.min(.5,red);
     if(out)out.prev=(out.prev||0)+d*Math.min(.75,arm/(arm+10*d));d*=1-red;}
   else if(el==='chaos'&&P.keys.has('ci'))return 0;
-  else{let r=P.res[el]||0;if(imb)r=Math.min(50,r);d*=1-r/100;}
+  else{let r=P.res[el]||0;if(imb)r=Math.min(50,r);d*=1-r/100;if(el==='fire'&&P.U.u_fireHitRed)d=Math.max(0,d-P.U.u_fireHitRed);}
   if(P.fort)d*=1-P.fort/100;
   if(P.dmgTaken)d*=1+P.dmgTaken/100;
   if(C&&C.shock>0)d*=1+.15*(1-clamp((P.t.shockEffYou||0)+(P.t.chillShockEffYou||0),0,100)/100);
@@ -3573,6 +3625,7 @@ function endRound(P){
   C.fb.forEach(b=>b.turns--);C.fb=C.fb.filter(b=>b.turns>0);
   minionTick();if(typeof totemTick==='function')totemTick(P);if(typeof orbTick==='function')orbTick(P);
   if(P.rage&&!P.U.u_rage&&!P.keys.has('k_chief_ramako'))C.rage=Math.max(0,C.rage-2);
+  if(typeof onEndRound==='function')onEndRound(P);
   C.hitLast=C.hitThis;C.hitThis=false;C.hitThisPrev=false;C.moved=false;
   C.turn++;
 }
@@ -3580,6 +3633,7 @@ function endRound(P){
 /* ---- итог волны и боя ---- */
 let pendingReward=null;
 async function waveCleared(){
+  if(typeof onBeforeWaveClear==='function'&&onBeforeWaveClear())return;
   C.busy=true;save();
   if(C.wave<C.waves){logC(`<b class="gold-t">Волна ${C.wave} зачищена</b>`);render();await sleep(700);if(!C||C.over)return;
     const P=calc();
@@ -3848,7 +3902,8 @@ function minionHit(m,tpl,e,mul,P){
     if(parts.cold>0){e.st.chill=2;if(!e.boss&&roll(6+tpl.ail.freeze+cb)){e.st.frozen=1;ail.push('заморозка');}}
     if(parts.light>0&&roll(10+tpl.ail.shock+cb)){e.st.shock=2;ail.push('шок');}
     const pc=(parts.phys||0)+(parts.chaos||0);if(pc>0&&roll(tpl.ail.poison)){e.st.poi.push({d:pc*.2*tpl.poiMore,t:3});ail.push('яд');}}
-  if(m.um>0&&roll(25)){const w=e.st.wither||{n:0,t:0};w.n=Math.min(15,w.n+1);w.t=3;e.st.wither=w;ail.push('истощение');}
+  if((m.um>0&&roll(25))||(P.U.u_minionWither&&roll(60))){const w=e.st.wither||{n:0,t:0};w.n=Math.min(15,w.n+1);w.t=3;e.st.wither=w;ail.push('истощение');}
+  if(P.U.u_minionPoison&&roll(P.U.u_minionPoison)){e.st.poi.push({d:total*.2,t:3});ail.push('яд');}
   if(tpl.maim)e.st.maim=2;
   if(tpl.knock&&!e.boss&&e.hp>0&&e.d<3&&roll(tpl.knock)){e.d++;ail.push('отброшен');}
   if(tpl.cull&&!e.boss&&e.hp>0&&e.hp<e.maxHp*tpl.cull/100){e.hp=0;ail.push('добит');}
@@ -4175,6 +4230,7 @@ function mtagRow(k){const ts=statTags(k);return ts.length?`<span class="mtags" t
 
 /* ---------- сферы ---------- */
 function applyOrb(it,k){
+  if(!craftOnline())return false;
   if(it.mirrored){toast('Отражённый предмет нельзя изменить');return false;}
   if(k==='annul'||k==='mirror')return specialOrb(it,k);
   /* точильный камень и деталь доспеха: качество, свойства не трогают (работают и на уникальных, и на Legacy) */
@@ -4513,7 +4569,7 @@ function rcWhy(r){
   const its=rcItems(r);if(!its.length)return r.kind==='one'?`в сумке нет обычной ${r.cat==='weapon'?'оружия':'брони'} с качеством 20%`.replace('обычной оружия','обычного оружия'):`в сумке нет ${r.cat==='weapon'?'оружия':'брони'} с качеством`;
   if(r.kind==='set'){const t=its.reduce((a,x)=>a+itemQ(x),0);return t>=RC_SET?'':`в сумке качество на ${t}% из ${RC_SET}%`;}
   return '';}
-function rcDo(id,uids){const r=RECIPES.find(x=>x.id===id);if(!r||rcWhy(r))return false;
+function rcDo(id,uids){const r=RECIPES.find(x=>x.id===id);if(!r||rcWhy(r))return false;if(!craftOnline())return false;
   if(r.kind==='cur'){S.cur[r.cur]-=r.need;}
   else{let take;if(r.kind==='one')take=[rcItems(r)[0]];else{const pool=rcItems(r),set=new Set(uids||[]);take=pool.filter(x=>set.has(x.uid));if(take.reduce((a,x)=>a+itemQ(x),0)<RC_SET){toast(`Выберите предметы с качеством на ${RC_SET}%`);return false;}}
     const t=new Set(take);S.inv=S.inv.filter(x=>!t.has(x));}
@@ -4686,6 +4742,7 @@ function fosOrbOk(it,k){if(!it||it.slot==='flask'||it.rar==='unique'||it.mirrore
 function sanctVals(it,ms){ms.forEach(m=>{const T=afxTiers(afxBase(it),m.g),row=T&&T.find(x=>x[0]===m.t);if(!row)return;const G=AFX_G[m.g];
   const a=afxVals(row,G),b=afxVals(row,G),sum=v=>v.reduce((s,x)=>s+x,0);m.r=sum(a)>=sum(b)?a:b;});}
 function fossilCraft(it,k,sel){
+  if(!craftOnline())return false;
   const chk=fosRule(sel);if(!chk.ok){toast(chk.why);return false;}const RU=chk.rule,M=MN();
   if(!(S.cur[k]>0)||!fosOrbOk(it,k)){toast('Эту сферу сейчас нельзя применить');return false;}
   const ADD=['trans','aug','exalt','regal','alch','alt','chaos'];
@@ -4867,6 +4924,7 @@ function benchWhy(it,r){
 const benchCanPay=c=>Object.entries(c).every(([k,n])=>(S.cur[k]||0)>=n);
 const benchRoll=(lo,hi)=>{const dec=lo%1||hi%1;const v=lo+Math.random()*(hi-lo);return dec?Math.round(v*10)/10:Math.round(v);};
 function benchCraft2(it,rid,ti){
+  if(!craftOnline())return false;
   const r=BENCH2.find(x=>x.id===rid),t=r&&r.t[ti];if(!t)return false;
   const why=benchWhy(it,r);if(why){toast(why);return false;}
   if(!BENCH_BASES[t[2]].includes(benchAfxBase(it))){toast('Не подходит к этой основе');return false;}
@@ -4883,6 +4941,349 @@ function benchRemove(it){const c=benchRemoveCost(it);if(S.gold<c||!it.mods.some(
   nameItem(it);save();return true;}
 
 /* =========================================================
+   РАЗЛОМ (Breach) — тестовый модуль, в основную игру пока не входит.
+   Рука Разлома в волне → Разлом на 6 ходов: монстры владыки на линии «Далеко», убийства продлевают его (+0,5 хода, до 12 в запасе, всего не больше 20 ходов)
+   и поднимают уровень (1–5, по 6 убийств). С 3-го уровня — Сжатые руки с осколками. Осколки → Камень Разлома → Владения владыки.
+   Пять разных камней → Ксешт, Мы Едины.
+   ========================================================= */
+const BR_LORDS={
+  xoph:{n:'Ксоф',full:'Ксоф, Тёмные угли',el:'fire',col:'#ff7d45',dom:'Владения Ксофа',gen:'Ксофа'},
+  tul:{n:'Тул',full:'Тул, Ползущая лавина',el:'cold',col:'#78d4ff',dom:'Владения Тула',gen:'Тула'},
+  esh:{n:'Эш',full:'Эш, Раздвоенная мысль',el:'light',col:'#ffe066',dom:'Владения Эш',gen:'Эш'},
+  uul:{n:'Уул-Нетол',full:'Уул-Нетол, Освобождённая плоть',el:'phys',col:'#d9cbb4',dom:'Владения Уул-Нетола',gen:'Уул-Нетола'},
+  chayula:{n:'Чаюла',full:'Чаюла, Видящий сны',el:'chaos',col:'#c77dff',dom:'Владения Чаюлы',gen:'Чаюлы'},
+};
+const BR_IDS=Object.keys(BR_LORDS);
+/* параметры Разлома */
+const BRC={mapChance:35,start:6,cap:12,total:20,perKill:1,hp:.25,dmg:.7,lvlKills:6,maxLvl:5,handLvl:3,chance:.12,shardsStone:100,domTurns:12,domKills:20,domTotal:30};
+/* монстры владык: ближний бой, дальний бой, чары — стихия владыки */
+const BR_MON_N={
+  xoph:['Пламенный ползун','Метатель углей','Пепельный заклинатель'],tul:['Ледяной коготь','Метатель сосулек','Морозная провидица'],
+  esh:['Искрящий клешнерук','Грозовой шип','Шепчущий разряд'],uul:['Костяной паук','Плюющийся хитин','Мясной жрец'],
+  chayula:['Пустотный ходок','Глаз бездны','Сновидец Чаюлы']};
+BR_IDS.forEach(l=>{const L=BR_LORDS[l],res=L.el==='phys'?{}:{[L.el]:40};
+  MONS['br_'+l+'_m']={n:BR_MON_N[l][0],el:L.el,k:'melee',hp:.9,dmg:.95,sp:2,res:{...res},br:l,poison:L.el==='chaos'?1:0};
+  MONS['br_'+l+'_r']={n:BR_MON_N[l][1],el:L.el,k:'ranged',hp:.75,dmg:1,ev:1.2,res:{...res},br:l};
+  MONS['br_'+l+'_s']={n:BR_MON_N[l][2],el:L.el,k:'spell',hp:.7,dmg:1.05,res:{...res},br:l};});
+/* владыки: у каждого свой приём и два особых умения. Здоровье фиксированное: владыка 1,3 млн, Ксешт 4 млн (+ вторая стадия 2 млн) */
+const LORD_HP=1300000;
+Object.assign(MONS,{
+  br_xoph:{n:'Ксоф, Тёмные угли',el:'fire',k:'spell',hp:1,dmg:1,res:{fire:60},brLord:'xoph',boss:{hp:6,fixHp:LORD_HP,spec:[
+    {every:3,name:'Горящая земля',type:'burn',m:.5,t:3,el:'fire'},{every:4,name:'Извержение',type:'nuke',m:1.8,el:'fire'},
+    {every:5,name:'Огненный рывок',type:'brDash',m:1.5},{every:7,name:'Пепельный покров',type:'hex',eff:{resF:-25,dmgP:-15},t:3}]},
+    hint:'Горящая земля (шаг уводит с линии). Огненный рывок: прыгает вплотную, бьёт и поджигает. Пепельный покров: −25% к сопротивлению огню и −15% к урону на 3 хода.'},
+  br_tul:{n:'Тул, Ползущая лавина',el:'cold',k:'spell',hp:1,dmg:1,res:{cold:60},brLord:'tul',boss:{hp:6,fixHp:LORD_HP,spec:[
+    {every:3,name:'Ледяные оковы',type:'brFlask',t:2},{every:4,name:'Лавина',type:'nuke',m:1.8,el:'cold'},
+    {every:5,name:'Ледяная тюрьма',type:'brFreeze'},{every:7,name:'Метель',type:'brBlizzard',t:2}]},
+    hint:'Замораживает флаконы на 2 хода. Ледяная тюрьма: вы пропускаете ход (нельзя избежать). Метель: отходит далеко, охлаждает вас, 2 хода получает вдвое меньше урона.'},
+  br_esh:{n:'Эш, Раздвоенная мысль',el:'light',k:'spell',hp:1,dmg:1,res:{light:60},brLord:'esh',boss:{hp:6,fixHp:LORD_HP,spec:[
+    {every:2,name:'Разряд по мане',type:'brMana',m:1},{every:5,name:'Скачок молнии',type:'brBlink',m:1.2},
+    {every:7,name:'Перегрузка',type:'hex',eff:{costP:60,mregP:-50},t:3}]},
+    hint:'Разряд по мане втрое сильнее, если вы тратили ману. Скачок молнии: перескакивает на другую линию и шокирует вас. Перегрузка: расход маны +60%, регенерация маны −50% на 3 хода.'},
+  br_uul:{n:'Уул-Нетол, Освобождённая плоть',el:'phys',k:'melee',hp:1.2,dmg:1.05,arm:3,brLord:'uul',boss:{hp:6,fixHp:LORD_HP,spec:[
+    {every:3,name:'Выводок',type:'summon',mon:'br_uul_m',n:2},{every:4,name:'Удар костяной лапой',type:'nuke',m:1.6,el:'phys'},
+    {every:5,name:'Сотрясение',type:'brSlam',m:1.4},{every:7,name:'Костяная клетка',type:'brCage'}]},
+    hint:'Призывает пауков. Сотрясение: сильный удар и оглушение. Костяная клетка: подтягивает вас вплотную и вызывает кровотечение.'},
+  br_chayula:{n:'Чаюла, Видящий сны',el:'chaos',k:'spell',hp:1,dmg:1,res:{chaos:60},brLord:'chayula',boss:{hp:6,fixHp:LORD_HP,spec:[
+    {every:3,name:'Пелена сна',type:'brVeil',t:2},{every:4,name:'Пустота',type:'drain',p:.25},
+    {every:5,name:'Пожирание',type:'brDevour'},{every:7,name:'Шаг сквозь сон',type:'brDream'}]},
+    hint:'Пелена: намерения врагов не видны. Пожирание: снимает ваши флаконы и заряды и лечится. Шаг сквозь сон: уходит далеко, из сна выходят двое сновидцев.'},
+  br_xesht:{n:'Ксешт, Мы Едины',el:'fire',k:'melee',sp:1,hp:1.3,dmg:1.15,res:{fire:30,cold:30,light:30,chaos:30},brLord:'xesht',
+    boss:{hp:10,fixHp:4140000,spec:[{every:3,name:'Слияние владык',type:'nuke',m:2,el:'chaos'},{every:4,name:'Единство владык',type:'xUnity'},
+      {every:5,name:'Выводок Уул-Нетола',type:'summon',mon:'br_uul_m',n:2},{every:6,name:'Разрыв реальности',type:'xRift',m:1.3}]},
+    hint:'Каждые 25% здоровья меняет стихию: огонь → холод → молния → хаос. Единство владык: все враги лечатся на 10% и 2 хода получают вдвое меньше урона. Разрыв реальности: подтягивает вас и оглушает. После смерти — вторая стадия.'},
+  br_xesht2:{n:'Ксешт, Истинный облик',el:'chaos',k:'melee',sp:1,hp:1.3,dmg:1.3,res:{fire:40,cold:40,light:40,chaos:50},brLord:'xesht2',
+    boss:{hp:10,fixHp:2000000,spec:[{every:3,name:'Пять голосов',type:'xFive',m:.7},{every:4,name:'Разлом времени',type:'xTime'},
+      {every:5,name:'Сновидцы',type:'summon',mon:'br_chayula_s',n:2}]},
+    hint:'Пять голосов: удар всеми стихиями сразу. Разлом времени: вы пропускаете ход.'},
+});
+const XESHT_EL=['fire','cold','light','chaos'];
+
+/* ---------- уникальные предметы Разлома (PoE 1, адаптированы) ----------
+   r:[мин,макс] — значение выпадает случайно в этом диапазоне; rr:[[мин,макс],[мин,макс]] — для «от # до #»; v — фиксированное */
+const BR_UNIQ=[
+  /* Ксоф */
+  {n:'Зарождение Ксофа',br:'xoph',bless:'Взращивание Ксофа',slot:'weapon',wk:'bow',minL:60,poe:"Xoph's Inception",mods:[{k:'physL',r:[160,190]},{k:'lifeKillF',r:[40,60]},{k:'physToFire',v:20},{k:'igniteC',v:10},{k:'ex_vsIgn',v:20}]},
+  {n:'Взращивание Ксофа',br:'xoph',blessed:1,slot:'weapon',wk:'bow',minL:60,poe:"Xoph's Nurture",mods:[{k:'physL',r:[165,195]},{k:'physToFire',v:50},{k:'igniteC',v:10},{k:'ex_ignSpread',v:1},{k:'ex_hitLife',r:[40,60]}]},
+  {n:'Бесформенное пламя',br:'xoph',bless:'Бесформенная преисподняя',slot:'helm',dt:'armour',minL:60,poe:'The Formless Flame',mods:[{k:'armL',r:[80,120]},{k:'resF',v:-30},{k:'u_fireHitRed',r:[100,200]},{k:'u_overFireArm',v:1}]},
+  {n:'Бесформенная преисподняя',br:'xoph',blessed:1,slot:'helm',dt:'armour',minL:60,poe:'The Formless Inferno',mods:[{k:'life',r:[60,100]},{k:'resF',v:-30},{k:'minionP',v:30},{k:'u_overFireMinion',v:1}]},
+  {n:'Сердце Ксофа',br:'xoph',bless:'Кровь Ксофа',slot:'amulet',base:'Янтарный амулет',minL:60,poe:"Xoph's Heart",mods:[{k:'str',r:[20,30]},{k:'fireP',v:25},{k:'life',r:[25,35]},{k:'resF',r:[20,40]},{k:'u_ashNear',v:1}]},
+  {n:'Кровь Ксофа',br:'xoph',blessed:1,slot:'amulet',base:'Янтарный амулет',minL:64,poe:"Xoph's Blood",mods:[{k:'str',r:[20,30]},{k:'lifeP',v:10},{k:'resF',r:[20,40]},{k:'ex_pen',v:10},{k:'u_ashNear',v:1},{k:'u_k_avatar',v:1}]},
+  /* Тул */
+  {n:'Тулборн',br:'tul',bless:'Падение Тула',slot:'weapon',wk:'wand',wc:'caster',minL:60,poe:'Tulborn',mods:[{k:'spellP',r:[31,35]},{k:'spCold',rr:[[120,140],[150,170]]},{k:'u_powFrozen',v:1},{k:'ex_vsChill',v:12},{k:'manaKillF',r:[20,25]}]},
+  {n:'Падение Тула',br:'tul',blessed:1,slot:'weapon',wk:'wand',wc:'caster',minL:60,poe:'Tulfall',mods:[{k:'spellP',r:[31,35]},{k:'spellEcho',r:[10,20]},{k:'u_powFrozen',v:1},{k:'perPow:spCold',rr:[[50,50],[70,70]]},{k:'u_powMaxFrz',v:1}]},
+  {n:'Снежная грация',br:'tul',bless:'Совершенная форма',slot:'body',dt:'eva',minL:60,poe:'The Snowblind Grace',mods:[{k:'dex',r:[25,35]},{k:'evaL',r:[80,100]},{k:'life',r:[40,60]},{k:'u_arcticFree',v:1}]},
+  {n:'Совершенная форма',br:'tul',blessed:1,slot:'body',dt:'eva',minL:60,poe:'The Perfect Form',mods:[{k:'suppress',v:50},{k:'evaL',r:[150,200]},{k:'resC',v:-30},{k:'u_overColdEva',v:1},{k:'u_k_acro',v:1}]},
+  {n:'Безмятежность',br:'tul',bless:'Пандемониус',slot:'amulet',base:'Нефритовый амулет',minL:60,poe:'The Halcyon',mods:[{k:'dex',r:[20,30]},{k:'resC',r:[35,40]},{k:'freezeC',v:10},{k:'u_freezeSpread',v:1},{k:'frozeRecent:dmgP',v:60}]},
+  {n:'Пандемониус',br:'tul',blessed:1,slot:'amulet',base:'Нефритовый амулет',minL:60,poe:'The Pandemonius',mods:[{k:'dex',r:[20,30]},{k:'coldP',r:[20,30]},{k:'resC',r:[35,40]},{k:'ex_chillAtk',v:1},{k:'u_blindChill',v:1},{k:'u_coldPenChill',v:20}]},
+  /* Эш */
+  {n:'Рука мысли и движения',br:'esh',bless:'Рука мудрости и действия',slot:'weapon',wk:'claw',minL:60,poe:'Hand of Thought and Motion',mods:[{k:'ex_hitLife',v:46},{k:'dexP',r:[8,12]},{k:'intP',r:[8,12]},{k:'ex_killLife',v:1},{k:'u_lightPerDex',v:1},{k:'u_critPerInt',v:5}]},
+  {n:'Рука мудрости и действия',br:'esh',blessed:1,slot:'weapon',wk:'claw',minL:60,poe:'Hand of Wisdom and Action',mods:[{k:'ex_hitLife',v:46},{k:'dexP',r:[8,12]},{k:'intP',r:[8,12]},{k:'leech',v:1},{k:'u_lightPerInt',v:1},{k:'u_atkPerDex',v:1}]},
+  {n:'Зеркало Эш',br:'esh',bless:'Лик Эш',slot:'shield',dt:'es',minL:60,poe:"Esh's Mirror",mods:[{k:'spellP',r:[5,10]},{k:'int',r:[20,30]},{k:'esL',r:[170,230]},{k:'resL',r:[35,40]},{k:'u_shockSpread',v:1},{k:'killRecent:lightP',v:30}]},
+  {n:'Лик Эш',br:'esh',blessed:1,slot:'shield',dt:'es',minL:60,poe:"Esh's Visage",mods:[{k:'spellP',r:[5,10]},{k:'esL',r:[240,260]},{k:'life',r:[70,100]},{k:'resL',r:[30,40]},{k:'resCh',r:[17,29]},{k:'shockEffYou',v:50}]},
+  {n:'Голос бури',br:'esh',bless:'Хор бури',slot:'amulet',base:'Лазуритовый амулет',minL:60,poe:'Voice of the Storm',mods:[{k:'int',r:[20,30]},{k:'allAttr',r:[10,15]},{k:'lightP',v:50},{k:'manaP',r:[10,20]},{k:'u_luckyLight',v:1}]},
+  {n:'Хор бури',br:'esh',blessed:1,slot:'amulet',base:'Лазуритовый амулет',minL:60,poe:'Choir of the Storm',mods:[{k:'int',r:[20,30]},{k:'manaP',r:[10,20]},{k:'resL',v:-30},{k:'u_overLightCrit',v:1},{k:'u_boltOnCrit',v:1}]},
+  /* Уул-Нетол */
+  {n:'Поцелуй Уул-Нетола',br:'uul',bless:'Объятия Уул-Нетола',slot:'weapon',wk:'axe2',minL:60,poe:"Uul-Netol's Kiss",mods:[{k:'physL',r:[230,270]},{k:'atkP',v:-15},{k:'u_vulnOnHit',v:1},{k:'ex_dbl',v:15},{k:'ex_armBreak',v:15}]},
+  {n:'Объятия Уул-Нетола',br:'uul',blessed:1,slot:'weapon',wk:'axe2',minL:60,poe:"Uul-Netol's Embrace",mods:[{k:'physL',r:[280,320]},{k:'atkP',r:[-30,-25]},{k:'bleedC',v:25},{k:'u_boneNova',v:1}]},
+  {n:'Бесконечная погоня',br:'uul',bless:'Красный след',slot:'boots',dt:'armour',minL:60,poe:'The Infinite Pursuit',mods:[{k:'stepFree',v:20},{k:'bleedYou:stepFree',v:20},{k:'u_noPoisonBleed',v:1},{k:'u_noStunBleed',v:1},{k:'u_selfBleed',v:50}]},
+  {n:'Красный след',br:'uul',blessed:1,slot:'boots',dt:'armour',minL:60,poe:'The Red Trail',mods:[{k:'armL',r:[60,100]},{k:'life',r:[60,100]},{k:'stepFree',v:30},{k:'still:physRed',v:10},{k:'u_frzBleedHit',v:1},{k:'u_selfBleed',v:50}]},
+  {n:'Предвосхищение',br:'uul',bless:'Капитуляция',slot:'shield',dt:'armour',minL:60,poe:'The Anticipation',mods:[{k:'life',r:[30,40]},{k:'armL',v:100},{k:'life',r:[50,70]},{k:'block',v:6},{k:'blockRecent:armour',r:[1500,3000]},{k:'ex_blockDmg',v:20}]},
+  {n:'Капитуляция',br:'uul',blessed:1,slot:'shield',dt:'armour',minL:60,poe:'The Surrender',mods:[{k:'life',r:[30,40]},{k:'armL',r:[165,205]},{k:'life',r:[65,80]},{k:'u_blockHeal',r:[15,30]},{k:'block',v:6}]},
+  /* Чаюла */
+  {n:'Разлучённые во сне',br:'chayula',bless:'Единые во сне',slot:'weapon',wk:'sword',wc:'melee',minL:60,poe:'Severed in Sleep',mods:[{k:'accP',v:40},{k:'addChaos',rr:[[60,80],[100,130]]},{k:'minionRes',v:29},{k:'u_minionWither',v:1},{k:'minionCritM',v:30}]},
+  {n:'Единые во сне',br:'chayula',blessed:1,slot:'weapon',wk:'sword',wc:'melee',minL:60,poe:'United in Dream',mods:[{k:'accP',v:40},{k:'addChaos',rr:[[60,80],[100,130]]},{k:'minionRes',v:29},{k:'u_minionPoison',v:60},{k:'u_minionLeech',v:10}]},
+  {n:'Кожа верных',br:'chayula',bless:'Кожа владык',slot:'body',dt:'es',minL:60,noReq:1,poe:'Skin of the Loyal',mods:[{k:'gemLvl',v:1},{k:'armourP',v:100},{k:'evaP',v:100},{k:'esP',v:100}]},
+  {n:'Кожа владык',br:'chayula',blessed:1,slot:'body',dt:'es',minL:60,noReq:1,poe:'Skin of the Lords',mods:[{k:'gemLvl',v:2},{k:'armourP',v:100},{k:'evaP',v:100},{k:'esP',v:100},{k:'u_k_RANDOM',v:1}]},
+  {n:'Око Чаюлы',br:'chayula',bless:'Присутствие Чаюлы',slot:'amulet',base:'Лазуритовый амулет',minL:60,poe:'Eye of Chayula',mods:[{k:'allAttr',r:[10,16]},{k:'lifeP',v:-20},{k:'iir',v:30},{k:'u_noStun',v:1}]},
+  {n:'Присутствие Чаюлы',br:'chayula',blessed:1,slot:'amulet',base:'Лазуритовый амулет',minL:60,poe:'Presence of Chayula',mods:[{k:'allAttr',r:[10,16]},{k:'iir',v:30},{k:'resCh',v:60},{k:'u_noStun',v:1},{k:'u_lifeToEs',v:20}]},
+  /* Ксешт и кольцо Разлома */
+  {n:'Корона пяти владык',br:'xesht',slot:'helm',dt:'es',minL:80,poe:'(своя)',mods:[{k:'gemLvl',v:1},{k:'esL',r:[120,160]},{k:'resAll',r:[12,18]},{k:'ex_pen',r:[6,10]},{k:'ex_boss',r:[20,30]}]},
+  {n:'Узы Единства',br:'xesht',slot:'belt',minL:80,poe:'(своя)',mods:[{k:'life',r:[70,100]},{k:'resAll',r:[10,15]},{k:'allAttr',r:[15,25]},{k:'dmgP',r:[20,30]},{k:'onslOnKill',v:15}]},
+  {n:'Плоть Ксешта',br:'xesht',slot:'amulet',base:'Янтарный амулет',minL:80,poe:'(своя)',mods:[{k:'resAll',r:[15,20]},{k:'elemP',r:[25,35]},{k:'life',r:[50,70]},{k:'ex_pen',r:[8,12]},{k:'u_xeshtShift',v:1}]},
+];
+/* ключевые умения для «Кожи владык» (случайное при выпадении) */
+const BR_SKIN_KEYS=['acro','avatar','ironref','resolute','pointblank','glancing','ee','mom','zealot','ghost','ironwill','k_precise','k_crimson','k_versatile','wind','pain'];
+const brU=n=>BR_UNIQ.find(u=>u.n===n);
+
+/* катализаторы: качество колец, амулетов и поясов, усиливает свойства одной метки */
+const BR_CAT={
+  fertile:{n:'Жизненный',tags:['life','mana']},prism:{n:'Резонирующий',tags:['res']},temper:{n:'Закаляющий',tags:['def','es']},
+  abras:{n:'Абразивный',tags:['atk']},imbued:{n:'Насыщенный',tags:['spell']},accel:{n:'Ускоряющий',tags:['speed']},
+  unstable:{n:'Нестабильный',tags:['crit']},intrinsic:{n:'Внутренний',tags:['attr']},noxious:{n:'Ядовитый',tags:['phys','chaos']},turbulent:{n:'Бурный',tags:['fire','cold','light']},
+};
+const BR_CAT_IDS=Object.keys(BR_CAT);
+const catSlotOk=it=>it&&['ring','amulet','belt'].includes(it.slot);
+const catCap=it=>it&&it.brRing?40:20;
+
+/* ---------- состояние персонажа ---------- */
+function BRS(){if(!S.br)S.br={};const b=S.br;b.sh=b.sh||{};b.st=b.st||{};b.bl=b.bl||{};b.cat=b.cat||{};b.kills=b.kills||0;b.done=b.done||{};return b;}
+
+/* ---------- характеристики: новые свойства предметов Разлома ---------- */
+Object.assign(LBL,{
+  u_fireHitRed:v=>`−${v} урона огнём от каждого удара по вам`,u_overFireArm:()=>'Броня увеличена на избыточное сопротивление огню (1% за 1%)',
+  u_overFireMinion:()=>'Здоровье приспешников увеличено на ваше избыточное сопротивление огню',u_ashNear:()=>'Враги вплотную и рядом покрыты пеплом: ваши попадания игнорируют 10% их сопротивления огню',
+  u_powFrozen:()=>'Заряд энергии за убийство замороженного врага',u_powMaxFrz:()=>'На максимуме зарядов энергии вы теряете их все и получаете заряд ярости',
+  u_arcticFree:()=>'«Ледяная броня» не резервирует ману, её эффект на 50% сильнее',u_overColdEva:()=>'Уклонение увеличено на избыточное сопротивление холоду (1% за 1%)',
+  u_freezeSpread:()=>'Заморозка переходит на ещё одного врага на той же линии',u_blindChill:()=>'Ваши попадания ослепляют охлаждённых врагов',
+  u_coldPenChill:v=>`Попадания игнорируют ${v}% сопротивления холоду охлаждённых врагов`,
+  u_lightPerDex:()=>'Атаки получают 1–12 урона молнией за каждые 10 ловкости',u_lightPerInt:()=>'Атаки получают 1–12 урона молнией за каждые 10 интеллекта',
+  u_critPerInt:v=>`+${v}% к шансу крит. удара за каждые 25 интеллекта`,u_atkPerDex:()=>'+1% к урону атак за каждые 25 ловкости',
+  u_shockSpread:()=>'Шок переходит на ещё одного врага на той же линии',u_luckyLight:()=>'Урон молнией без крит. удара везучий (из двух бросков — лучший)',
+  u_overLightCrit:()=>'Шанс крит. удара увеличен на избыточное сопротивление молнии (1% за 1%)',u_boltOnCrit:()=>'Крит. удар вызывает молнию: 30% урона удара молнией по случайному врагу',
+  u_vulnOnHit:()=>'Попадания атак проклинают Уязвимостью',u_boneNova:()=>'Попадание по кровоточащему врагу — костяная звезда: 20% урона по остальным врагам на этой линии',
+  u_noPoisonBleed:()=>'Пока вы кровоточите, вас нельзя отравить',u_noStunBleed:()=>'Пока вы кровоточите, вас нельзя оглушить',u_selfBleed:v=>`${v}% шанс начать кровоточить от удара атакой`,
+  u_frzBleedHit:()=>'Заряд ярости за попадание, пока вы кровоточите',u_minionWither:()=>'Приспешники: 60% шанс наложить Истощение',u_minionPoison:v=>`Приспешники: ${v}% шанс отравить`,
+  u_noStun:()=>'Вас нельзя оглушить',u_lifeToEs:v=>`${v}% максимума здоровья превращается в энергетический щит`,u_xeshtShift:()=>'Дар Ксешта: +15% к урону стихиями и хаосом',
+  dexP:v=>`+${v}% к ловкости`,intP:v=>`+${v}% к интеллекту`,strP:v=>`+${v}% к силе`,
+});
+if(!LBL.bleedC)LBL.bleedC=v=>`${v}% шанс вызвать кровотечение атаками`;
+Object.assign(TREE_COND,{frozeRecent:'если на этом или прошлом ходу вы заморозили врага',blockRecent:'если на этом или прошлом ходу вы заблокировали удар',
+  still:'если на этом и прошлом ходу вы не двигались',bleedYou:'пока вы кровоточите'});
+['frozeRecent','blockRecent','still','bleedYou'].forEach(k=>DYN_COND.add(k));
+{const _b=benchDynOn;benchDynOn=function(){const o=_b();if(!C||!C.enemies)return o;
+  return {...o,frozeRecent:C.frzAt!=null&&C.turn-C.frzAt<=1?1:0,blockRecent:C.blockAt!=null&&C.turn-C.blockAt<=1?1:0,still:!C.moved&&!C.movedPrev?1:0,bleedYou:C.bleed&&C.bleed.length?1:0};};}
+{const _ob=onBlock;onBlock=function(e,kind,P){if(C)C.blockAt=C.turn;return _ob(e,kind,P);};}
+
+/* итоговые характеристики героя: свойства, зависящие от сопротивлений, атрибутов и состояния */
+function calcHook(P,g){const U=P.U,t=P.t,ov=k=>Math.max(0,P.resRaw[k]-P.pen-P.resCap[k]);
+  /* тестовая сборка: «Усиление испытателя» */
+  if(S&&S.brGod&&window.BREACH_TEST){t.dmgMore=(t.dmgMore||0)+300;P.dmgMore=(P.dmgMore||0)+300;P.lifeMax=R(P.lifeMax*2);P.life=R(P.life*2);P.es=R(P.es*2);}
+  if(U.u_overFireArm)P.armour=R(P.armour*(1+ov('fire')/100));
+  if(U.u_overColdEva)P.eva=R(P.eva*(1+ov('cold')/100));
+  if(U.u_overLightCrit)t.critP=(t.critP||0)+ov('light');
+  if(U.u_overFireMinion)t.minionLife=(t.minionLife||0)+ov('fire');
+  if(U.u_critPerInt)t.critP=(t.critP||0)+U.u_critPerInt*Math.floor(P.attr.int/25);
+  if(U.u_atkPerDex)t.atkP=(t.atkP||0)+Math.floor(P.attr.dex/25);
+  if(U.u_lightPerDex||U.u_lightPerInt){const n=Math.floor((U.u_lightPerDex?P.attr.dex:0)/10)+Math.floor((U.u_lightPerInt?P.attr.int:0)/10);t.addLightMin=(t.addLightMin||0)+n;t.addLightMax=(t.addLightMax||0)+12*n;}
+  if(U.u_noStun||(U.u_noStunBleed&&C&&C.bleed&&C.bleed.length))P.avoidStun=100;
+  if(U.u_noPoisonBleed&&C&&C.bleed&&C.bleed.length)t.avoidPoison=100;
+  if(U.u_lifeToEs){const f=Math.min(90,U.u_lifeToEs)/100,x=R(P.lifeMax*f);P.lifeMax-=x;P.life=Math.max(1,R(P.life*(1-f)));P.es+=x;}
+  if(U.u_xeshtShift){t.elemP=(t.elemP||0)+15;t.chaosP=(t.chaosP||0)+15;}
+}
+/* катализатор: множитель для свойств предмета с нужной меткой */
+function catMult(it){if(!catSlotOk(it)||!it.cq||!it.ct||!BR_CAT[it.ct])return null;const tg=BR_CAT[it.ct].tags,f=1+it.cq/100;
+  return (k,v)=>statTags(k).some(x=>tg.includes(x))?(Math.abs(v)<5?Math.round(v*f*10)/10:R(v*f)):v;}
+
+/* ---------- попадания героя: эффекты уникальных предметов ---------- */
+function onHeroHit(sk,e,P,r){const U=P.U,others=()=>alive().filter(o=>o!==e&&o.d===e.d&&!o.boss);
+  if(r.ail.includes('заморозка')){C.frzAt=C.turn;if(U.u_freezeSpread){const o=others().find(x=>!x.st.frozen);if(o){o.st.frozen=1;o.st.chill=2;logF(`&nbsp;&nbsp;Заморозка переходит на ${o.n}`);}}}
+  if(U.u_blindChill&&e.st.chill&&e.hp>0)e.st.blind=2;
+  if(U.u_shockSpread&&r.ail.includes('шок')){const o=others().find(x=>!x.st.shock);if(o){o.st.shock=e.st.shock||2;logF(`&nbsp;&nbsp;Шок переходит на ${o.n}`);}}
+  if(U.u_vulnOnHit&&sk.type==='attack'&&e.hp>0&&!e.st.curse&&HEXES.vuln)applyCurse(e,{id:'vuln',L:Math.max(1,Math.floor(S.lvl/5)),f:1,dur:4});
+  if(U.u_frzBleedHit&&sk.type==='attack'&&C.bleed&&C.bleed.length)gainCharge('frz',P);
+  if(U.u_boneNova&&sk.type==='attack'&&e.st.bleed&&e.st.bleed.length&&r.total>0){const d0=r.total*.2;
+    alive().filter(o=>o!==e&&o.d===e.d).forEach(o=>{const v=Math.max(1,R(d0*(1-Math.min(.6,o.arm/(o.arm+10*d0)))));o.hp=Math.max(0,o.hp-v);fx(o.uid,fmt(v),'');if(o.hp<=0)killEnemy(o,P);});
+    logF('&nbsp;&nbsp;Костяная звезда');}
+  if(U.u_boltOnCrit&&r.crit&&r.total>0){const o=pick(alive());if(o){const v=Math.max(1,R(r.total*.3*(1-enemyRes(o,'light',hexOn(o),0)/100)));o.hp=Math.max(0,o.hp-v);fx(o.uid,'⚡'+fmt(v),'');logF(`&nbsp;&nbsp;Молния по ${o.n}: ${fmt(v)}`);if(o.hp<=0)killEnemy(o,P);}}
+}
+/* заряды: «на максимуме энергии — заряд ярости» */
+{const _gc=gainCharge;gainCharge=function(k,P,n){_gc(k,P,n);if(k==='pow'&&P&&P.U&&P.U.u_powMaxFrz&&C&&C.ch&&C.ch.pow>=P.chMax.pow){C.ch.pow=P.chMin.pow;logF('&nbsp;&nbsp;Заряды энергии сброшены → заряд ярости');_gc('frz',P,1);}};}
+/* получение удара: «50% шанс начать кровоточить» */
+{const _ha=heroAilments;heroAilments=function(e,pp,raw,kind,P,crit,sup){_ha(e,pp,raw,kind,P,crit,sup);
+  if(P.U.u_selfBleed&&kind!=='spell'&&!C.bleed.length&&roll(P.U.u_selfBleed)){C.bleed=[{d:(pp.phys||pp.total||1)*.1,t:4,t0:C.turn}];logF('&nbsp;&nbsp;Вы истекаете кровью (свойство предмета)');}};}
+
+/* ---------- Разлом в бою ---------- */
+const brTier=()=>C&&C.I?(C.I.mtier||C.I.mt||1):1;
+function brMonPool(l){return ['br_'+l+'_m','br_'+l+'_r','br_'+l+'_s'];}
+/* рука Разлома появляется в волне на карте (в тесте — по настройке) */
+function onSpawnWave(){
+  if(!C||!C.I)return;
+  if(C.I.brD){brDomainStart();return;}
+  if(C.br&&C.br.on)return;
+  const force=window.BR_FORCE,m=S.mapRun,k=m&&m.br&&C.I.map&&!C.I.pin&&!C.I.mine?(m.step+'|'+C.wave):null;
+  if(!C.brUsed&&(force||(k&&m.br.k===k))){
+    const l=m&&m.br&&m.br.lord||(Math.random()<.1?'chayula':pick(BR_IDS.filter(x=>x!=='chayula')));C.brHand={lord:l};if(m&&m.br)m.br.k=null;
+    toast(`✋ Рука Разлома на поле боя — ${BR_LORDS[l].n}! Нажмите на неё, чтобы открыть Разлом${C.vein?'. Рядом и жила сульфура ⛏':''}`);haptic('medium');
+    logC(`<span style="color:${BR_LORDS[l].col}">Над полем видна Рука Разлома — ${BR_LORDS[l].n}. Нажмите, чтобы открыть</span>`);}
+}
+function brOpen(){if(!C||!C.brHand||C.over)return;const l=C.brHand.lord;C.brHand=null;C.brUsed=1;
+  C.br={on:true,lord:l,lvl:1,prog:0,kills:0,turns:BRC.start,elapsed:0,hands:[],handGot:0,catGot:0};
+  logC(`<b style="color:${BR_LORDS[l].col}">Разлом ${BR_LORDS[l].gen} открыт!</b> Убийства продлевают его.`);brSpawn();render();}
+function brSpawn(){const b=C.br;if(!b||!b.on||b.lordOut)return;
+  const dom=!!C.I.brD,alive_=alive().filter(e=>e.br).length;
+  let n=dom?Math.min(7,3+Math.floor(b.elapsed/2)):1+b.lvl;n=Math.max(0,Math.min(n,(dom?10:8)-alive_));
+  const rareC=dom?12+2*b.elapsed:4+4*b.lvl,magC=dom?30:15+5*b.lvl,pool=brMonPool(b.lord);
+  for(let i=0;i<n;i++){const r=Math.random()*100,rar=r<rareC?'rare':r<rareC+magC?'magic':'normal';
+    const e=mkEnemy(pick(pool),C.I.lvl,{d:pick([1,2,2,3]),rar,map:C.I.mt});const st=1+.08*(b.lvl-1);e.maxHp=e.hp=Math.max(1,R(e.hp*BRC.hp*st));e.dmg*=BRC.dmg*(1+.06*(b.lvl-1));e.br=b.lord;e.n='✶ '+e.n;if(e.aura&&e.aura.mend){delete e.aura.mend;if(!Object.keys(e.aura).length)e.aura=null;}e.regen=0;C.enemies.push(e);}
+  if(n)logF(`Из Разлома выходят ${n}`);}
+function onKillHook(e,P){
+  brCorpseKeep(e);
+  if(e.br&&C.br&&C.br.on){const b=C.br;b.kills++;b.prog++;BRS().kills++;if(!b.frozenT)b.turns=Math.min(BRC.cap,b.turns+BRC.perKill);
+    if(b.prog>=BRC.lvlKills&&b.lvl<BRC.maxLvl){b.lvl++;b.prog=0;logC(`<b style="color:${BR_LORDS[b.lord].col}">Разлом расширяется: уровень ${b.lvl}</b>`);}
+    if(C.I.brD&&!b.lordOut&&b.kills>=BRC.domKills)brLordSpawn();}
+  if(e.brLord){brLordLoot(e);if(C.br&&C.br.on)brClose();}
+  if(P.U.u_powFrozen&&e.st&&e.st.frozen)gainCharge('pow',P);
+}
+function onEndRound(P){
+  C.movedPrev=C.moved;
+  if(C.flaskFrz>0)C.flaskFrz--;if(C.veil>0)C.veil--;
+  const b=C.br;if(!b||!b.on)return;
+  if(!b.frozenT){b.turns-=1;b.elapsed++;}
+  if(b.turns<=0||(!b.frozenT&&b.elapsed>=(C.I.brD?BRC.domTotal:BRC.total)))brClose();
+  else{brSpawn();if(b.lvl>=BRC.handLvl&&b.hands.length<2&&Math.random()<.35)b.hands.push({uid:'bh'+(++EUID),d:ri(1,3)});}
+}
+function brShards(){const b=C.br,t=brTier(),lo=8+(t-1)*17/15,hi=12+(t-1)*23/15;
+  return Math.max(1,R(rnd(lo,hi)*clamp(b.kills/20,.25,1.5)*(.8+.1*b.lvl)));}
+function brClose(){const b=C.br;if(!b||!b.on)return;b.on=false;
+  C.enemies.forEach(e=>{if(e.br&&e.hp>0){e.hp=0;e.dead=true;e.gone=true;}});
+  if(C.I.brD&&!b.lordOut){logC(`<b class="bad-t">${BR_LORDS[b.lord].dom} рушатся: владыка не вышел</b>`);}
+  const n=brShards(),B=BRS();B.sh[b.lord]=(B.sh[b.lord]||0)+n;C.brSh=(C.brSh||0)+n;
+  logC(`<b style="color:${BR_LORDS[b.lord].col}">Разлом закрылся</b>: убито ${b.kills}, уровень ${b.lvl} → осколков ${BR_LORDS[b.lord].gen}: +${n}${b.handGot?` (из рук ещё +${b.handGot})`:''}`);
+  C.loot.push({name:`Осколки ${BR_LORDS[b.lord].gen} ×${n+(b.handGot||0)}`,g:1});
+  save();
+}
+/* Сжатая рука: открывается, если на её линии нет врагов */
+function brClasp(uid){const b=C&&C.br;if(!b||C.busy)return;const h=b.hands.find(x=>x.uid===uid);if(!h)return;
+  if(alive().some(e=>e.d===h.d)){toast('Рядом враги: сначала очистите эту линию');return;}
+  b.hands=b.hands.filter(x=>x!==h);const n=ri(3,5),B=BRS();B.sh[b.lord]=(B.sh[b.lord]||0)+n;b.handGot+=n;
+  let extra='';if(roll(10)){const c=pick(BR_CAT_IDS);B.cat[c]=(B.cat[c]||0)+1;extra=`, катализатор: ${BR_CAT[c].n}`;C.loot.push({name:`Катализатор: ${BR_CAT[c].n}`,g:1});}
+  logC(`Сжатая рука: +${n} осколков ${BR_LORDS[b.lord].gen}${extra}`);save();render();}
+/* волна не заканчивается, пока Разлом открыт: сразу выходят новые монстры */
+function onBeforeWaveClear(){const b=C&&C.br;if(!b||!b.on)return false;
+  if(b.lordOut&&b.frozenT){/* владыка повержен — Разлом закрывается */brClose();return false;}
+  brSpawn();if(!alive().length)return false;C.busy=false;render();if(C.auto)scheduleAuto();return true;}
+
+/* ---------- владения владыки ---------- */
+function breachInfo(m){const L=BR_LORDS[m.brD]||{dom:'Ксешт',n:'Ксешт'};
+  return {lvl:m.brD==='xesht'?86:84,boss:null,pool:brMonPool(m.brD==='xesht'?'xoph':m.brD),name:m.brD==='xesht'?'Сердце Разлома':L.dom,sub:m.brD==='xesht'?'Ксешт, Мы Едины':'Камень Разлома',act:5,map:1,mt:16,mtier:16,waves:1,brD:m.brD};}
+function brDomainStart(){const l=C.I.brD;C.enemies=[];
+  if(l==='xesht'){const b=mkEnemy('br_xesht',C.I.lvl,{d:2,map:16});b.boss={...b.boss,spec:b.boss.spec.map(x=>({...x}))};b.brLord='xesht';b.xph=0;C.enemies.push(b);for(let i=0;i<3;i++){const e=mkEnemy(pick(brMonPool(pick(BR_IDS))),C.I.lvl,{d:ri(2,3),map:16});e.maxHp=e.hp=R(e.hp*.6);C.enemies.push(e);}
+    logC('<span class="boss-t">Ксешт, Мы Едины</span>: пять владык в одном теле');return;}
+  C.br={on:true,lord:l,lvl:1,prog:0,kills:0,turns:BRC.domTurns,elapsed:0,hands:[],handGot:0};C.brUsed=1;
+  logC(`<b style="color:${BR_LORDS[l].col}">${BR_LORDS[l].dom}</b>: ${BRC.domKills} убийств — и выйдет владыка. Время: ${BRC.domTurns} ходов, убийства продлевают.`);brSpawn();}
+function brLordSpawn(){const b=C.br;b.lordOut=1;b.frozenT=1;const e=mkEnemy('br_'+b.lord,C.I.lvl+1,{d:2,map:16});e.brLord=b.lord;C.enemies.push(e);
+  logC(`<span class="boss-t">${e.n}</span> выходит из Разлома! Время больше не идёт.`);if(MONS['br_'+b.lord].hint)logC(`<span class="dim">${MONS['br_'+b.lord].hint}</span>`);}
+/* добыча владыки */
+function brLordLoot(e){const l=e.brLord,B=BRS();B.done[l]=(B.done[l]||0)+1;
+  if(l==='xesht'){B.done[l]--;const n=mkEnemy('br_xesht2',e.lvl,{d:2,map:16});n.brLord='xesht2';C.enemies.push(n);
+    logC('<span class="boss-t">Ксешт падает — и поднимается снова: Ксешт, Истинный облик!</span>');logC(`<span class="dim">${MONS.br_xesht2.hint}</span>`);return;}
+  if(l==='xesht2'){B.done.xesht=(B.done.xesht||0)+1;addLoot(brMakeRing());const pool=shuffle(BR_UNIQ.filter(u=>u.br==='xesht').slice()),k=roll(35)?2:1;
+    pool.slice(0,k).forEach(u=>{const it=brMakeUnique(u);addLoot(it);logC(`Уникальный предмет Ксешта: <span class="r-unique">${esc(it.name)}</span>`);});
+    for(let i=0;i<4;i++){const c=pick(BR_CAT_IDS);B.cat[c]=(B.cat[c]||0)+1;}C.loot.push({name:'Катализаторы ×4',g:1});
+    logC('<span class="r-unique">Ксешт повержен окончательно: Кольцо Разлома</span>');return;}
+  const pool=BR_UNIQ.filter(u=>u.br===l&&!u.blessed),u=brMakeUnique(pick(pool));addLoot(u);logC(`Уникальный предмет Разлома: <span class="r-unique">${esc(u.name)}</span>`);
+  if(roll(35)){B.bl[l]=(B.bl[l]||0)+1;C.loot.push({name:`Благословение ${BR_LORDS[l].gen}`,g:1});logC(`<span class="r-unique">Благословение ${BR_LORDS[l].gen}</span>`);}
+  const nc=ri(2,4);for(let i=0;i<nc;i++){const c=pick(BR_CAT_IDS);B.cat[c]=(B.cat[c]||0)+1;}C.loot.push({name:`Катализаторы ×${nc}`,g:1});
+}
+/* приёмы владык: заморозка флаконов, удар по мане, пелена; смена стихии Ксешта */
+{const _ea=enemyAct;enemyAct=function(e,P){
+  if(e.boss&&e.brLord==='xesht'&&!e.st.frozen&&!e.st.stun){const ph=Math.min(3,Math.floor((1-e.hp/e.maxHp)/.25));
+    if(ph>(e.xph||0)){e.xph=ph;const el=XESHT_EL[ph];e.el=el;e.mix={[el]:1};logC(`<span class="boss-t">Ксешт меняет облик: ${EL[el]}</span>`);fx(e.uid,EL[el],'');}
+    e.boss.spec[0].el=e.el;}
+  if(e.boss&&e.brLord&&!e.st.frozen&&!e.st.stun){const sp=e.boss.spec.slice().reverse().find(s=>(e.turn+1)%s.every===0);
+    if(sp&&(sp.type.startsWith('br')||sp.type.startsWith('x'))){e.turn++;logC(`<span class="boss-t">${e.n}: ${sp.name}!</span>`);
+      if(brAbility(e,sp,P))return;
+      if(sp.type==='brFlask'){C.flaskFrz=sp.t+1;logC(`Флаконы заморожены на ${sp.t} хода`);}
+      else if(sp.type==='brVeil'){C.veil=sp.t+1;logC('Поле скрыто пеленой: намерения врагов не видны');}
+      else if(sp.type==='brMana'){const spent=C.manaAt!=null&&C.turn-C.manaAt<=1;hurtPlayer(e,e.dmg*(spent?3:1)*sp.m,'light','spell',P);if(spent)logC('Вы тратили ману — удар втрое сильнее');}
+      return;}}
+  return _ea(e,P);};}
+/* лечение боссов Разлома ограничено: за бой (стадию) — не больше 6% максимума здоровья, чтобы живучий билд с малым уроном не превращал бой в бесконечный */
+const BR_HEAL_CAP=.06;
+function brBossHeal(e,f){const cap=e.maxHp*BR_HEAL_CAP,used=e.healed6||0,h=Math.max(0,Math.min(R(e.maxHp*f),R(cap-used)));e.healed6=used+h;if(!h)logF(`${e.n} больше не может лечиться`);return h;}
+/* особые умения владык и Ксешта */
+function brAbility(e,sp,P){const t=sp.type;
+  if(t==='brDash'){e.d=0;e.moved=true;hurtPlayer(e,e.dmg*sp.m,'fire','melee',P);if(C.hp>0&&!C.cure){C.burn={d:R(e.dmg*.25*(1-(P.res.fire||0)/100)),t:3,t0:C.turn};logC('Ксоф прыгает вплотную — вы горите');}return true;}
+  if(t==='brFreeze'){if(!C.stunned){C.stunned=2;C.stunAt=C.turn;logC('<b class="bad-t">Ледяная тюрьма: вы заморожены</b>');}return true;}
+  if(t==='brBlizzard'){e.d=3;e.moved=true;e.st.ward=sp.t+1;C.chill=Math.max(C.chill||0,3);logC('Тул уходит в метель: вы охлаждены, он получает вдвое меньше урона');return true;}
+  if(t==='brBlink'){const ds=[0,1,2,3].filter(d=>d!==e.d);e.d=pick(ds);e.moved=true;hurtPlayer(e,e.dmg*sp.m,'light','spell',P);C.shock=Math.max(C.shock||0,3);logC(`Эш перескакивает: ${DIST[e.d].toLowerCase()} · вы шокированы`);return true;}
+  if(t==='brSlam'){hurtPlayer(e,e.dmg*sp.m,'phys','melee',P);if(C.hp>0&&!C.stunned&&!C.stunImm){C.stunned=1;C.stunAt=C.turn;logC('<b class="bad-t">Сотрясение: вы оглушены</b>');}return true;}
+  if(t==='brCage'){e.d=0;e.moved=true;C.bleed=[{d:e.dmg*.15,t:4,t0:C.turn}];hurtPlayer(e,e.dmg*.8,'phys','melee',P);logC('Костяная клетка: вас подтягивает вплотную, вы истекаете кровью');return true;}
+  if(t==='brDevour'){const nb=C.fb.filter(b=>!b.bad).length;C.fb=C.fb.filter(b=>b.bad);CHG.forEach(k=>{C.ch[k]=P.chMin[k];});const h=brBossHeal(e,.04);if(h){e.hp=Math.min(e.maxHp,e.hp+h);fx(e.uid,'+'+fmt(h),'heal');}
+    logC(`Чаюла пожирает ваши силы: сняты эффекты флаконов (${nb}) и заряды, +${fmt(h)} здоровья`);return true;}
+  if(t==='brDream'){e.d=3;e.moved=true;for(let i=0;i<2;i++){const m=mkEnemy('br_chayula_s',e.lvl-1,{d:ri(1,2),map:C.I.mt});m.summoned=1;m.maxHp=m.hp=R(m.hp*.4);C.enemies.push(m);}logC('Чаюла уходит в сон: выходят двое сновидцев');return true;}
+  if(t==='xUnity'){alive().forEach(o=>{const h=o.boss?brBossHeal(o,.02):R(o.maxHp*.1);if(h){o.hp=Math.min(o.maxHp,o.hp+h);fx(o.uid,'+'+fmt(h),'heal');}o.st.ward=3;});logC('Единство владык: враги лечатся и 2 хода получают вдвое меньше урона');return true;}
+  if(t==='xRift'){e.d=0;e.moved=true;hurtPlayer(e,e.dmg*sp.m,e.el,'spell',P);if(C.hp>0&&!C.stunned){C.stunned=1;C.stunAt=C.turn;logC('<b class="bad-t">Разрыв реальности: вас втягивает и оглушает</b>');}return true;}
+  if(t==='xFive'){['fire','cold','light','chaos','phys'].forEach(el=>{if(C.hp>0)hurtPlayer(e,e.dmg*sp.m,el,'spell',P);});return true;}
+  if(t==='xTime'){if(!C.stunned){C.stunned=1;C.stunAt=C.turn;logC('<b class="bad-t">Разлом времени: вы пропускаете ход</b>');}return true;}
+  return false;}
+{const _uf=useFlask;useFlask=function(k){if(C&&C.flaskFrz>0){toast('Флаконы заморожены');return;}return _uf(k);};}
+{const _in=intent;intent=function(e,P){if(C&&C.veil>0&&e.hp>0)return {t:'???',c:'dim'};return _in(e,P);};}
+{const _pc=payCost;payCost=function(sk,P,cost){const m0=C?C.mana:0,r=_pc(sk,P,cost);if(!r&&C&&C.mana<m0)C.manaAt=C.turn;return r;};}
+/* Горящая земля Ксофа гаснет, если вы сделали шаг */
+{const _mv=move;move=async function(dir){const r=await _mv(dir);if(C&&C.burn&&C.enemies.some(e=>e.brLord==='xoph'&&e.hp>0)){C.burn=null;logC('Вы сошли с горящей линии');}return r;};}
+
+/* ---------- предметы ---------- */
+function brRoll(m){if(m.rr)return m.rr.map(([a,b])=>ri(a,b));if(m.r)return ri(Math.min(m.r[0],m.r[1]),Math.max(m.r[0],m.r[1]));return m.v;}
+function brMakeUnique(u,ilvl){ilvl=ilvl||84;
+  const it=makeItem(u.slot,ilvl,'normal',{wk:u.wk,dt:u.dt,wc:u.wc,bone:u.slot==='ring'||u.slot==='shield'?0:undefined});
+  if(u.base&&JEWEL[u.slot]){const j=JEWEL[u.slot].find(x=>x.n===u.base);if(j){it.base=j.n;it.imp={};const tr=tierOf(ilvl);for(const k in j.imp)it.imp[k]=R(j.imp[k]*(1+tr*.5));}}
+  it.rar='unique';it.name=u.n;it.uv=2;it.brU=1;delete it.q;
+  it.mods=u.mods.map(m=>{let k=m.k;if(k==='u_k_RANDOM')k='u_k_'+pick(BR_SKIN_KEYS);return {k,v:brRoll(m)};});
+  if(u.noReq)it.req=1;return it;}
+function brMakeRing(){const it=makeItem('ring',86,'rare');it.base='Кольцо Разлома';it.brRing=1;it.imp={resAll:12};nameItem(it);return it;}
+/* благословение: превращает уникальный предмет Разлома в улучшенную версию */
+function brBless(it){const U=it&&it.brU&&brU(it.name);if(!U||!U.bless){toast('Этот предмет нельзя благословить');return false;}const B=BRS();
+  if(!(B.bl[U.br]>0)){toast(`Нужно Благословение ${BR_LORDS[U.br].gen}`);return false;}
+  const n=brMakeUnique(brU(U.bless),it.ilvl);B.bl[U.br]--;
+  for(const k of ['uid','fav','cq','ct'])if(it[k]!=null)n[k]=it[k];
+  const i=S.inv.indexOf(it);if(i>=0)S.inv[i]=n;else for(const sl in S.equip)if(S.equip[sl]===it)S.equip[sl]=n;
+  save();toast(`Благословлено: ${n.name}`);return n;}
+/* катализатор: +2% качества колец, амулетов и поясов; другой тип сбрасывает качество */
+function brCatalyst(it,c){const B=BRS();if(!catSlotOk(it)){toast('Только кольца, амулеты и пояса');return false;}if(!(B.cat[c]>0))return false;
+  if(it.mirrored){toast('Отражённый предмет нельзя изменить');return false;}
+  if(it.ct!==c){it.ct=c;it.cq=0;}if(it.cq>=catCap(it)){toast(`Качество уже ${catCap(it)}%`);return false;}
+  it.cq=Math.min(catCap(it),it.cq+2);B.cat[c]--;save();toast(`${BR_CAT[c].n} катализатор: качество ${it.cq}%`);return true;}
+/* осколки → камень */
+function brMakeStone(l){const B=BRS();if((B.sh[l]||0)<BRC.shardsStone)return false;B.sh[l]-=BRC.shardsStone;B.st[l]=(B.st[l]||0)+1;save();return true;}
+function brStartDomain(l){const B=BRS();if(S.mapRun){toast('Сначала закончите текущую карту');return;}
+  if(l==='xesht'){if(!BR_IDS.every(x=>B.st[x]>0)){toast('Нужны пять разных Камней Разлома');return;}BR_IDS.forEach(x=>B.st[x]--);}
+  else{if(!(B.st[l]>0)){toast('Нет Камня Разлома');return;}B.st[l]--;}
+  S.mapRun={tier:16,step:3,brD:l,name:l==='xesht'?'Сердце Разлома':BR_LORDS[l].dom,pool:[]};save();startBattle({type:'map',step:3});}
+/* автобой во время Разлома: сначала монстры Разлома (их убийства держат Разлом) */
+{const _pt=pickTarget;pickTarget=function(sk,P){if(C&&C.auto&&C.br&&C.br.on){const cur=C.enemies.find(e=>e.uid===C.target&&e.hp>0&&e.br);if(cur&&inRange(sk,cur,P))return cur;
+  const b=alive().filter(e=>e.br&&inRange(sk,e,P)).sort((a,b)=>a.d-b.d||a.hp-b.hp)[0];if(b)return b;}return _pt(sk,P);};}
+
+/* Разлом на карте: шанс 35% на карту, рука появляется в случайной волне случайного боя (вместе с жилами сульфура возможна) */
+{const _sm=startMap;startMap=function(tier){_sm(tier);const m=S.mapRun;if(m&&m.tier===tier&&!m.br&&roll(BRC.mapChance)){
+  m.br={k:pick(['0|2','0|3','1|1','1|2','1|3','2|1','2|2','2|3','3|1','3|2']),lord:Math.random()<.1?'chayula':pick(BR_IDS.filter(x=>x!=='chayula'))};save();}};}
+/* трупы монстров Разлома исчезают — остаётся по одному каждого вида (для призраков) */
+function brCorpseKeep(e){if(!e.br||!C)return;C.brKept=C.brKept||{};
+  if(C.brKept[e.type]){e.gone=true;if(C.corpses){const i=C.corpses.map(c=>c.type).lastIndexOf(e.type);if(i>=0&&C.corpses.filter(c=>c.type===e.type).length>1)C.corpses.splice(i,1);}}
+  else C.brKept[e.type]=1;}
+
+/* =========================================================
    ИНТЕРФЕЙС: оболочка, персонажи, карта/убежище, бой, герой, древо, камни
    ========================================================= */
 let screen='roster',sub=null,tab='map',viewAct=0,pendingCls='duelist',gemTab='skills',selNode=null,showTreeSum=false,treeTab='tree',
@@ -4891,7 +5292,10 @@ const app=document.getElementById('app'),tabsEl=document.getElementById('tabs'),
 let modalHtml=null,modalLock=false;
 function modal(h,lock){modalHtml=h;modalLock=!!lock;renderModal();syncBack();}
 function closeModal(){modalHtml=null;modalLock=false;renderModal();syncBack();}
-function renderModal(){ovEl.innerHTML=modalHtml?`<div class="ov" data-a="ovbg"><div class="modal" role="dialog"><div class="grab"></div>${modalHtml}</div></div>`:'';if(modalHtml)bindQ();}
+/* окно уже открыто — меняется только содержимое: без повторной анимации и с сохранённой прокруткой (иначе окно «дёргается» при каждом действии) */
+function renderModal(){const md=modalHtml&&ovEl.querySelector('.modal');
+  if(md){const st=md.scrollTop;md.innerHTML=`<div class="grab"></div>${modalHtml}`;md.scrollTop=st;bindQ();return;}
+  ovEl.innerHTML=modalHtml?`<div class="ov" data-a="ovbg"><div class="modal" role="dialog"><div class="grab"></div>${modalHtml}</div></div>`:'';if(modalHtml)bindQ();}
 let toastT=null;
 function toast(m){if(typeof document==='undefined')return;let el=document.querySelector('.toast');if(!el){el=document.createElement('div');el.className='toast';document.body.appendChild(el);}el.textContent=m;clearTimeout(toastT);toastT=setTimeout(()=>el.remove(),1900);}
 
@@ -5043,7 +5447,7 @@ function vSettings(){const u=ACC.ui||{},sc=u.cbScale||100;
       <div><span>На устройстве</span><span class="good-t">${ACC&&ACC.t?whenTxt(ACC.t):'—'}</span></div>
       <div><span>Сервер игры</span><span class="${srvReady&&!srvErr?'good-t':AUCTION_URL?'bad-t':'dim'}">${!AUCTION_URL?'не задан':!srvOn()?'только в Telegram':srvErr?esc(srvErr):srvReady?(srvAt?whenTxt(srvAt):'подключён'):'нет связи'}</span></div></div>
       <button class="btn pri full" data-a="saveNow" style="margin-top:10px">Сохранить сейчас</button>
-      ${AUCTION_URL&&srvOn()&&!srvReady?'<button class="btn sm full" data-a="srvRetry" style="margin-top:6px">Подключиться к серверу</button>':''}</div>
+      ${AUCTION_URL&&srvOn()&&!srvReady?'<button class="btn sm full" data-a="srvRetry" style="margin-top:6px">Подключиться к серверу</button>':''}${savesExtra()}</div>
 
     ${S?`<div class="eyebrow" style="margin-top:4px">Персонаж: ${esc(S.name)}</div>${heroShopPanel()}${lootFilterPanel()}`:'<p class="dim small">Поиск у торговца и лутфильтр настраиваются для каждого персонажа отдельно — сначала выберите персонажа.</p>'}
   </div>`;}
@@ -5165,7 +5569,8 @@ function vCombat(){
   const lanes=[3,2,1,0].map(d=>{const ens=C.enemies.filter(e=>e.d===d&&(e.hp>0||e.dead&&!e.gone));
     const inr=ens.some(e=>e.hp>0&&inRange(P.basic,e,P))&&P.basic.cat==='melee';
     const obs=(C.orbs||[]).filter(o=>o.d===d);
-    return `<div class="lane ${ens.length||obs.length?'has':''} ${inr?'inr':''}"><div class="ll">${DIST[d]}</div><div class="ens">${obs.map(o=>`<button class="orbx ${C.target===o.uid?'tgt':''}" data-a="tgt" data-u="${o.uid}" aria-label="${ORB_N[o.kind]}"><b>◉ ${ORB_N[o.kind]}</b><small>${o.t} х.${o.store?` · копит ${fmt(o.store)}`:''}</small></button>`).join('')}${ens.map(e=>{
+    const bl=typeof breachLaneHtml==='function'?breachLaneHtml(d):'';
+    return `<div class="lane ${ens.length||obs.length||bl?'has':''} ${inr?'inr':''}"><div class="ll">${DIST[d]}</div><div class="ens">${bl}${obs.map(o=>`<button class="orbx ${C.target===o.uid?'tgt':''}" data-a="tgt" data-u="${o.uid}" aria-label="${ORB_N[o.kind]}"><b>◉ ${ORB_N[o.kind]}</b><small>${o.t} х.${o.store?` · копит ${fmt(o.store)}`:''}</small></button>`).join('')}${ens.map(e=>{
       const oor=e.hp>0&&!P.skills.concat([P.basic]).some(s=>s&&!s.bad&&inRange(s,e,P)),it=intent(e,P);
       return `<button class="en r-${e.rar} ${e.uid===C.target?'tgt':''} ${e.hp<=0?'dead':''} ${oor?'oor':''} ${C.actor===e.uid?'acting':''}" data-a="tgt" data-u="${e.uid}" data-en="${e.uid}" aria-label="${e.n}, ${KIND_N[e.k]}">
         <div class="nm"><span style="color:${ELC[e.el]}">${KIND[e.k]}</span><span class="nmt">${e.n}</span></div>
@@ -5184,7 +5589,7 @@ function vCombat(){
   return `<div class="cb-head"><div class="sp"><div class="eyebrow">${I.sub} · ур. ${I.lvl} · волна ${C.wave}/${C.waves} · ход ${C.turn}</div><h2>${I.name}</h2></div>
       ${S.inv.length>=INV_WARN?`<span class="invwarn" title="Инвентарь почти полон">! ${S.inv.length}/${INV_MAX}</span>`:''}<button class="btn sm ghost" data-a="helpFight" aria-label="Как идёт бой">?</button><button class="btn sm ghost" data-a="journal">Журнал</button><button class="btn sm ghost" data-a="fightEdit" data-t="tree" ${C.busy?'disabled':''} aria-label="Древо и камни">Билд</button><button class="btn sm ghost" data-a="fleeAsk" ${C.busy?'disabled':''}>Уйти</button></div>
   <div class="cbxp"><span class="num">ур. ${S.lvl}</span><div class="xpbar"><i style="width:${S.lvl>=MAXLVL?100:clamp(S.xp/xpNeed(S.lvl)*100,0,100)}%"></i></div><span class="num dim">${S.lvl>=MAXLVL?'макс.':R(S.xp/xpNeed(S.lvl)*1000)/10+'%'}</span></div>
-  <div class="field">${C.vein?`<button class="vein" data-a="vein" ${C.busy?'disabled':''}><b>⛏ Жила сульфура</b><small>Нажмите, чтобы добыть · не тратит ход</small></button>`:''}${lanes}${minionRow()}</div>
+  <div class="field">${typeof breachFieldHtml==='function'?breachFieldHtml():''}${C.vein?`<button class="vein" data-a="vein" ${C.busy?'disabled':''}><b>⛏ Жила сульфура</b><small>Нажмите, чтобы добыть · не тратит ход</small></button>`:''}${lanes}${minionRow()}</div>
   <div class="cb-bot ${C.tipCur?'tipwait':''}"><div class="cb-in">
   <div class="me" id="mebox">
     ${P.es>0?bar('esb',C.es,P.es,`Щит ${fmt(C.es)} / ${fmt(P.es)}`):''}
@@ -5216,7 +5621,7 @@ function vJournal(){
 function lootLine(it){if(it.frag||it.g)return `<div class="r-unique">${esc(it.name)}</div>`;if(it.gem)return `<div class="r-gem">${esc(it.name)}</div>`;if(it.map)return `<div class="r-map">${esc(it.name)}</div>`;if(it.offer)return `<div class="r-unique">${esc(it.name)}</div>`;return `<div class="r-${it.rar}">${esc(it.name)}</div>`;}
 function showVictory(note,cont){
   const lootH=C.loot.length?C.loot.map(lootLine).join(''):'<div class="dim">Предметов нет</div>';
-  const orbs=Object.entries(C.orbs).map(([k,v])=>`<div class="r-cur">${ORBS[k].n} ×${v}</div>`).join('');
+  const orbs=Object.entries(C.cdrop||{}).filter(([k])=>ORBS[k]).map(([k,v])=>`<div class="r-cur">${ORBS[k].n} ×${v}</div>`).join('');
   const lab=C.B.type==='lab';
   modal(`<div class="eyebrow">${C.I.sub}</div><h2>Победа</h2>${note?`<p class="notice">${note}</p>`:''}
     <div class="sheet"><div><span>Опыт</span><span>+${fmt(C.xp)}</span></div><div><span>Золото</span><span>+${fmt(C.gold)}</span></div><div><span>Убито</span><span>${C.kills}</span></div><div><span>Ходов</span><span>${C.turn}</span></div></div>${C.lfN?`<p class="dim small" style="margin:0">Лутфильтр продал ${C.lfN} предм. за ${fmt(C.lfG)} зол.</p>`:''}
@@ -5634,7 +6039,7 @@ function itemLines(it){
       const L_=afxLimit(it),pre=own.filter(m=>m.a==='p'&&!m.cr),suf=own.filter(m=>m.a==='s'&&!m.cr),old=own.filter(m=>!m.a&&!m.cr),cr=own.filter(m=>m.cr);
       const one=m=>{const t=tagOf(m),rg=isAfx(m)?afxStatRanges(it,m):[],x=isAfx(m)?afxRange(it,m):null,ur=it.rar==='unique'?uRange(it,m):null;
         if(ur&&ur.lo!=null){const lines=modStats(m).map(([k,v])=>`<div class="mod ${ur.p<1/3?'rlo':ur.p>2/3?'rhi':''}">${esc(withRange(lbl(k,v),v,uRangeTxt(ur)))}${ur.p>=.999?' ★':''}${mtagRow(k)}</div>`).join('');
-          return `<div class="afxblk">${lines}<small class="roll">${ur.old?'старое значение — вне текущего диапазона':`положение в диапазоне ${R(ur.p*100)}% · значение растёт с уровнем предмета`}</small></div>`;}
+          return `<div class="afxblk">${lines}<small class="roll">${ur.old?'старое значение — вне текущего диапазона':`положение в диапазоне ${R(ur.p*100)}%${ur.rand?'':' · значение растёт с уровнем предмета'}`}</small></div>`;}
         if(ur&&ur.fixed)return `<div class="afxblk"><div class="mod">${esc(lbl(m.k,m.v))}${mtagRow(m.k)}</div><small class="roll">фиксированное значение</small></div>`;
         const lines=modStats(m).map(([k,v],i)=>{const txt=rg[i]?withRange(lbl(k,v),v,rg[i]):lbl(k,v);
           return `<div class="mod afx">${i===0&&t[0]?`<b class="afxt ${t[1]}">${t[0]}</b>`:i>0&&t[0]?'<b class="afxt blank"></b>':''}${esc(txt)}${mtagRow(k)}</div>`;}).join('');
@@ -5945,7 +6350,7 @@ let devTab='maps';
 function vDevice(){
   const gN=gmapCount(),ready=Object.keys(PIN_GROUPS).filter(pinReady).length;
   let h=`<div class="stack">${subHead('Устройство картографа','Убежище')}
-    <div class="seg"><button class="${devTab==='maps'?'on':''}" data-a="devTab" data-t="maps">Карты</button><button class="${devTab==='guard'?'on':''}" data-a="devTab" data-t="guard">Хранители${gN?' · '+gN:''}</button><button class="${devTab==='pin'?'on':''}" data-a="devTab" data-t="pin">Пинакл${ready?' · '+ready:''}</button></div>
+    <div class="seg"><button class="${devTab==='maps'?'on':''}" data-a="devTab" data-t="maps">Карты</button>${typeof breachPanel==='function'?`<button class="${devTab==='breach'?'on':''}" data-a="devTab" data-t="breach">Разлом${brReadyN()?' · '+brReadyN():''}</button>`:''}<button class="${devTab==='guard'?'on':''}" data-a="devTab" data-t="guard">Хранители${gN?' · '+gN:''}</button><button class="${devTab==='pin'?'on':''}" data-a="devTab" data-t="pin">Пинакл${ready?' · '+ready:''}</button></div>
     ${S.mapRun?`<button class="btn pri full" data-a="mapCont">Продолжить: ${esc(S.mapRun.name)} · бой ${S.mapRun.step+1}/4</button>`:''}`;
   if(devTab==='maps')h+=`
     <div class="panel"><p class="muted" style="margin:0">Вставьте карту, чтобы открыть её: 4 боя по 3 волны, в конце босс. Тир 1 — 68 уровень области, тир 16 — 83. Сопротивления −30%, смерть: −10% опыта уровня и потеря карты.</p>
@@ -5955,6 +6360,7 @@ function vDevice(){
     <div class="panel"><div class="row"><span class="sp small muted">Нет карт? Картограф продаст карту 1 тира.</span><button class="btn sm" data-a="mapBuy" ${S.gold>=mapBuyCost()?'':'disabled'}>Купить · ${fmt(mapBuyCost())}</button></div></div>
 `;
   else if(devTab==='guard')h+=guardPanel();
+  else if(devTab==='breach'&&typeof breachPanel==='function')h+=breachPanel();
   else h+=pinPanel();
   return h+'</div>';
 }
@@ -6415,7 +6821,7 @@ function corpsePicker(i){const cs=C.corpses||[];
   modal(`<div class="row"><span class="eyebrow sp">Сотворение призрака: выберите труп</span><button class="btn sm ghost" data-a="close">Отмена</button></div>
     <p class="dim small" style="margin:0">Выбранный монстр привяжется к камню. Сбросить привязку можно только сферой очищения. Боссов поднять нельзя.</p>
     <div class="list">${rows}</div>`);}
-function gemScour(uid){const g=gem(uid)||(ACC.stash.gems||[]).find(x=>x.uid===uid);if(!g||!g.spec)return false;if(!(S.cur.scour>0)){toast('Нет сферы очищения');return false;}
+function gemScour(uid){const g=gem(uid)||(ACC.stash.gems||[]).find(x=>x.uid===uid);if(!g||!g.spec)return false;if(!craftOnline())return false;if(!(S.cur.scour>0)){toast('Нет сферы очищения');return false;}
   S.cur.scour--;const n=MONS[g.spec.type]?MONS[g.spec.type].n:'';delete g.spec;
   if(C&&C.minions)C.minions.forEach(m=>{const sl=S.skills[m.slot];if(m.spec&&sl&&sl.a===uid){m.hp=0;m.gone=1;}});
   save();toast(`Привязка снята${n?': '+n:''}`);return true;}
@@ -6451,6 +6857,36 @@ function uRange(it,m){const U=uDef(it);if(!U||m.k==null)return null;const d=U.mo
   const p=A?(pos(v[0],lo[0],hi[0])+pos(v[1],lo[1],hi[1]))/2:pos(v,lo,hi);
   return {lo,hi,arr:A,p:clamp(p,0,1),old:p<-.01||p>1.01};}
 function uRangeTxt(ur){return ur.arr?`${ur.lo[0]}–${ur.hi[0]} / ${ur.lo[1]}–${ur.hi[1]}`:`${ur.lo}–${ur.hi}`;}
+
+/* ---------- версии персонажей: другие версии, история на сервере, копии на устройстве ---------- */
+const xpPct=c=>{try{return R((c.xp||0)/xpNeed(c.lvl)*100);}catch(e){return 0;}};
+const verTxt=c=>`ур. ${c.lvl} (${xpPct(c)}%)${c.done?' · убежище':''}${c.mapBest?` · карты до ${c.mapBest}`:''} · убийств ${fmt(c.kills||0)}`;
+let histData=null,histErr='',histOpen=false;
+function devCopies(){const out=[];[KEY+'_bak1',KEY+'_bak2'].forEach(k=>{try{const a=JSON.parse(localStorage.getItem(k)||'null');(a&&a.chars||[]).forEach(c=>{const cur=ACC.chars.find(x=>x.id===c.id);
+    if(cur&&charHash(cur)!==charHash(c)&&!out.some(o=>charHash(o)===charHash(c)))out.push(c);});}catch(e){}});return out;}
+function savesExtra(){let h='';const alt=ACC.alt||{},ids=Object.keys(alt).filter(id=>ACC.chars.some(c=>c.id===id));
+  if(ids.length)h+=`<div class="eyebrow" style="margin:12px 0 6px">Другие версии персонажей</div><p class="dim small" style="margin:0 0 6px">Появляются, когда персонаж менялся на двух устройствах. Переключиться можно только на версию, которая не отстаёт от текущей.</p>
+    ${ids.map(id=>{const a=alt[id].c,cur=ACC.chars.find(c=>c.id===id);return `<div class="rcp"><b>${esc(cur.name)}</b><small>Сейчас: ${verTxt(cur)}</small><small>Другая версия: ${verTxt(a)} · сохранена ${whenTxt(a.t||alt[id].at)}</small>
+      <div class="row" style="gap:6px"><button class="btn sm pri" data-a="altUse" data-id="${id}" ${notBehind(a,cur)?'':'disabled'}>${notBehind(a,cur)?'Переключиться на другую версию':'Переключение недоступно: версия отстаёт'}</button><button class="btn sm ghost" data-a="altDrop" data-id="${id}">Удалить</button></div></div>`;}).join('')}`;
+  const dc=devCopies();
+  if(dc.length)h+=`<div class="eyebrow" style="margin:12px 0 6px">Копии на этом устройстве</div>${dc.map((c,i)=>`<div class="row" style="justify-content:space-between;padding-block:4px;flex-wrap:nowrap;gap:6px"><span class="small">${esc(c.name)} · ${verTxt(c)} · ${whenTxt(c.t)}</span><button class="btn sm" data-a="devUse" data-i="${i}" ${notBehind(c,ACC.chars.find(x=>x.id===c.id))?'':'disabled'}>Вернуть</button></div>`).join('')}`;
+  if(srvOn()){h+=`<button class="btn sm full" data-a="histLoad" style="margin-top:10px">${histOpen?'Обновить историю на сервере':'История сохранений на сервере'}</button>`;
+    if(histOpen)h+=histErr?`<p class="bad-t small">${esc(histErr)}</p>`:!histData?'<p class="dim small">Загрузка…</p>':`<p class="dim small" style="margin:6px 0">Версии сохраняются на сервере каждые 10 минут игры. Вернуть можно только версию, которая не отстаёт от текущей: убийств и действий со сферами и предметами в ней не меньше. Откатить крафт или продажу нельзя — если персонаж пострадал из-за ошибки, напишите администратору.</p>
+      <div class="list">${histData.filter(v=>v.chars.length).map(v=>`<div class="rcp"><small class="dim">${new Date(v.ts).toLocaleString('ru-RU')}</small>${v.chars.map(c=>`<div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:6px"><span class="small">${esc(c.name)} · ${verTxt(c)}</span>${(()=>{const cur=ACC.chars.find(x=>x.id===c.id),ok=notBehind(c,cur);return `<button class="btn sm" data-a="histUse" data-ts="${v.ts}" data-id="${c.id}" ${ok?'':'disabled'} title="${ok?'':'Версия отстаёт: откат запрещён'}">${ok?'Вернуть':'Отстаёт'}</button>`;})()}</div>`).join('')}</div>`).join('')||'<span class="dim">История пуста</span>'}</div>`;}
+  return h;}
+/* поставить выбранную версию персонажа вместо текущей: она получает номер версии выше всех, текущая уходит в «другие версии» */
+function useVersion(c){c=JSON.parse(JSON.stringify(c));const i=ACC.chars.findIndex(x=>x.id===c.id);if(i>=0&&!notBehind(c,ACC.chars[i])){toast('Нельзя: в этой версии меньше убийств или действий с предметами и сферами — откат запрещён');return false;}if(i<0&&ACC.chars.length>=MAX_CHARS){toast('Нет места для персонажа');return false;}
+  ACC.alt=ACC.alt||{};const cur=i>=0?ACC.chars[i]:null;
+  c.rev=Math.max(cur?cur.rev||0:0,c.rev||0,(ACC.alt[c.id]&&ACC.alt[c.id].c.rev)||0)+1;c.t=Date.now();c.dev=DEV;c.base=cur&&cur.base!=null?cur.base:undefined;
+  if(cur){ACC.alt[c.id]={c:cur,at:Date.now()};ACC.chars[i]=fixChar(c);}else ACC.chars.push(fixChar(c));
+  if(ACC.del)delete ACC.del[c.id];if(ACC.cur===c.id||!S)S=ACC.chars.find(x=>x.id===ACC.cur)||S;C=null;revInit();save(true);toast(`Версия персонажа «${c.name}» восстановлена`);return true;}
+Object.assign(ACT,{
+  altUse(d){const a=ACC.alt&&ACC.alt[d.id];if(!a)return;delete ACC.alt[d.id];useVersion(a.c);render();},
+  altDrop(d){if(ACC.alt)delete ACC.alt[d.id];save(true);render();},
+  devUse(d){const c=devCopies()[+d.i];if(c&&useVersion(c))render();},
+  histLoad(){histOpen=true;histData=null;histErr='';render();srvReq('/history').then(j=>{histData=j.list||[];render();}).catch(e=>{histErr=e===404?'Сервер ещё не обновлён: загрузите новую версию сервера':'Не удалось загрузить историю ('+e+')';render();});},
+  histUse(d){srvReq('/history/'+d.ts).then(j=>{const c=j.acc&&(j.acc.chars||[]).find(x=>x.id===d.id);if(!c){toast('Персонаж не найден в версии');return;}if(useVersion(c))render();}).catch(e=>toast('Не удалось загрузить версию ('+e+')'));},
+});
 
 /* =========================================================
    ИНТЕРФЕЙС АЗУРИТОВОЙ ШАХТЫ: спуск, улучшения, станок ископаемых
@@ -6510,7 +6946,7 @@ function vMineBench(M){
 /* итог узла шахты: добыча и выбор направления */
 function showMineWin(note){
   const lootH=C.loot.length?C.loot.map(lootLine).join(''):'<div class="dim">Предметов нет</div>';
-  const orbs=Object.entries(C.orbs).map(([k,v])=>`<div class="r-cur">${ORBS[k].n} ×${v}</div>`).join('');
+  const orbs=Object.entries(C.cdrop||{}).filter(([k])=>ORBS[k]).map(([k,v])=>`<div class="r-cur">${ORBS[k].n} ×${v}</div>`).join('');
   modal(`<div class="eyebrow">${C.I.sub} · ${C.I.name}</div><h2>Победа</h2>${note?`<p class="notice">${note}</p>`:''}
     <div class="sheet"><div><span>Опыт</span><span>+${fmt(C.xp)}</span></div><div><span>Золото</span><span>+${fmt(C.gold)}</span></div><div><span>Сульфур</span><span>${fmt(MN().su)} / ${fmt(mineCap())}</span></div><div><span>Азурит</span><span>${fmt(MN().az)}</span></div></div>
     <div><div class="eyebrow" style="margin-bottom:6px">Добыча</div><div class="list">${lootH}${orbs}</div></div>
@@ -6709,6 +7145,180 @@ Object.assign(ACT,{
   tipsSet(d,el){ACC.ui=ACC.ui||{};ACC.ui[d.k]=d.k==='tipsOff'?(el.checked?0:1):(el.checked?1:0);save();},
   tipsReset(){ACC.tips={intro:1};ACC.tipsOld=0;save();toast('Подсказки будут показаны заново');render();},
 });
+
+/* =========================================================
+   РАЗЛОМ — интерфейс тестовой сборки: рука и Разлом на поле боя, Сжатые руки,
+   станция «Разлом» в убежище (осколки, камни, владения, Ксешт), благословения и катализаторы, тестовая панель.
+   ========================================================= */
+function breachFieldHtml(){if(!C)return '';let h='';
+  if(C.brHand){const L=BR_LORDS[C.brHand.lord];h+=`<button class="brhand" data-a="brOpen" style="border-color:${L.col}" ${C.busy?'disabled':''}><b style="color:${L.col}">✋ Рука Разлома · ${L.n}</b><small>Нажмите, чтобы открыть Разлом · не тратит ход</small></button>`;}
+  const b=C.br;if(b&&b.on){const L=BR_LORDS[b.lord];
+    h+=`<div class="brbar" style="border-color:${L.col}"><div class="row" style="gap:8px;flex-wrap:nowrap"><b class="sp" style="color:${L.col}">Разлом ${L.gen} · ур. ${b.lvl}</b><span class="num">${b.frozenT?'∞':Math.ceil(b.turns)+' х.'}</span></div>
+      <div class="brprog"><i style="width:${b.lvl>=BRC.maxLvl?100:b.prog/BRC.lvlKills*100}%;background:${L.col}"></i></div>
+      <small class="dim">Убито ${b.kills}${C.I.brD&&!b.lordOut?` / ${BRC.domKills} до владыки`:''} · каждое убийство +1 ход (до ${BRC.cap}) · всего не больше ${C.I.brD?BRC.domTotal:BRC.total} ходов, прошло ${b.elapsed}${b.lvl>=BRC.handLvl?' · Сжатые руки открыты':''}</small></div>`;}
+  return h;}
+function breachLaneHtml(d){const b=C&&C.br;if(!b||!b.on)return '';
+  return b.hands.filter(x=>x.d===d).map(x=>{const blocked=alive().some(e=>e.d===d);
+    return `<button class="brclasp ${blocked?'off':''}" data-a="brClasp" data-u="${x.uid}" ${C.busy?'disabled':''}><b>✊ Сжатая рука</b><small>${blocked?'на линии враги':'осколки · без хода'}</small></button>`;}).join('');}
+
+
+/* значок катализатора: кристалл цвета метки в бордовой рамке на бордовой кучке песка */
+function catSvg(c,sz){const C_=BR_CAT[c];if(!C_)return '';const col=t=>(MTAGS.find(x=>x[0]===t)||[0,0,'#ccc'])[2];
+  const ic=(MTAGS.find(x=>x[0]===C_.tags[0])||[0,0,0,''])[3];
+  const a=col(C_.tags[0]),b=col(C_.tags[C_.tags.length-1]),gid='cg'+c+(sz||32),sid='cs'+c+(sz||32);
+  const grains=[[9,25.5],[12,24.2],[15,25.8],[18,24.4],[21,25.6],[24,24.8],[13.5,26.6],[19.5,26.4]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r=".55" fill="#d9707a" fill-opacity=".55"/>`).join('');
+  return `<svg class="catic" viewBox="0 0 32 32" width="${sz||32}" height="${sz||32}" aria-hidden="true"><defs>
+    <linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset=".25" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient>
+    <linearGradient id="${sid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8e2633"/><stop offset="1" stop-color="#3d0b14"/></linearGradient></defs>
+    <rect x="1.5" y="1.5" width="29" height="29" rx="4" fill="#24080e" stroke="#7d1d2b" stroke-width="1.6"/>
+    <rect x="3.6" y="3.6" width="24.8" height="24.8" rx="2.5" fill="none" stroke="#4e1019" stroke-width=".8"/>
+    <ellipse cx="16" cy="18" rx="7" ry="8" fill="${a}" opacity=".18"/>
+    <path d="M4.5 27.5Q7 22.5 11 22.8Q13.5 21 16 21.4Q19 20.6 21.5 22.6Q25.5 22.4 27.5 27.5Z" fill="url(#${sid})" stroke="#5a1220" stroke-width=".7"/>${grains}
+    <path d="M16 4.5L20.6 10.5L19.4 21.8L16 24L12.6 21.8L11.4 10.5Z" fill="url(#${gid})" stroke="${b}" stroke-width=".7" stroke-linejoin="round"/>
+    <path d="M16 4.5L16.6 12L16 24M11.4 10.5L16.6 12L20.6 10.5" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width=".6"/>
+    <path d="M12.8 11.5L13.6 19.5" stroke="#fff" stroke-opacity=".5" stroke-width=".7" stroke-linecap="round"/>
+    <g transform="translate(16 15.2) scale(.3) translate(-12 -12)" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="${ic}" stroke="#1a0508" stroke-opacity=".55" stroke-width="3.6"/><path d="${ic}" stroke="${a}" stroke-width="2.4" style="filter:brightness(.55)"/><path d="${ic}" stroke="#fff" stroke-opacity=".8" stroke-width="1" transform="translate(-.6 -.6)"/></g>
+    <path d="M6.5 27.6Q10 23.4 13 23.9Q16 22.8 19 23.9Q22.5 23.4 25.5 27.6Z" fill="url(#${sid})" stroke="#5a1220" stroke-width=".6"/><circle cx="12" cy="25.6" r=".5" fill="#d9707a" fill-opacity=".6"/><circle cx="17.5" cy="25" r=".5" fill="#d9707a" fill-opacity=".6"/><circle cx="21" cy="26.2" r=".5" fill="#d9707a" fill-opacity=".6"/></svg>`;}
+
+/* ---------- станция «Разлом» в убежище ---------- */
+let brTab='lords';
+const brReadyN=()=>{if(!S)return 0;const B=BRS();return BR_IDS.reduce((a,l)=>a+(B.st[l]||0),0);};
+function breachPanel(){const B=BRS();let h='';
+  {
+    h+=`<div class="panel"><p class="dim small" style="margin:0">На картах (шанс 35% на карту) в одной из волн появляется Рука Разлома. Открытый Разлом держится, пока вы убиваете: осколки владыки → ${BRC.shardsStone} осколков = Камень Разлома → Владения владыки (${BRC.domKills} убийств за ${BRC.domTurns} ходов, затем владыка). Пять разных камней открывают Ксешта.</p></div>`;
+    h+=BR_IDS.map(l=>{const L=BR_LORDS[l],sh=B.sh[l]||0,st=B.st[l]||0,bl=B.bl[l]||0;
+      return `<div class="pinbox" style="border-color:${L.col}"><div class="row"><b class="sp" style="color:${L.col};font-family:var(--ff-d);font-size:16px">${L.full}</b>${B.done[l]?`<span class="dim small">повержен ×${B.done[l]}</span>`:''}</div>
+        <p class="dim small" style="margin:2px 0 6px">${EL[L.el]} · ${MONS['br_'+l].hint}</p>
+        <div class="sheet"><div><span>Осколки</span><span class="num">${sh} / ${BRC.shardsStone}</span></div><div><span>Камни Разлома</span><span class="num">${st}</span></div><div><span>Благословения</span><span class="num">${bl}</span></div></div>
+        <div class="dim small" style="margin:6px 0">Добыча: ${BR_UNIQ.filter(u=>u.br===l&&!u.blessed).map(u=>`<span class="r-unique">${u.n}</span>`).join(', ')}</div>
+        <div class="row" style="gap:6px"><button class="btn sm" data-a="brStone" data-l="${l}" ${sh>=BRC.shardsStone?'':'disabled'}>Собрать камень</button><button class="btn sm ${st?'pri':''}" data-a="brDom" data-l="${l}" ${st&&!S.mapRun?'':'disabled'}>Войти во владения</button></div></div>`;}).join('');
+    const all=BR_IDS.every(l=>B.st[l]>0);
+    h+=`<div class="pinbox" style="border-color:#e0c080"><b style="font-family:var(--ff-d);font-size:16px">Ксешт, Мы Едины</b><p class="dim small" style="margin:2px 0 6px">${MONS.br_xesht.hint} Здоровье 4 млн, затем вторая стадия — 2 млн. Добыча: Кольцо Разлома (качество катализаторов до 40%) и ${BR_UNIQ.filter(u=>u.br==='xesht').map(u=>`<span class="r-unique">${u.n}</span>`).join(', ')} (один, иногда два).</p>
+      <button class="btn full ${all?'pri':''}" data-a="brDom" data-l="xesht" ${all&&!S.mapRun?'':'disabled'}>${all?'Бросить вызов Ксешту (5 камней)':'Нужны пять разных Камней Разлома'}</button></div>`;}
+  if(window.BREACH_TEST)h+=brTestPanel();
+  return h;}
+function brUniqCard(u){if(!u)return '';const L=BR_LORDS[u.br];
+  return `<button class="lnk r-unique" data-a="brUInfo" data-n="${esc(u.n)}">${u.n}</button>`;}
+function brUInfoModal(n){const u=brU(n);if(!u)return;
+  const rows=u.mods.map(m=>{const v=m.rr?[m.rr[0][1],m.rr[1][1]]:m.r?m.r[1]:m.v;let t=m.k==='u_k_RANDOM'?'Случайное ключевое умение':lbl(m.k,v);
+    const rg=m.rr?`${m.rr[0][0]}–${m.rr[0][1]} / ${m.rr[1][0]}–${m.rr[1][1]}`:m.r?`${Math.min(...m.r)}–${Math.max(...m.r)}`:'';if(rg)t=withRange(t,v,rg);return `<div class="umod">${esc(t)}</div>`;}).join('');
+  modal(`<div class="row"><span class="eyebrow sp">Уникальный предмет Разлома</span><button class="btn sm ghost" data-a="close">Закрыть</button></div>
+    <h2 class="r-unique" style="font-size:20px">${u.n}</h2><div class="dim small">${u.poe} · ${u.slot==='weapon'?WEAP[u.wk].n:({helm:'Шлем',body:'Нательная броня',gloves:'Перчатки',boots:'Обувь',shield:'Щит',amulet:'Амулет',ring:'Кольцо',belt:'Пояс'})[u.slot]||u.slot}${u.dt?' · '+DT_N[u.dt]:''} · ${u.br==='xesht'?'Ксешт':BR_LORDS[u.br].n}${u.blessed?' · благословлённый':''}</div>
+    <div class="card r-unique"><div class="bd">${rows}</div></div>${u.bless?`<p class="dim small">Благословение ${BR_LORDS[u.br].gen} → <b class="r-unique">${u.bless}</b></p>`:''}`);}
+
+/* ---------- окно предмета: благословение и катализаторы ---------- */
+{const _op=orbPanel;orbPanel=function(it){let h=_op(it);const B=BRS(),U=it&&it.brU&&brU(it.name);
+  if(U&&U.bless)h+=`<div class="panel"><div class="eyebrow" style="margin-bottom:6px">Благословение ${BR_LORDS[U.br].gen}</div><p class="dim small" style="margin:0 0 6px">Превращает предмет в «${U.bless}». Есть: ${B.bl[U.br]||0}.</p><button class="btn full ${B.bl[U.br]?'pri':''}" data-a="brBless" ${B.bl[U.br]?'':'disabled'}>Благословить</button></div>`;
+  if(catSlotOk(it)){const have=BR_CAT_IDS.filter(c=>B.cat[c]>0);
+    h+=`<div class="panel"><div class="eyebrow" style="margin-bottom:6px">Катализаторы${it.ct?` · сейчас ${BR_CAT[it.ct].n} ${it.cq}%/${catCap(it)}%`:''}</div>
+      ${have.length?`<div class="tchips">${have.map(c=>`<button class="tchip catchip ${it.ct===c?'on':''}" data-a="brCat" data-c="${c}">${catSvg(c,22)}${BR_CAT[c].n} ×${B.cat[c]}${it.ct&&it.ct!==c&&it.cq?' · сброс':''}</button>`).join('')}</div>`:'<span class="dim small">Катализаторов нет</span>'}</div>`;}
+  return h;};}
+/* окно предмета показывает значения уже с качеством катализатора: собственные свойства, префиксы и суффиксы нужной метки */
+function brCatView(it){if(!catSlotOk(it)||!it.cq||!it.ct||!BR_CAT[it.ct])return it;const f=1+it.cq/100,tg=BR_CAT[it.ct].tags,ok=k=>statTags(k).some(x=>tg.includes(x));
+  const sc=(k,v)=>typeof v!=='number'||!ok(k)?v:(Math.abs(v)<5?Math.round(v*f*10)/10:R(v*f));
+  const c=JSON.parse(JSON.stringify(it));for(const k in c.imp||{})c.imp[k]=sc(k,c.imp[k]);
+  c.mods.forEach(m=>{if(m.meta)return;if(m.s){m.s=m.s.map(([k,v])=>[k,Array.isArray(v)?v.map(x=>sc(k,x)):sc(k,v)]);return;}
+    if(isAfx(m)){const G=AFX_G[m.g];if(!G||!m.r)return;if(G.arr){if(ok(G.st[0][0]))m.r=m.r.map(x=>x*f);}else G.st.forEach((st,i)=>{if(st&&ok(st[0])&&m.r[i]!=null)m.r[i]*=f;});return;}
+    if(m.k!=null)m.v=Array.isArray(m.v)?m.v.map(x=>sc(m.k,x)):sc(m.k,m.v);});
+  return c;}
+{const _il=itemLines;itemLines=function(it){let h=_il(brCatView(it));
+  if(it&&it.ct&&BR_CAT[it.ct]&&it.cq)h=`<div class="num">Качество (${BR_CAT[it.ct].n}): <span class="qv">+${it.cq}%</span> <span class="dim small">усиливает собственные свойства, префиксы и суффиксы с меткой: ${BR_CAT[it.ct].tags.map(t=>MTAG_N[t]||t).join(', ')} (значения ниже уже с качеством)</span></div>`+h;
+  if(it&&it.brRing)h+=`<div class="dim small" style="margin-top:4px">Кольцо Разлома: катализаторы до 40% качества</div>`;
+  if(it&&it.brU){const U=brU(it.name);if(U)h+=`<div class="dim small" style="margin-top:4px">Предмет Разлома · ${U.br==='xesht'?'Ксешт':BR_LORDS[U.br].n}${U.blessed?' · благословлённый':''}</div>`;}
+  return h;};}
+{const _ud=uDef,_ur=uRange;uDef=function(it){if(it&&it.brU)return brU(it.name)||null;return _ud(it);};
+  uRange=function(it,m){if(!(it&&it.brU))return _ur(it,m);const U=brU(it.name);if(!U)return null;
+    const i=it.mods.indexOf(m),di=U.mods[i];const d=di&&(di.k===m.k||di.k==='u_k_RANDOM')?di:U.mods.find(x=>x.k===m.k);if(!d)return null;
+    if(!d.r&&!d.rr)return {fixed:1};const A=!!d.rr,lo=A?d.rr.map(x=>x[0]):Math.min(...d.r),hi=A?d.rr.map(x=>x[1]):Math.max(...d.r);
+    const pos=(v,a,b)=>b===a?1:(v-a)/(b-a),p=A?(pos(m.v[0],lo[0],hi[0])+pos(m.v[1],lo[1],hi[1]))/2:pos(m.v,lo,hi);return {lo,hi,arr:A,p:clamp(p,0,1),old:false,rand:1};};}
+const curItem=()=>{const w=window._item;return w&&(w.where==='inv'?S.inv.find(x=>x.uid===w.key):S.equip[w.key]);};
+Object.assign(ACT,{
+  brOpen(){brOpen();},brClasp(d){brClasp(d.u);},brTab(d){brTab=d.t;render();},
+  brStone(d){if(brMakeStone(d.l)){toast(`Камень Разлома ${BR_LORDS[d.l].gen} собран`);render();}},
+  brDom(d){brStartDomain(d.l);},brUInfo(d){brUInfoModal(d.n);},
+  brBless(){const w=window._item,it=curItem();if(!it)return;const n=brBless(it);if(n){if(w.where==='inv')openItem('inv',n.uid);else openItem(w.where,w.key);}},
+  brCat(d){const w=window._item,it=curItem();if(!it)return;if(brCatalyst(it,d.c))openItem(w.where,w.key);},
+  brT(d){brTestAct(d.k,d);},
+});
+
+/* ---------- тестовая панель ---------- */
+function brTestPanel(){
+  return `<div class="panel"><div class="ph"><h2>Тест Разлома</h2></div><p class="dim small" style="margin:0 0 8px">Только в тестовой сборке. Сохранения отдельные — ваш основной персонаж не затрагивается.</p>
+    <label class="row" style="min-height:40px;flex-wrap:nowrap"><input type="checkbox" data-a="brT" data-k="god" ${S.brGod?'checked':''} style="width:22px;height:22px;flex:none"> <span>Усиление испытателя: ×4 урона, ×2 здоровья и щита (только для теста)</span></label>
+    <label class="row" style="min-height:40px;flex-wrap:nowrap"><input type="checkbox" data-a="brT" data-k="force" ${window.BR_FORCE?'checked':''} style="width:22px;height:22px;flex:none"> <span>Рука Разлома в каждой волне (иначе ${R(BRC.chance*100)}% на картах)</span></label>
+    <div class="list">
+      <button class="btn" data-a="brT" data-k="map">Карта 16 тира с Разломом</button>
+      <button class="btn" data-a="brT" data-k="res">+300 осколков каждого владыки, +2 камня, +3 благословения, +10 катализаторов каждого</button>
+      <button class="btn" data-a="brT" data-k="uniq">Все уникальные предметы Разлома в сумку</button>
+      <button class="btn" data-a="brT" data-k="heal">Сброс кулдаунов: полное здоровье, мана, флаконы</button></div>
+    <div class="eyebrow" style="margin:10px 0 6px">Новый тестовый персонаж (ур. 90, сильная экипировка)</div>
+    <div class="tchips">${CLASS_ORDER.map(k=>`<button class="tchip" data-a="brT" data-k="char" data-c="${k}">${CLASSES[k].n}</button>`).join('')}</div></div>`;}
+function brTestAct(k,d){if(!window.BREACH_TEST)return;const B=BRS();
+  if(k==='god'){S.brGod=!S.brGod;save();render();return;}
+  if(k==='force'){window.BR_FORCE=!window.BR_FORCE;try{localStorage.setItem('izg_br_force',window.BR_FORCE?'1':'');}catch(e){}render();return;}
+  if(k==='map'){if(S.mapRun){toast('Сначала закончите карту');return;}window.BR_FORCE=true;S.maps[16]=(S.maps[16]||0)+1;startMap(16);return;}
+  if(k==='res'){BR_IDS.forEach(l=>{B.sh[l]=(B.sh[l]||0)+300;B.st[l]=(B.st[l]||0)+2;B.bl[l]=(B.bl[l]||0)+3;});BR_CAT_IDS.forEach(c=>B.cat[c]=(B.cat[c]||0)+10);save();render();toast('Ресурсы Разлома добавлены');return;}
+  if(k==='uniq'){BR_UNIQ.forEach(u=>S.inv.push(brMakeUnique(u)));S.inv.push(brMakeRing());save();render();toast(`В сумке ${BR_UNIQ.length+1} предметов`);return;}
+  if(k==='char'){brTestChar(d.c);screen='main';tab='map';render();return;}
+}
+
+/* ---------- сильный тестовый персонаж ---------- */
+const BR_W={lifeP:3,life:.08,resAll:1.2,resF:.5,resC:.5,resL:.5,resCh:.3,esP:.5,es:.05,armourP:.3,evaP:.3,dmgP:1,atkP:1,spellP:1,elemP:1,physP:.8,fireP:.7,coldP:.7,lightP:.7,chaosP:.6,
+  critP:.35,critM:.8,critSpell:.4,dmgMore:3,extraAct:3,dotMore:.8,str:.25,dex:.25,int:.25,allAttr:.6,regen:2,leech:3,manaP:.3,mreg:.3,block:1,physRed:1.5,suppress:.6,evadeFlat:1.5,
+  aoeP:.6,projP:.6,meleeP:.6,minionP:.8,igniteC:.3,freezeC:.3,shockC:.3,poisonC:.3,manaKillF:.1,lifeKillF:.05,flaskEff:.3};
+const brStatScore=(k,v)=>{const base=String(k).replace(/^[a-zA-Z]+:/,'');const w=BR_W[base];if(Array.isArray(v))return (v[0]+v[1])/2*.25;return (w==null?.15:w)*v;};
+function brItemScore(it){let s=0;const d=itemDef(it);if(d)s+=(d.armour||0)*.01+(d.eva||0)*.01+(d.es||0)*.06;
+  if(it.slot==='weapon'){const w=wInfo(it);s+=(w.min+w.max)*.6+w.crit*4;}
+  it.mods.forEach(m=>modStats(m).forEach(([k,v])=>{s+=brStatScore(k,v);}));for(const k in it.imp||{})s+=brStatScore(k,it.imp[k]);return s;}
+function brBestItem(slot,o,n){let best=null,bs=-1e9;for(let i=0;i<n;i++){const it=makeItem(slot,84,'rare',o);const s=brItemScore(it);if(s>bs){bs=s;best=it;}}best.req=1;return best;}
+function brAutoTree(){let guard=0;while(pointsFree()>0&&guard++<200){
+  const al=new Set(S.alloc),dist={},prev={},q=[...al].filter(x=>NODES[x].t!=='mastery');q.forEach(x=>dist[x]=0);
+  for(let h=0;h<q.length;h++){const x=q[h];for(const y of NODES[x].adj){if(dist[y]!=null||NODES[y].t==='start')continue;dist[y]=dist[x]+1;prev[y]=x;q.push(y);}}
+  let best=null,bv=0;for(const id in dist){if(al.has(id)||!dist[id])continue;const N=NODES[id];if(N.t==='key'||N.t==='mastery'||N.t==='jewel')continue;if(dist[id]>pointsFree())continue;
+    let sc=0;(N.s||[]).forEach(([k,v])=>{sc+=brStatScore(k,v);});if(N.attr)sc+=N.attr*.25;const r=sc/dist[id];if(r>bv){bv=r;best=id;}}
+  if(!best)break;let c=best;const path=[];while(!al.has(c)){path.unshift(c);c=prev[c];}path.forEach(x=>S.alloc.push(x));}}
+function brSkillScore(P,i){const sk=P.skills[i];if(!sk||sk.bad)return 0;if(sk.fn==='summon')return sk.mn.avg*sk.mn.max;return sk.avgUse*(AREA_FN.has(sk.fn)?3:1)*(1+Math.min(3,(sk.extra||0)+(sk.chain||0))*.6);}
+function brTestChar(cls){
+  newGame(cls,'Тест Разлома · '+CLASSES[cls].n);const c=CLASSES[cls];
+  S.lvl=90;S.xp=0;S.done=true;S.prog=BATTLES.length;S.bonus=bonusFromProg(S)+24;S.gold=500000;
+  S.labs=[1,1,1,1];
+  /* снаряжение: лучшие из 40 редких предметов 84 уровня */
+  S.equip={};const W=c.weapon;S.equip.weapon=brBestItem('weapon',{wk:W,wc:W==='staff'||W==='sceptre'||W==='wand'?'caster':W==='bow'?undefined:'melee'},60);
+  if(c.off==='dagger')S.equip.offhand=brBestItem('weapon',{wk:'dagger',wc:'melee'},40);else if(c.off)S.equip.offhand=brBestItem(c.off,{dt:c.dt},40);else if(W==='bow')S.equip.offhand=brBestItem('quiver',{},40);
+  ['helm','body','gloves','boots'].forEach(sl=>S.equip[sl]=brBestItem(sl,{dt:c.dt},40));
+  S.equip.amulet=brBestItem('amulet',{},40);S.equip.ring1=brBestItem('ring',{bone:0},40);S.equip.ring2=brBestItem('ring',{bone:0},40);S.equip.belt=brBestItem('belt',{},40);
+  ['life','life','mana'].forEach((fk,i)=>{S.equip['flask'+(i+1)]=makeFlask(84,'magic',fk);});S.equip.flask4=makeFlask(84,'magic','granite');S.equip.flask5=makeFlask(84,'magic','bismuth');
+  /* древо */
+  brAutoTree();
+  /* камни: лучшее умение класса, затем поддержки и ауры жадным перебором */
+  S.gems=[];S.skills=[{a:null,s:[]},{a:null,s:[]},{a:null,s:[]},{a:null,s:[]}];S.auras=[null,null,null,null];
+  const acts=c.list.filter(id=>GEMS[id]&&!GEMS[id].sup&&!HEXES[id]&&!(GEMS[id].tags||[]).includes('move')&&GEMS[id].fn!=='buff');
+  let best=null,bs=0;acts.forEach(id=>{const g=addGem(id,20);S.skills[0].a=g.uid;const P=calc(),v=brSkillScore(P,0);if(v>bs){bs=v;best=id;}S.gems=S.gems.filter(x=>x!==g);});
+  const main=addGem(best||c.gem,20);S.skills[0].a=main.uid;
+  const sups=SUPPORT_IDS.filter(id=>supFits(GEMS[id],slotFitA(0)||fitOf(GEMS[main.id])));
+  for(let j=0;j<5;j++){let bb=null,bv=brSkillScore(calc(),0);sups.forEach(id=>{if(S.skills[0].s.some(u=>gem(u).id===id))return;const g=addGem(id,20);S.skills[0].s.push(g.uid);const v=brSkillScore(calc(),0);if(v>bv*1.01){bv=v;bb=id;}S.skills[0].s.pop();S.gems=S.gems.filter(x=>x!==g);});
+    if(!bb)break;S.skills[0].s.push(addGem(bb,20).uid);}
+  const moves=c.list.filter(id=>GEMS[id]&&(GEMS[id].tags||[]).includes('move'));if(moves[0])S.skills[1].a=addGem(moves[0],20).uid;
+  const auras=c.auras||AURA_IDS;let ai=0;
+  for(const id of auras){if(ai>=4)break;const g=addGem(id,20);S.auras[ai]=g.uid;const P=calc();const ok=P.auras[ai]&&P.auras[ai].on&&P.mana>60;const v=brSkillScore(P,0);S.auras[ai]=null;
+    if(ok&&v>brSkillScore(calc(),0)*1.03){S.auras[ai]=g.uid;ai++;}else S.gems=S.gems.filter(x=>x!==g);}
+  /* ресурсы */
+  ['chaos','exalt','divine','alch','regal','scour','annul','alt','aug','trans','whet','scrap'].forEach(k=>S.cur[k]=50);S.maps[16]=5;
+  const B=BRS();BR_IDS.forEach(l=>{B.sh[l]=120;B.st[l]=1;B.bl[l]=1;});BR_CAT_IDS.forEach(x=>B.cat[x]=4);
+  S.cb={order:[0,1,2,3],hide:{},mv:{0:1,b:1}};
+  S.brGod=true;save();toast(`Тестовый персонаж готов: ${GEMS[main.id].n}`);}
+/* стили Разлома — только в тестовой сборке */
+(function(){if(typeof document==='undefined')return;const st=document.createElement('style');st.textContent=`
+.brhand,.brclasp{display:flex;flex-direction:column;align-items:flex-start;gap:2px;border:1px solid var(--line2);background:#1d1410;padding:8px 10px;margin:0 0 6px;width:100%;text-align:left;color:var(--txt)}
+.brhand{border-width:2px;animation:brpulse 1.6s ease-in-out infinite}
+.brclasp{width:auto;padding:6px 8px;margin:0 4px 4px 0;border-color:#a77dff;background:#1a1220}
+.brclasp.off{opacity:.55}
+.brclasp b,.brhand b{font-family:var(--ff-d)}.brclasp small,.brhand small{color:var(--muted);font-size:11px}
+.brbar{border:1px solid;padding:8px 10px;margin:0 0 6px;background:#18110d}
+.brprog{height:5px;background:#0006;margin:6px 0 4px}.brprog i{display:block;height:100%}
+@keyframes brpulse{50%{box-shadow:0 0 14px #c77dff66}}
+.catgrid{display:grid;grid-template-columns:1fr;gap:6px}.catrow{display:flex;align-items:center;gap:10px;padding:4px 0;border-bottom:1px solid var(--line)}
+.catchip{display:inline-flex;align-items:center;gap:5px}.catic{flex:none;filter:drop-shadow(0 1px 2px #0008)}`;document.head.appendChild(st);})();
 
 /* старт: после загрузки всех модулей, чтобы все константы уже были объявлены */
 load();
