@@ -1982,7 +1982,7 @@ function load(){
   try{const s=localStorage.getItem(KEY);if(s)ACC=JSON.parse(s);}catch(e){ACC=null;}
   if(!ACC){ACC=newAcc();try{const s3=localStorage.getItem(KEY3);if(s3){const o=JSON.parse(s3);if(o&&o.v===3){ACC.u=(o.u||0)+10;const c=migrate3(o);ACC.chars.push(c);ACC.cur=c.id;}}}catch(e){}}
   ACC.chars.forEach(fixChar);ACC.del=ACC.del||{};(ACC.stash&&ACC.stash.items||[]).forEach(afxMigrate);ACC.ui=ACC.ui||{aura:1,flask:1,ability:1};ACC.stash=ACC.stash||{items:[],tabs:1};ACC.stash.gems=ACC.stash.gems||[];ACC.auc=ACC.auc||{lots:[],seq:0};
-  S=ACC.chars.find(c=>c.id===ACC.cur)||null;revInit();
+  S=ACC.chars.find(c=>c.id===ACC.cur)||null;
 }
 /* =========================================================
    ХРАНЕНИЕ АККАУНТА
@@ -1997,40 +1997,11 @@ const tgUser=()=>{try{return tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user||null
 function hash32(str){let h=0x811c9dc5;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h.toString(16);}
 function backupLocal(){try{const cur=localStorage.getItem(KEY);if(!cur)return;const b1=localStorage.getItem(KEY+'_bak1');if(b1&&b1!==cur)localStorage.setItem(KEY+'_bak2',b1);localStorage.setItem(KEY+'_bak1',cur);}catch(e){}}
 /* слияние двух аккаунтов без потерь */
-/* версия персонажа: rev растёт при каждом сохранении, в котором персонаж реально изменился; base — rev, известный серверу */
-const charScore=c=>(c.kills||0)+(c.xp||0)/1e9+(c.lvl||0)*1e6;
-function charBetter(x,y){if(notBehind(x,y)&&!notBehind(y,x))return true;if(notBehind(y,x)&&!notBehind(x,y))return false;const rx=x.rev||0,ry=y.rev||0;if(rx!==ry)return rx>ry;if((x.t||0)!==(y.t||0))return (x.t||0)>(y.t||0);return charScore(x)>charScore(y);}
-function charDiverged(x,y){const d=(p,q)=>p.base!=null&&(q.rev||0)>p.base&&(p.rev||0)>p.base;return d(x,y)||d(y,x);}
-const REV_H={};
-const charHash=c=>hash32(JSON.stringify(c,(k,v)=>k==='t'||k==='rev'||k==='base'||k==='dev'||k==='created'||k==='econ'?undefined:v));
-/* econ — счётчик «необратимых» действий: потрачена сфера или ископаемое, предмет или камень ушёл от персонажа (продажа, тайник, аукцион, рецепт).
-   Вместе с убийствами (kills) он только растёт. Версию персонажа нельзя заменить версией, где этих счётчиков меньше, — так нельзя откатить неудачный крафт или размножить предмет */
-const ECON={};
-function econSnap(c){const fos=(c.mine&&c.mine.fos)||{};let cs=0;for(const k in (c.cur||{}))cs+=c.cur[k]||0;for(const k in fos)cs+=fos[k]||0;
-  return {cs,it:new Set([...Object.values(c.equip||{}),...(c.inv||[])].filter(Boolean).map(x=>x.uid)),gm:new Set((c.gems||[]).map(g=>g.uid))};}
-function econCheck(c){const n=econSnap(c),o=ECON[c.id];ECON[c.id]=n;if(!o)return false;
-  let lost=n.cs<o.cs;if(!lost)for(const u of o.it)if(!n.it.has(u)){lost=true;break;}if(!lost)for(const u of o.gm)if(!n.gm.has(u)){lost=true;break;}
-  if(lost){c.econ=(c.econ||0)+1;return true;}return false;}
-/* версия cand не «откатывает» персонажа: убийств и необратимых действий в ней не меньше, чем в cur */
-const notBehind=(cand,cur)=>!cur||(cand.kills||0)>=(cur.kills||0)&&(cand.econ||0)>=(cur.econ||0);
-/* крафт и обмен — только со связью с сервером, чтобы результат сразу попал на сервер */
-function craftOnline(){if(srvOn()&&(!srvReady||srvErr)){toast('Нет связи с сервером: сферы, крафт и обмен недоступны, пока связь не восстановится');return false;}return true;}
-/* устройство, которое последним меняло персонажа: сервер не даёт одному устройству затереть изменения другого, которых оно не видело */
-const DEV=(()=>{try{let d=localStorage.getItem('izg_dev');if(!d){d='d'+Math.random().toString(36).slice(2,10);localStorage.setItem('izg_dev',d);}return d;}catch(e){return 'd0';}})();
-function revInit(){if(ACC)ACC.chars.forEach(c=>{REV_H[c.id]=charHash(c);ECON[c.id]=econSnap(c);});}
-let econNow=false;
-function revBump(){if(!ACC)return;ACC.chars.forEach(c=>{if(econCheck(c))econNow=true;const h=charHash(c);if(REV_H[c.id]==null){REV_H[c.id]=h;return;}if(REV_H[c.id]!==h){REV_H[c.id]=h;c.rev=(c.rev||0)+1;c.t=Date.now();c.dev=DEV;}});}
 function mergeAcc(a,b){
   if(!a||!a.chars)return b;if(!b||!b.chars)return a;
   const del={...(a.del||{}),...(b.del||{})};
-  /* выбор версии персонажа: побеждает та, в которой больше изменений (rev), а не та, что сохранена позже.
-     Если обе версии менялись независимо от общей точки (игра на двух устройствах), проигравшая не теряется — она уходит в ACC.alt */
-  const map={},alt={...(a.alt||{}),...(b.alt||{})};
-  [...a.chars,...b.chars].forEach(c=>{if(!c||!c.id||(del[c.id]&&del[c.id]>=(c.t||0)))return;const o=map[c.id];if(!o){map[c.id]=c;return;}if(o===c)return;
-    const win=charBetter(c,o)?c:o,lose=win===c?o:c;map[c.id]=win;
-    if(charDiverged(c,o)&&JSON.stringify(lose)!==JSON.stringify(win))alt[c.id]={c:lose,at:Date.now()};});
+  const map={};[...a.chars,...b.chars].forEach(c=>{if(!c||!c.id||(del[c.id]&&del[c.id]>=(c.t||0)))return;const o=map[c.id];if(!o||(c.t||0)>(o.t||0)||((c.t||0)===(o.t||0)&&(c.kills||0)+(c.xp||0)/1e9+(c.lvl||0)*1e6>(o.kills||0)+(o.xp||0)/1e9+(o.lvl||0)*1e6))map[c.id]=c;});
   const newer=(x,y)=>((x&&x.t)||0)>=((y&&y.t)||0)?x:y;
-  for(const id in alt)if(!map[id]||(alt[id].c.rev||0)===(map[id].rev||0)&&alt[id].c.t===map[id].t)delete alt[id];
   const accNew=newer(a,b);
   const m={...accNew,chars:Object.values(map).sort((x,y)=>(x.created||0)-(y.created||0)).slice(0,MAX_CHARS),del,u:Math.max(a.u||0,b.u||0),
     gold:(newer(a,b).gold!=null?newer(a,b).gold:Math.max(a.gold||0,b.gold||0)),stash:newer(a.stash||{},b.stash||{}),auc:newer(a.auc||{},b.auc||{}),aucGold:(newer(a.auc||{},b.auc||{})===(a.auc||{})?a:b).aucGold||0,t:Math.max(a.t||0,b.t||0)};
@@ -2045,17 +2016,16 @@ function sameChars(a,b){const k=x=>(x&&x.chars||[]).map(c=>c.id+':'+(c.t||0)).so
 function adoptAcc(d,note){
   if(C&&!C.over&&S){const cur=S;ACC=d;ACC.stash=ACC.stash||{items:[],tabs:1};ACC.stash.gems=ACC.stash.gems||[];ACC.del=ACC.del||{};const i=ACC.chars.findIndex(c=>c.id===cur.id);if(i>=0)ACC.chars[i]=cur;else ACC.chars.push(cur);ACC.cur=cur.id;return true;}
   const before=ACC;ACC=d;ACC.stash=ACC.stash||{items:[],tabs:1};ACC.stash.gems=ACC.stash.gems||[];ACC.chars.forEach(fixChar);(ACC.stash&&ACC.stash.items||[]).forEach(afxMigrate);ACC.ui=ACC.ui||{aura:1,flask:1,ability:1};ACC.del=ACC.del||{};
-  S=ACC.chars.find(c=>c.id===ACC.cur)||null;C=null;revInit();
+  S=ACC.chars.find(c=>c.id===ACC.cur)||null;C=null;
   if(!sameChars(before,ACC)){screen=S?'main':ACC.chars.length?'roster':'select';tab='map';if(note)toast(note);}
   return true;
 }
 function save(now){
-  if(!ACC)return;const t=Date.now();ACC.t=t;ACC.ver=GAME_VER;revBump();if(S){S.t=S.t||t;S.created=S.created||t;}
+  if(!ACC)return;const t=Date.now();ACC.t=t;ACC.ver=GAME_VER;if(S){S.t=t;S.created=S.created||t;}
   const uid=tgUid();if(uid){ACC.tgId=uid;const u=tgUser();if(u)ACC.tgName=u.username||u.first_name||'';}
   const str=JSON.stringify(ACC);
   try{localStorage.setItem(KEY,str);}catch(e){}
   /* копии: устройство и сервер игры. Облако Telegram больше не используется (только разовый перенос старых сохранений) */
-  if(econNow){econNow=false;now=true;}
   if(srvReady){clearTimeout(srvTimer);if(now)srvSave(str);else srvTimer=setTimeout(()=>srvSave(str),1500);}
 }
 /* облако Telegram: два слота (a/b) кусками по 3800 символов. Сначала пишется запасной слот, потом указатель —
@@ -2115,25 +2085,11 @@ function cloudLoad(){
 function srvOn(){return !!(AUCTION_URL&&tg&&tg.initData);}
 function srvReq(path,opt={}){return fetch(AUCTION_URL.replace(/\/$/,'')+path,{method:opt.method||'GET',headers:{'Content-Type':'application/json','X-Tg-Init-Data':tg.initData},body:opt.body}).then(r=>r.ok?r.json():Promise.reject(r.status));}
 let srvLoading=false;
-function srvLoad(){if(!srvOn()||srvReady||srvLoading)return;srvLoading=true;srvReq('/save').finally(()=>{srvLoading=false;}).then(j=>{if(j&&j.acc&&j.acc.chars){const m=mergeAcc(ACC,j.acc);if(!sameChars(ACC,m))backupLocal();adoptAcc(m,'Аккаунт синхронизирован с сервером');
-    const sr=new Map(j.acc.chars.map(c=>[c.id,c.rev||0]));ACC.chars.forEach(c=>{if(sr.has(c.id))c.base=sr.get(c.id);});altNote();}
+function srvLoad(){if(!srvOn()||srvReady||srvLoading)return;srvLoading=true;srvReq('/save').finally(()=>{srvLoading=false;}).then(j=>{if(j&&j.acc&&j.acc.chars){const m=mergeAcc(ACC,j.acc);if(!sameChars(ACC,m))backupLocal();adoptAcc(m,'Аккаунт синхронизирован с сервером');}
   srvReady=true;save(true);render();}).catch(()=>{srvReady=false;srvTries++;if(srvTries<4)setTimeout(srvLoad,5000*srvTries);});}
 let srvTries=0;
 let boardAt=0;
-/* сервер отказался затирать свою версию: берём её, а свою кладём в «другие версии», чтобы игрок выбрал сам */
-function srvKeep(j){backupLocal();ACC.alt=ACC.alt||{};
-  j.kept.forEach(id=>{const sc=j.acc.chars.find(c=>c.id===id),i=ACC.chars.findIndex(c=>c.id===id);if(!sc)return;
-    if(i>=0){const mine=ACC.chars[i];if(charHash(mine)!==charHash(sc))ACC.alt[id]={c:mine,at:Date.now()};ACC.chars[i]=fixChar(sc);}else ACC.chars.push(fixChar(sc));
-    sc.base=sc.rev||0;});
-  for(const id in (j.acc.alt||{}))if(!ACC.alt[id])ACC.alt[id]=j.acc.alt[id];
-  S=ACC.chars.find(c=>c.id===ACC.cur)||S;revInit();try{localStorage.setItem(KEY,JSON.stringify(ACC));}catch(e){}
-  toast('На сервере более новая версия персонажа — она загружена. Ваша сохранена в «Другие версии»');render();}
-function altNote(){const n=Object.keys(ACC.alt||{}).length;if(n)setTimeout(()=>toast(`Найдена другая версия персонажа (игра на двух устройствах). Выбрать: Настройки → Сохранения`),600);}
-function srvSave(str){if(!srvOn())return;const sent=JSON.parse(str).chars.map(c=>[c.id,c.rev||0]);srvReq('/save',{method:'POST',body:str}).then(j=>{srvAt=Date.now();srvErr='';
-    /* сервер принял: эти версии теперь известны серверу. Если на сервере была версия новее — сервер её сохранил и вернул */
-    sent.forEach(([id,r])=>{const c=ACC.chars.find(x=>x.id===id);if(c&&(c.rev||0)===r)c.base=r;});
-    if(j&&j.kept&&j.kept.length&&j.acc&&j.acc.chars&&!(C&&!C.over))srvKeep(j);
-    if(screen==='settings')render();if(Date.now()-boardAt>30000){boardAt=Date.now();srvReq('/board',{method:'POST',body:JSON.stringify(boardOf())}).catch(()=>{});}}).catch(e=>{srvErr='ошибка '+e;if(screen==='settings')render();});}
+function srvSave(str){if(!srvOn())return;srvReq('/save',{method:'POST',body:str}).then(()=>{srvAt=Date.now();srvErr='';if(screen==='settings')render();if(Date.now()-boardAt>30000){boardAt=Date.now();srvReq('/board',{method:'POST',body:JSON.stringify(boardOf())}).catch(()=>{});}}).catch(e=>{srvErr='ошибка '+e;if(screen==='settings')render();});}
 /* сводка персонажей для таблицы лидеров: уровень и умение с наибольшим уроном */
 /* сводка персонажа для лидеров и статистики администратора */
 function charInfo(c){const pS=S,pC=C;const o={top:null,b:null};try{S=c;C=null;const P=calc();
@@ -2156,7 +2112,7 @@ function newGame(cls,name){
   const c=CLASSES[cls];
   S={id:'c'+Date.now().toString(36)+ri(10,99),v:4,t:Date.now(),created:Date.now(),name:name||'Изгнанник',cls,lvl:1,xp:0,goldIn:1,alloc:[startNode(cls)],attrPick:{},mast:{},treeV:3,attrDef:mainAttr(cls),bonus:0,
      gems:[],skills:[{a:null,s:[]},{a:null,s:[]},{a:null,s:[]},{a:null,s:[]}],auras:[null,null,null,null],hex:null,
-     equip:{},inv:[],cur:{},prog:0,done:false,deaths:0,kills:0,lfs:[lfNew('Фильтр 1'),lfNew('Фильтр 2'),lfNew('Фильтр 3')],lfOn:0,shop:null,maps:{},gmaps:{},frag:{},pinK:{},offer:0,mapBest:0,labs:[0,0,0,0],asc:null,ascAlloc:[]};
+     equip:{},inv:[],cur:{},prog:0,done:false,deaths:0,kills:0,lf:lfDefault(),shop:null,maps:{},gmaps:{},frag:{},pinK:{},offer:0,mapBest:0,labs:[0,0,0,0],asc:null,ascAlloc:[]};
   goldLink(S);if(!ACC.chars.length&&!ACC.gold)ACC.gold=30;
   ACC.chars.push(S);ACC.cur=S.id;
   const g1={uid:newUid(),id:c.gem,lvl:1,xp:0},g2={uid:newUid(),id:c.sup,lvl:1,xp:0};
@@ -4219,7 +4175,6 @@ function mtagRow(k){const ts=statTags(k);return ts.length?`<span class="mtags" t
 
 /* ---------- сферы ---------- */
 function applyOrb(it,k){
-  if(!craftOnline())return false;
   if(it.mirrored){toast('Отражённый предмет нельзя изменить');return false;}
   if(k==='annul'||k==='mirror')return specialOrb(it,k);
   /* точильный камень и деталь доспеха: качество, свойства не трогают (работают и на уникальных, и на Legacy) */
@@ -4558,7 +4513,7 @@ function rcWhy(r){
   const its=rcItems(r);if(!its.length)return r.kind==='one'?`в сумке нет обычной ${r.cat==='weapon'?'оружия':'брони'} с качеством 20%`.replace('обычной оружия','обычного оружия'):`в сумке нет ${r.cat==='weapon'?'оружия':'брони'} с качеством`;
   if(r.kind==='set'){const t=its.reduce((a,x)=>a+itemQ(x),0);return t>=RC_SET?'':`в сумке качество на ${t}% из ${RC_SET}%`;}
   return '';}
-function rcDo(id,uids){const r=RECIPES.find(x=>x.id===id);if(!r||rcWhy(r))return false;if(!craftOnline())return false;
+function rcDo(id,uids){const r=RECIPES.find(x=>x.id===id);if(!r||rcWhy(r))return false;
   if(r.kind==='cur'){S.cur[r.cur]-=r.need;}
   else{let take;if(r.kind==='one')take=[rcItems(r)[0]];else{const pool=rcItems(r),set=new Set(uids||[]);take=pool.filter(x=>set.has(x.uid));if(take.reduce((a,x)=>a+itemQ(x),0)<RC_SET){toast(`Выберите предметы с качеством на ${RC_SET}%`);return false;}}
     const t=new Set(take);S.inv=S.inv.filter(x=>!t.has(x));}
@@ -4731,7 +4686,6 @@ function fosOrbOk(it,k){if(!it||it.slot==='flask'||it.rar==='unique'||it.mirrore
 function sanctVals(it,ms){ms.forEach(m=>{const T=afxTiers(afxBase(it),m.g),row=T&&T.find(x=>x[0]===m.t);if(!row)return;const G=AFX_G[m.g];
   const a=afxVals(row,G),b=afxVals(row,G),sum=v=>v.reduce((s,x)=>s+x,0);m.r=sum(a)>=sum(b)?a:b;});}
 function fossilCraft(it,k,sel){
-  if(!craftOnline())return false;
   const chk=fosRule(sel);if(!chk.ok){toast(chk.why);return false;}const RU=chk.rule,M=MN();
   if(!(S.cur[k]>0)||!fosOrbOk(it,k)){toast('Эту сферу сейчас нельзя применить');return false;}
   const ADD=['trans','aug','exalt','regal','alch','alt','chaos'];
@@ -4913,7 +4867,6 @@ function benchWhy(it,r){
 const benchCanPay=c=>Object.entries(c).every(([k,n])=>(S.cur[k]||0)>=n);
 const benchRoll=(lo,hi)=>{const dec=lo%1||hi%1;const v=lo+Math.random()*(hi-lo);return dec?Math.round(v*10)/10:Math.round(v);};
 function benchCraft2(it,rid,ti){
-  if(!craftOnline())return false;
   const r=BENCH2.find(x=>x.id===rid),t=r&&r.t[ti];if(!t)return false;
   const why=benchWhy(it,r);if(why){toast(why);return false;}
   if(!BENCH_BASES[t[2]].includes(benchAfxBase(it))){toast('Не подходит к этой основе');return false;}
@@ -5090,7 +5043,7 @@ function vSettings(){const u=ACC.ui||{},sc=u.cbScale||100;
       <div><span>На устройстве</span><span class="good-t">${ACC&&ACC.t?whenTxt(ACC.t):'—'}</span></div>
       <div><span>Сервер игры</span><span class="${srvReady&&!srvErr?'good-t':AUCTION_URL?'bad-t':'dim'}">${!AUCTION_URL?'не задан':!srvOn()?'только в Telegram':srvErr?esc(srvErr):srvReady?(srvAt?whenTxt(srvAt):'подключён'):'нет связи'}</span></div></div>
       <button class="btn pri full" data-a="saveNow" style="margin-top:10px">Сохранить сейчас</button>
-      ${AUCTION_URL&&srvOn()&&!srvReady?'<button class="btn sm full" data-a="srvRetry" style="margin-top:6px">Подключиться к серверу</button>':''}${savesExtra()}</div>
+      ${AUCTION_URL&&srvOn()&&!srvReady?'<button class="btn sm full" data-a="srvRetry" style="margin-top:6px">Подключиться к серверу</button>':''}</div>
 
     ${S?`<div class="eyebrow" style="margin-top:4px">Персонаж: ${esc(S.name)}</div>${heroShopPanel()}${lootFilterPanel()}`:'<p class="dim small">Поиск у торговца и лутфильтр настраиваются для каждого персонажа отдельно — сначала выберите персонажа.</p>'}
   </div>`;}
@@ -6462,7 +6415,7 @@ function corpsePicker(i){const cs=C.corpses||[];
   modal(`<div class="row"><span class="eyebrow sp">Сотворение призрака: выберите труп</span><button class="btn sm ghost" data-a="close">Отмена</button></div>
     <p class="dim small" style="margin:0">Выбранный монстр привяжется к камню. Сбросить привязку можно только сферой очищения. Боссов поднять нельзя.</p>
     <div class="list">${rows}</div>`);}
-function gemScour(uid){const g=gem(uid)||(ACC.stash.gems||[]).find(x=>x.uid===uid);if(!g||!g.spec)return false;if(!craftOnline())return false;if(!(S.cur.scour>0)){toast('Нет сферы очищения');return false;}
+function gemScour(uid){const g=gem(uid)||(ACC.stash.gems||[]).find(x=>x.uid===uid);if(!g||!g.spec)return false;if(!(S.cur.scour>0)){toast('Нет сферы очищения');return false;}
   S.cur.scour--;const n=MONS[g.spec.type]?MONS[g.spec.type].n:'';delete g.spec;
   if(C&&C.minions)C.minions.forEach(m=>{const sl=S.skills[m.slot];if(m.spec&&sl&&sl.a===uid){m.hp=0;m.gone=1;}});
   save();toast(`Привязка снята${n?': '+n:''}`);return true;}
@@ -6498,36 +6451,6 @@ function uRange(it,m){const U=uDef(it);if(!U||m.k==null)return null;const d=U.mo
   const p=A?(pos(v[0],lo[0],hi[0])+pos(v[1],lo[1],hi[1]))/2:pos(v,lo,hi);
   return {lo,hi,arr:A,p:clamp(p,0,1),old:p<-.01||p>1.01};}
 function uRangeTxt(ur){return ur.arr?`${ur.lo[0]}–${ur.hi[0]} / ${ur.lo[1]}–${ur.hi[1]}`:`${ur.lo}–${ur.hi}`;}
-
-/* ---------- версии персонажей: другие версии, история на сервере, копии на устройстве ---------- */
-const xpPct=c=>{try{return R((c.xp||0)/xpNeed(c.lvl)*100);}catch(e){return 0;}};
-const verTxt=c=>`ур. ${c.lvl} (${xpPct(c)}%)${c.done?' · убежище':''}${c.mapBest?` · карты до ${c.mapBest}`:''} · убийств ${fmt(c.kills||0)}`;
-let histData=null,histErr='',histOpen=false;
-function devCopies(){const out=[];[KEY+'_bak1',KEY+'_bak2'].forEach(k=>{try{const a=JSON.parse(localStorage.getItem(k)||'null');(a&&a.chars||[]).forEach(c=>{const cur=ACC.chars.find(x=>x.id===c.id);
-    if(cur&&charHash(cur)!==charHash(c)&&!out.some(o=>charHash(o)===charHash(c)))out.push(c);});}catch(e){}});return out;}
-function savesExtra(){let h='';const alt=ACC.alt||{},ids=Object.keys(alt).filter(id=>ACC.chars.some(c=>c.id===id));
-  if(ids.length)h+=`<div class="eyebrow" style="margin:12px 0 6px">Другие версии персонажей</div><p class="dim small" style="margin:0 0 6px">Появляются, когда персонаж менялся на двух устройствах. Переключиться можно только на версию, которая не отстаёт от текущей.</p>
-    ${ids.map(id=>{const a=alt[id].c,cur=ACC.chars.find(c=>c.id===id);return `<div class="rcp"><b>${esc(cur.name)}</b><small>Сейчас: ${verTxt(cur)}</small><small>Другая версия: ${verTxt(a)} · сохранена ${whenTxt(a.t||alt[id].at)}</small>
-      <div class="row" style="gap:6px"><button class="btn sm pri" data-a="altUse" data-id="${id}" ${notBehind(a,cur)?'':'disabled'}>${notBehind(a,cur)?'Переключиться на другую версию':'Переключение недоступно: версия отстаёт'}</button><button class="btn sm ghost" data-a="altDrop" data-id="${id}">Удалить</button></div></div>`;}).join('')}`;
-  const dc=devCopies();
-  if(dc.length)h+=`<div class="eyebrow" style="margin:12px 0 6px">Копии на этом устройстве</div>${dc.map((c,i)=>`<div class="row" style="justify-content:space-between;padding-block:4px;flex-wrap:nowrap;gap:6px"><span class="small">${esc(c.name)} · ${verTxt(c)} · ${whenTxt(c.t)}</span><button class="btn sm" data-a="devUse" data-i="${i}" ${notBehind(c,ACC.chars.find(x=>x.id===c.id))?'':'disabled'}>Вернуть</button></div>`).join('')}`;
-  if(srvOn()){h+=`<button class="btn sm full" data-a="histLoad" style="margin-top:10px">${histOpen?'Обновить историю на сервере':'История сохранений на сервере'}</button>`;
-    if(histOpen)h+=histErr?`<p class="bad-t small">${esc(histErr)}</p>`:!histData?'<p class="dim small">Загрузка…</p>':`<p class="dim small" style="margin:6px 0">Версии сохраняются на сервере каждые 10 минут игры. Вернуть можно только версию, которая не отстаёт от текущей: убийств и действий со сферами и предметами в ней не меньше. Откатить крафт или продажу нельзя — если персонаж пострадал из-за ошибки, напишите администратору.</p>
-      <div class="list">${histData.filter(v=>v.chars.length).map(v=>`<div class="rcp"><small class="dim">${new Date(v.ts).toLocaleString('ru-RU')}</small>${v.chars.map(c=>`<div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:6px"><span class="small">${esc(c.name)} · ${verTxt(c)}</span>${(()=>{const cur=ACC.chars.find(x=>x.id===c.id),ok=notBehind(c,cur);return `<button class="btn sm" data-a="histUse" data-ts="${v.ts}" data-id="${c.id}" ${ok?'':'disabled'} title="${ok?'':'Версия отстаёт: откат запрещён'}">${ok?'Вернуть':'Отстаёт'}</button>`;})()}</div>`).join('')}</div>`).join('')||'<span class="dim">История пуста</span>'}</div>`;}
-  return h;}
-/* поставить выбранную версию персонажа вместо текущей: она получает номер версии выше всех, текущая уходит в «другие версии» */
-function useVersion(c){c=JSON.parse(JSON.stringify(c));const i=ACC.chars.findIndex(x=>x.id===c.id);if(i>=0&&!notBehind(c,ACC.chars[i])){toast('Нельзя: в этой версии меньше убийств или действий с предметами и сферами — откат запрещён');return false;}if(i<0&&ACC.chars.length>=MAX_CHARS){toast('Нет места для персонажа');return false;}
-  ACC.alt=ACC.alt||{};const cur=i>=0?ACC.chars[i]:null;
-  c.rev=Math.max(cur?cur.rev||0:0,c.rev||0,(ACC.alt[c.id]&&ACC.alt[c.id].c.rev)||0)+1;c.t=Date.now();c.dev=DEV;c.base=cur&&cur.base!=null?cur.base:undefined;
-  if(cur){ACC.alt[c.id]={c:cur,at:Date.now()};ACC.chars[i]=fixChar(c);}else ACC.chars.push(fixChar(c));
-  if(ACC.del)delete ACC.del[c.id];if(ACC.cur===c.id||!S)S=ACC.chars.find(x=>x.id===ACC.cur)||S;C=null;revInit();save(true);toast(`Версия персонажа «${c.name}» восстановлена`);return true;}
-Object.assign(ACT,{
-  altUse(d){const a=ACC.alt&&ACC.alt[d.id];if(!a)return;delete ACC.alt[d.id];useVersion(a.c);render();},
-  altDrop(d){if(ACC.alt)delete ACC.alt[d.id];save(true);render();},
-  devUse(d){const c=devCopies()[+d.i];if(c&&useVersion(c))render();},
-  histLoad(){histOpen=true;histData=null;histErr='';render();srvReq('/history').then(j=>{histData=j.list||[];render();}).catch(e=>{histErr=e===404?'Сервер ещё не обновлён: загрузите новую версию сервера':'Не удалось загрузить историю ('+e+')';render();});},
-  histUse(d){srvReq('/history/'+d.ts).then(j=>{const c=j.acc&&(j.acc.chars||[]).find(x=>x.id===d.id);if(!c){toast('Персонаж не найден в версии');return;}if(useVersion(c))render();}).catch(e=>toast('Не удалось загрузить версию ('+e+')'));},
-});
 
 /* =========================================================
    ИНТЕРФЕЙС АЗУРИТОВОЙ ШАХТЫ: спуск, улучшения, станок ископаемых
