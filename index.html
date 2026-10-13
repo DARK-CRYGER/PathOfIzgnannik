@@ -2250,9 +2250,9 @@ function calc(){
       if(d.armour)d.armour=R(d.armour*(1+(eqInc(it.slot,'armourP')+sd)/100));if(d.eva)d.eva=R(d.eva*(1+(eqInc(it.slot,'evaP')+sd)/100));if(d.es)d.es=R(d.es*(1+(eqInc(it.slot,'esP')+sd)/100));
       if(!(keys.has('aegis')&&it.slot==='shield'))add(d,ti);}
     const cm=typeof catMult==='function'?catMult(it):null;
-    if(it.slot!=='weapon')add(cm?Object.fromEntries(Object.entries(it.imp||{}).map(([k,v])=>[k,typeof v==='number'?cm(k,v):v])):(it.imp||{}),ti);else{const im={...it.imp};delete im.physL;add(im,ti);}
+    if(it.slot!=='weapon')add(cm?Object.fromEntries(Object.entries(it.imp||{}).map(([k,v])=>[k,typeof v==='number'?cm(k,v,null):v])):(it.imp||{}),ti);else{const im={...it.imp};delete im.physL;add(im,ti);}
     if(it.block){const bl=R(it.block*(1+itStat(it,'blockL')/100));if(keys.has('aegis')&&it.slot==='shield')P.shieldBlock=bl;else P.block+=bl;}
-    it.mods.forEach(m=>modStats(m).forEach(([k,v])=>{if(LOCAL_W.has(k)||AFX_LOCAL.has(k)||(MODS[k]&&MODS[k].loc))return;if(cm&&typeof v==='number')v=cm(k,v);else if(cm&&Array.isArray(v))v=v.map(x=>cm(k,x));
+    it.mods.forEach(m=>modStats(m).forEach(([k,v])=>{if(LOCAL_W.has(k)||AFX_LOCAL.has(k)||(MODS[k]&&MODS[k].loc))return;if(cm&&typeof v==='number')v=cm(k,v,m);else if(cm&&Array.isArray(v))v=v.map(x=>cm(k,x,m));
       if(String(k).startsWith('u_k_')){keys.add(k.slice(4));return;}
       if(String(k).startsWith('u_')){U[k]=(U[k]||0)+v;return;}
       if(String(k).includes(':'))addK(k,v);else add1(k,v,ti);}));});
@@ -4955,7 +4955,7 @@ const BR_LORDS={
 };
 const BR_IDS=Object.keys(BR_LORDS);
 /* параметры Разлома */
-const BRC={mapChance:35,start:6,cap:12,total:20,perKill:1,hp:.25,dmg:.7,lvlKills:6,maxLvl:5,handLvl:3,chance:.12,shardsStone:100,domTurns:12,domKills:20,domTotal:30};
+const BRC={mapChance:35,claspKills:5,start:6,cap:12,total:20,perKill:1,hp:1.1,dmg:1.1,lvlKills:6,maxLvl:5,handLvl:3,chance:.12,shardsStone:100,domTurns:12,domKills:20,domTotal:30};
 /* монстры владык: ближний бой, дальний бой, чары — стихия владыки */
 const BR_MON_N={
   xoph:['Пламенный ползун','Метатель углей','Пепельный заклинатель'],tul:['Ледяной коготь','Метатель сосулек','Морозная провидица'],
@@ -5052,7 +5052,11 @@ const BR_CAT={
   abras:{n:'Абразивный',tags:['atk']},imbued:{n:'Насыщенный',tags:['spell']},accel:{n:'Ускоряющий',tags:['speed']},
   unstable:{n:'Нестабильный',tags:['crit']},intrinsic:{n:'Внутренний',tags:['attr']},noxious:{n:'Ядовитый',tags:['phys','chaos']},turbulent:{n:'Бурный',tags:['fire','cold','light']},
 };
-const BR_CAT_IDS=Object.keys(BR_CAT);
+/* катализаторы Ксешта: усиливают все префиксы или все суффиксы предмета */
+Object.assign(BR_CAT,{prefix:{n:'Префиксный',side:'p',col:['#f0d27a','#c9902a'],xesht:1},suffix:{n:'Суффиксный',side:'s',col:['#9fe0ff','#4a7fd0'],xesht:1}});
+const BR_CAT_IDS=Object.keys(BR_CAT).filter(c=>!BR_CAT[c].xesht),BR_CAT_ALL=Object.keys(BR_CAT);
+/* усиливает ли катализатор это свойство: метка свойства или сторона (префикс / суффикс) */
+function catHits(C_,k,m){if(C_.side)return !!(m&&m.a===C_.side);return statTags(k).some(x=>C_.tags.includes(x));}
 const catSlotOk=it=>it&&['ring','amulet','belt'].includes(it.slot);
 const catCap=it=>it&&it.brRing?40:20;
 
@@ -5102,8 +5106,8 @@ function calcHook(P,g){const U=P.U,t=P.t,ov=k=>Math.max(0,P.resRaw[k]-P.pen-P.re
   if(U.u_xeshtShift){t.elemP=(t.elemP||0)+15;t.chaosP=(t.chaosP||0)+15;}
 }
 /* катализатор: множитель для свойств предмета с нужной меткой */
-function catMult(it){if(!catSlotOk(it)||!it.cq||!it.ct||!BR_CAT[it.ct])return null;const tg=BR_CAT[it.ct].tags,f=1+it.cq/100;
-  return (k,v)=>statTags(k).some(x=>tg.includes(x))?(Math.abs(v)<5?Math.round(v*f*10)/10:R(v*f)):v;}
+function catMult(it){if(!catSlotOk(it)||!it.cq||!it.ct||!BR_CAT[it.ct])return null;const C_=BR_CAT[it.ct],f=1+it.cq/100;
+  return (k,v,m)=>catHits(C_,k,m)?(Math.abs(v)<5?Math.round(v*f*10)/10:R(v*f)):v;}
 
 /* ---------- попадания героя: эффекты уникальных предметов ---------- */
 function onHeroHit(sk,e,P,r){const U=P.U,others=()=>alive().filter(o=>o!==e&&o.d===e.d&&!o.boss);
@@ -5149,6 +5153,7 @@ function brSpawn(){const b=C.br;if(!b||!b.on||b.lordOut)return;
   if(n)logF(`Из Разлома выходят ${n}`);}
 function onKillHook(e,P){
   brCorpseKeep(e);
+  if(C.br&&C.br.hands)C.br.hands.forEach(h=>{if(h.d===e.d)h.kills=(h.kills||0)+1;});
   if(e.br&&C.br&&C.br.on){const b=C.br;b.kills++;b.prog++;BRS().kills++;if(!b.frozenT)b.turns=Math.min(BRC.cap,b.turns+BRC.perKill);
     if(b.prog>=BRC.lvlKills&&b.lvl<BRC.maxLvl){b.lvl++;b.prog=0;logC(`<b style="color:${BR_LORDS[b.lord].col}">Разлом расширяется: уровень ${b.lvl}</b>`);}
     if(C.I.brD&&!b.lordOut&&b.kills>=BRC.domKills)brLordSpawn();}
@@ -5175,7 +5180,7 @@ function brClose(){const b=C.br;if(!b||!b.on)return;b.on=false;
 }
 /* Сжатая рука: открывается, если на её линии нет врагов */
 function brClasp(uid){const b=C&&C.br;if(!b||C.busy)return;const h=b.hands.find(x=>x.uid===uid);if(!h)return;
-  if(alive().some(e=>e.d===h.d)){toast('Рядом враги: сначала очистите эту линию');return;}
+  if((h.kills||0)<BRC.claspKills){toast(`Убейте ещё ${BRC.claspKills-(h.kills||0)} врагов на этой линии`);return;}
   b.hands=b.hands.filter(x=>x!==h);const n=ri(3,5),B=BRS();B.sh[b.lord]=(B.sh[b.lord]||0)+n;b.handGot+=n;
   let extra='';if(roll(10)){const c=pick(BR_CAT_IDS);B.cat[c]=(B.cat[c]||0)+1;extra=`, катализатор: ${BR_CAT[c].n}`;C.loot.push({name:`Катализатор: ${BR_CAT[c].n}`,g:1});}
   logC(`Сжатая рука: +${n} осколков ${BR_LORDS[b.lord].gen}${extra}`);save();render();}
@@ -5207,6 +5212,7 @@ function brLordLoot(e){const l=e.brLord,B=BRS();B.done[l]=(B.done[l]||0)+1;
   if(l==='xesht2'){B.done.xesht=(B.done.xesht||0)+1;addLoot(brMakeRing());const pool=shuffle(BR_UNIQ.filter(u=>u.br==='xesht').slice()),k=roll(35)?2:1;
     pool.slice(0,k).forEach(u=>{const it=brMakeUnique(u);addLoot(it);logC(`Уникальный предмет Ксешта: <span class="r-unique">${esc(it.name)}</span>`);});
     for(let i=0;i<4;i++){const c=pick(BR_CAT_IDS);B.cat[c]=(B.cat[c]||0)+1;}C.loot.push({name:'Катализаторы ×4',g:1});
+    const xs=ri(1,2);for(let i=0;i<xs;i++){const c=pick(['prefix','suffix']);B.cat[c]=(B.cat[c]||0)+1;C.loot.push({name:`${BR_CAT[c].n} катализатор`,g:1});}
     logC('<span class="r-unique">Ксешт повержен окончательно: Кольцо Разлома</span>');return;}
   const pool=BR_UNIQ.filter(u=>u.br===l&&!u.blessed),u=brMakeUnique(pick(pool));addLoot(u);logC(`Уникальный предмет Разлома: <span class="r-unique">${esc(u.name)}</span>`);
   if(roll(35)){B.bl[l]=(B.bl[l]||0)+1;C.loot.push({name:`Благословение ${BR_LORDS[l].gen}`,g:1});logC(`<span class="r-unique">Благословение ${BR_LORDS[l].gen}</span>`);}
@@ -6130,7 +6136,7 @@ function vItems(){
   const cnt=k=>k==='cur'?Object.values(S.cur).reduce((a,b)=>a+b,0):S.inv.filter(x=>INV_TABS.find(t=>t[0]===k)[2].includes(x.slot)).length;
   let list='';
   if(invTab==='cur'){list=`<div class="list">${ORB_IDS.map(k=>`<div class="orb"><span class="orbi"></span><span class="gt"><b class="r-cur">${ORBS[k].n} <span class="num">×${S.cur[k]||0}</span></b><small>${ORBS[k].d}</small></span></div>`).join('')}</div>
-    <p class="dim small" style="margin:8px 0 0">Сферы выпадают с монстров: чем больше свойств у монстра, тем выше шанс. Примените сферу в карточке предмета.</p>`;}
+    <p class="dim small" style="margin:8px 0 0">Сферы выпадают с монстров: чем больше свойств у монстра, тем выше шанс. Примените сферу в карточке предмета.</p>${typeof brCurHtml==='function'?brCurHtml():''}`;}
   else{const T=INV_TABS.find(t=>t[0]===invTab),items=sortInv(S.inv.filter(x=>T[2].includes(x.slot)));
     list=`<div class="bag">${items.map(x=>irow(x,'itemInv')).join('')||'<span class="dim">Пусто</span>'}</div>`;}
   return `<div class="stack">
@@ -7164,14 +7170,14 @@ function breachFieldHtml(){if(!C)return '';let h='';
       <small class="dim">Убито ${b.kills}${C.I.brD&&!b.lordOut?` / ${BRC.domKills} до владыки`:''} · каждое убийство +1 ход (до ${BRC.cap}) · всего не больше ${C.I.brD?BRC.domTotal:BRC.total} ходов, прошло ${b.elapsed}${b.lvl>=BRC.handLvl?' · Сжатые руки открыты':''}</small></div>`;}
   return h;}
 function breachLaneHtml(d){const b=C&&C.br;if(!b||!b.on)return '';
-  return b.hands.filter(x=>x.d===d).map(x=>{const blocked=alive().some(e=>e.d===d);
-    return `<button class="brclasp ${blocked?'off':''}" data-a="brClasp" data-u="${x.uid}" ${C.busy?'disabled':''}><b>✊ Сжатая рука</b><small>${blocked?'на линии враги':'осколки · без хода'}</small></button>`;}).join('');}
+  return b.hands.filter(x=>x.d===d).map(x=>{const k=Math.min(x.kills||0,BRC.claspKills),blocked=k<BRC.claspKills;
+    return `<button class="brclasp ${blocked?'off':''}" data-a="brClasp" data-u="${x.uid}" ${C.busy?'disabled':''}><b>✊ Сжатая рука · ${k}/${BRC.claspKills}</b><small>${blocked?'убейте врагов на этой линии':'осколки · без хода'}</small></button>`;}).join('');}
 
 
 /* значок катализатора: кристалл цвета метки в бордовой рамке на бордовой кучке песка */
 function catSvg(c,sz){const C_=BR_CAT[c];if(!C_)return '';const col=t=>(MTAGS.find(x=>x[0]===t)||[0,0,'#ccc'])[2];
-  const ic=(MTAGS.find(x=>x[0]===C_.tags[0])||[0,0,0,''])[3];
-  const a=col(C_.tags[0]),b=col(C_.tags[C_.tags.length-1]),gid='cg'+c+(sz||32),sid='cs'+c+(sz||32);
+  const ic=C_.side?FOS_IC[C_.side==='p'?'pre':'suf']:(MTAGS.find(x=>x[0]===C_.tags[0])||[0,0,0,''])[3];
+  const a=C_.col?C_.col[0]:col(C_.tags[0]),b=C_.col?C_.col[1]:col(C_.tags[C_.tags.length-1]),gid='cg'+c+(sz||32),sid='cs'+c+(sz||32);
   const grains=[[9,25.5],[12,24.2],[15,25.8],[18,24.4],[21,25.6],[24,24.8],[13.5,26.6],[19.5,26.4]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r=".55" fill="#d9707a" fill-opacity=".55"/>`).join('');
   return `<svg class="catic" viewBox="0 0 32 32" width="${sz||32}" height="${sz||32}" aria-hidden="true"><defs>
     <linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset=".25" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient>
@@ -7199,7 +7205,7 @@ function breachPanel(){const B=BRS();let h='';
         <div class="dim small" style="margin:6px 0">Добыча: ${BR_UNIQ.filter(u=>u.br===l&&!u.blessed).map(u=>`<span class="r-unique">${u.n}</span>`).join(', ')}</div>
         <div class="row" style="gap:6px"><button class="btn sm" data-a="brStone" data-l="${l}" ${sh>=BRC.shardsStone?'':'disabled'}>Собрать камень</button><button class="btn sm ${st?'pri':''}" data-a="brDom" data-l="${l}" ${st&&!S.mapRun?'':'disabled'}>Войти во владения</button></div></div>`;}).join('');
     const all=BR_IDS.every(l=>B.st[l]>0);
-    h+=`<div class="pinbox" style="border-color:#e0c080"><b style="font-family:var(--ff-d);font-size:16px">Ксешт, Мы Едины</b><p class="dim small" style="margin:2px 0 6px">${MONS.br_xesht.hint} Здоровье 4 млн, затем вторая стадия — 2 млн. Добыча: Кольцо Разлома (качество катализаторов до 40%) и ${BR_UNIQ.filter(u=>u.br==='xesht').map(u=>`<span class="r-unique">${u.n}</span>`).join(', ')} (один, иногда два).</p>
+    h+=`<div class="pinbox" style="border-color:#e0c080"><b style="font-family:var(--ff-d);font-size:16px">Ксешт, Мы Едины</b><p class="dim small" style="margin:2px 0 6px">${MONS.br_xesht.hint} Здоровье 4,14 млн, затем вторая стадия — 2 млн. Добыча: Кольцо Разлома (качество катализаторов до 40%), префиксные и суффиксные катализаторы и ${BR_UNIQ.filter(u=>u.br==='xesht').map(u=>`<span class="r-unique">${u.n}</span>`).join(', ')} (один, иногда два).</p>
       <button class="btn full ${all?'pri':''}" data-a="brDom" data-l="xesht" ${all&&!S.mapRun?'':'disabled'}>${all?'Бросить вызов Ксешту (5 камней)':'Нужны пять разных Камней Разлома'}</button></div>`;}
   if(window.BREACH_TEST)h+=brTestPanel();
   return h;}
@@ -7212,23 +7218,42 @@ function brUInfoModal(n){const u=brU(n);if(!u)return;
     <h2 class="r-unique" style="font-size:20px">${u.n}</h2><div class="dim small">${u.poe} · ${u.slot==='weapon'?WEAP[u.wk].n:({helm:'Шлем',body:'Нательная броня',gloves:'Перчатки',boots:'Обувь',shield:'Щит',amulet:'Амулет',ring:'Кольцо',belt:'Пояс'})[u.slot]||u.slot}${u.dt?' · '+DT_N[u.dt]:''} · ${u.br==='xesht'?'Ксешт':BR_LORDS[u.br].n}${u.blessed?' · благословлённый':''}</div>
     <div class="card r-unique"><div class="bd">${rows}</div></div>${u.bless?`<p class="dim small">Благословение ${BR_LORDS[u.br].gen} → <b class="r-unique">${u.bless}</b></p>`:''}`);}
 
+/* ---------- катализаторы: описание и раздел в инвентаре ---------- */
+function brCatDesc(c){const C_=BR_CAT[c];if(!C_)return '';
+  if(C_.side)return `усиливает все ${C_.side==='p'?'префиксы':'суффиксы'} предмета (собственные свойства и ${C_.side==='p'?'суффиксы':'префиксы'} не меняются)`;
+  return `усиливает собственные свойства, префиксы и суффиксы с меткой: ${C_.tags.map(t=>MTAG_N[t]||t).join(', ')}`;}
+const _brCatStats={};
+function brCatStats(c){if(_brCatStats[c])return _brCatStats[c];const C_=BR_CAT[c],keys=new Set();
+  Object.keys(AFX_G).forEach(g=>{const G=AFX_G[g];if(G.old)return;G.st.forEach(x=>{if(x&&catHits(C_,x[0],null))keys.add((G.arr?'1':'0')+x[0]);});});
+  const names=[...new Set([...keys].map(k=>statName(k.slice(1),k[0]==='1')).filter(t=>t&&!/undefined/.test(t)))];return _brCatStats[c]=names;}
+function brCurHtml(){if(!S)return '';const B=BRS(),have=BR_CAT_ALL.filter(c=>B.cat[c]>0);
+  return `<div class="panel" style="margin-top:10px"><div class="row" style="margin-bottom:6px"><span class="eyebrow sp">Катализаторы</span><button class="btn sm ghost" data-a="brCatInfo">Подробно</button></div>
+    ${have.length?`<div class="tchips">${have.map(c=>`<span class="tchip catchip">${catSvg(c,22)}${BR_CAT[c].n} ×${B.cat[c]}</span>`).join('')}</div>`:'<span class="dim small">Катализаторов нет. Они выпадают в Разломе, префиксные и суффиксные — с Ксешта.</span>'}
+    <p class="dim small" style="margin:6px 0 0">Применяются к кольцам, амулетам и поясам в карточке предмета: +2% качества за штуку, до ${catCap({})}% (Кольцо Разлома — до 40%). Другой катализатор сбрасывает качество.</p></div>`;}
+function brCatInfoModal(){const B=BRS();
+  const rows=BR_CAT_ALL.map(c=>{const C_=BR_CAT[c];
+    const det=C_.side?`<div class="dim small">Все ${C_.side==='p'?'префиксы':'суффиксы'} предмета, какие бы ни были метки. Собственные свойства не усиливает. Выпадает только с Ксешта.</div>`
+      :`<div class="dim small">Собственные свойства, префиксы и суффиксы с метками ${C_.tags.map(t=>`${mtagIcon(t)} ${MTAG_N[t]||t}`).join(', ')}:</div><div class="small" style="margin-top:3px">${brCatStats(c).join(' · ')||'—'}</div>`;
+    return `<div class="pinbox" style="padding:8px 10px"><div class="row" style="gap:8px;flex-wrap:nowrap;justify-content:flex-start">${catSvg(c,30)}<b class="sp">${C_.n} катализатор</b><span class="num dim">×${B.cat[c]||0}</span></div>${det}</div>`;}).join('');
+  modal(`<div class="row"><span class="eyebrow sp">Катализаторы</span><button class="btn sm ghost" data-a="close">Закрыть</button></div>
+    <p class="dim small">Катализатор даёт кольцу, амулету или поясу качество: каждый процент увеличивает подходящие свойства на 1%. +2% за катализатор, предел ${catCap({})}% (Кольцо Разлома — 40%). Новый тип катализатора сбрасывает качество.</p>${rows}`);}
 /* ---------- окно предмета: благословение и катализаторы ---------- */
 {const _op=orbPanel;orbPanel=function(it){let h=_op(it);const B=BRS(),U=it&&it.brU&&brU(it.name);
   if(U&&U.bless)h+=`<div class="panel"><div class="eyebrow" style="margin-bottom:6px">Благословение ${BR_LORDS[U.br].gen}</div><p class="dim small" style="margin:0 0 6px">Превращает предмет в «${U.bless}». Есть: ${B.bl[U.br]||0}.</p><button class="btn full ${B.bl[U.br]?'pri':''}" data-a="brBless" ${B.bl[U.br]?'':'disabled'}>Благословить</button></div>`;
-  if(catSlotOk(it)){const have=BR_CAT_IDS.filter(c=>B.cat[c]>0);
+  if(catSlotOk(it)){const have=BR_CAT_ALL.filter(c=>B.cat[c]>0);
     h+=`<div class="panel"><div class="eyebrow" style="margin-bottom:6px">Катализаторы${it.ct?` · сейчас ${BR_CAT[it.ct].n} ${it.cq}%/${catCap(it)}%`:''}</div>
       ${have.length?`<div class="tchips">${have.map(c=>`<button class="tchip catchip ${it.ct===c?'on':''}" data-a="brCat" data-c="${c}">${catSvg(c,22)}${BR_CAT[c].n} ×${B.cat[c]}${it.ct&&it.ct!==c&&it.cq?' · сброс':''}</button>`).join('')}</div>`:'<span class="dim small">Катализаторов нет</span>'}</div>`;}
   return h;};}
 /* окно предмета показывает значения уже с качеством катализатора: собственные свойства, префиксы и суффиксы нужной метки */
-function brCatView(it){if(!catSlotOk(it)||!it.cq||!it.ct||!BR_CAT[it.ct])return it;const f=1+it.cq/100,tg=BR_CAT[it.ct].tags,ok=k=>statTags(k).some(x=>tg.includes(x));
+function brCatView(it){if(!catSlotOk(it)||!it.cq||!it.ct||!BR_CAT[it.ct])return it;const f=1+it.cq/100,C_=BR_CAT[it.ct];let cur=null;const ok=k=>catHits(C_,k,cur);
   const sc=(k,v)=>typeof v!=='number'||!ok(k)?v:(Math.abs(v)<5?Math.round(v*f*10)/10:R(v*f));
-  const c=JSON.parse(JSON.stringify(it));for(const k in c.imp||{})c.imp[k]=sc(k,c.imp[k]);
-  c.mods.forEach(m=>{if(m.meta)return;if(m.s){m.s=m.s.map(([k,v])=>[k,Array.isArray(v)?v.map(x=>sc(k,x)):sc(k,v)]);return;}
+  const c=JSON.parse(JSON.stringify(it));for(const k in c.imp||{})c.imp[k]=sc(k,c.imp[k]);cur=null;
+  c.mods.forEach(m=>{cur=m;if(m.meta)return;if(m.s){m.s=m.s.map(([k,v])=>[k,Array.isArray(v)?v.map(x=>sc(k,x)):sc(k,v)]);return;}
     if(isAfx(m)){const G=AFX_G[m.g];if(!G||!m.r)return;if(G.arr){if(ok(G.st[0][0]))m.r=m.r.map(x=>x*f);}else G.st.forEach((st,i)=>{if(st&&ok(st[0])&&m.r[i]!=null)m.r[i]*=f;});return;}
     if(m.k!=null)m.v=Array.isArray(m.v)?m.v.map(x=>sc(m.k,x)):sc(m.k,m.v);});
   return c;}
 {const _il=itemLines;itemLines=function(it){let h=_il(brCatView(it));
-  if(it&&it.ct&&BR_CAT[it.ct]&&it.cq)h=`<div class="num">Качество (${BR_CAT[it.ct].n}): <span class="qv">+${it.cq}%</span> <span class="dim small">усиливает собственные свойства, префиксы и суффиксы с меткой: ${BR_CAT[it.ct].tags.map(t=>MTAG_N[t]||t).join(', ')} (значения ниже уже с качеством)</span></div>`+h;
+  if(it&&it.ct&&BR_CAT[it.ct]&&it.cq)h=`<div class="num">Качество (${BR_CAT[it.ct].n}): <span class="qv">+${it.cq}%</span> <span class="dim small">${brCatDesc(it.ct)} (значения ниже уже с качеством)</span></div>`+h;
   if(it&&it.brRing)h+=`<div class="dim small" style="margin-top:4px">Кольцо Разлома: катализаторы до 40% качества</div>`;
   if(it&&it.brU){const U=brU(it.name);if(U)h+=`<div class="dim small" style="margin-top:4px">Предмет Разлома · ${U.br==='xesht'?'Ксешт':BR_LORDS[U.br].n}${U.blessed?' · благословлённый':''}</div>`;}
   return h;};}
@@ -7241,7 +7266,7 @@ const curItem=()=>{const w=window._item;return w&&(w.where==='inv'?S.inv.find(x=
 Object.assign(ACT,{
   brOpen(){brOpen();},brClasp(d){brClasp(d.u);},brTab(d){brTab=d.t;render();},
   brStone(d){if(brMakeStone(d.l)){toast(`Камень Разлома ${BR_LORDS[d.l].gen} собран`);render();}},
-  brDom(d){brStartDomain(d.l);},brUInfo(d){brUInfoModal(d.n);},
+  brDom(d){brStartDomain(d.l);},brUInfo(d){brUInfoModal(d.n);},brCatInfo(){brCatInfoModal();},
   brBless(){const w=window._item,it=curItem();if(!it)return;const n=brBless(it);if(n){if(w.where==='inv')openItem('inv',n.uid);else openItem(w.where,w.key);}},
   brCat(d){const w=window._item,it=curItem();if(!it)return;if(brCatalyst(it,d.c))openItem(w.where,w.key);},
   brT(d){brTestAct(d.k,d);},
@@ -7263,7 +7288,7 @@ function brTestAct(k,d){if(!window.BREACH_TEST)return;const B=BRS();
   if(k==='god'){S.brGod=!S.brGod;save();render();return;}
   if(k==='force'){window.BR_FORCE=!window.BR_FORCE;try{localStorage.setItem('izg_br_force',window.BR_FORCE?'1':'');}catch(e){}render();return;}
   if(k==='map'){if(S.mapRun){toast('Сначала закончите карту');return;}window.BR_FORCE=true;S.maps[16]=(S.maps[16]||0)+1;startMap(16);return;}
-  if(k==='res'){BR_IDS.forEach(l=>{B.sh[l]=(B.sh[l]||0)+300;B.st[l]=(B.st[l]||0)+2;B.bl[l]=(B.bl[l]||0)+3;});BR_CAT_IDS.forEach(c=>B.cat[c]=(B.cat[c]||0)+10);save();render();toast('Ресурсы Разлома добавлены');return;}
+  if(k==='res'){BR_IDS.forEach(l=>{B.sh[l]=(B.sh[l]||0)+300;B.st[l]=(B.st[l]||0)+2;B.bl[l]=(B.bl[l]||0)+3;});BR_CAT_ALL.forEach(c=>B.cat[c]=(B.cat[c]||0)+10);save();render();toast('Ресурсы Разлома добавлены');return;}
   if(k==='uniq'){BR_UNIQ.forEach(u=>S.inv.push(brMakeUnique(u)));S.inv.push(brMakeRing());save();render();toast(`В сумке ${BR_UNIQ.length+1} предметов`);return;}
   if(k==='char'){brTestChar(d.c);screen='main';tab='map';render();return;}
 }
@@ -7310,7 +7335,7 @@ function brTestChar(cls){
     if(ok&&v>brSkillScore(calc(),0)*1.03){S.auras[ai]=g.uid;ai++;}else S.gems=S.gems.filter(x=>x!==g);}
   /* ресурсы */
   ['chaos','exalt','divine','alch','regal','scour','annul','alt','aug','trans','whet','scrap'].forEach(k=>S.cur[k]=50);S.maps[16]=5;
-  const B=BRS();BR_IDS.forEach(l=>{B.sh[l]=120;B.st[l]=1;B.bl[l]=1;});BR_CAT_IDS.forEach(x=>B.cat[x]=4);
+  const B=BRS();BR_IDS.forEach(l=>{B.sh[l]=120;B.st[l]=1;B.bl[l]=1;});BR_CAT_ALL.forEach(x=>B.cat[x]=4);
   S.cb={order:[0,1,2,3],hide:{},mv:{0:1,b:1}};
   S.brGod=true;save();toast(`Тестовый персонаж готов: ${GEMS[main.id].n}`);}
 /* стили Разлома — только в тестовой сборке */
