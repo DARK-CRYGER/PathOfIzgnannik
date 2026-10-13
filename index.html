@@ -3299,7 +3299,7 @@ async function useOnOrb(sk,P,ob,oh,i){
 function leechLife(h,P){const room=P.life-C.hp;
   if(P.keys.has('vaal')&&h>room){C.hp=P.life;C.blood=Math.min(P.life*.25,(C.blood||0)+h-Math.max(0,room));}
   else C.hp=Math.min(P.life,C.hp+h);}
-function heroActed(sk,P){C.stunImm=false;
+function heroActed(sk,P){C.stunImm=false;C.rOpen=true;
   if(sk.type==='spell'){C.spellTurns=(C.lastSpell===C.turn-1?C.spellTurns:0)+1;C.lastSpell=C.turn;if(P.t.powEvery2Spell&&C.spellTurns%2===0)gainCharge('pow',P);}
   if(P.t.mrecover&&roll(P.t.mrecover))C.mana=Math.min(P.mana,C.mana+Math.max(P.manaMax,1)*.1);}
 /* проклятие тратит ход и действует на цель и соседние дистанции; метка не тратит ход */
@@ -3324,6 +3324,7 @@ async function move(dir){
   if(!C||C.busy||C.over)return;
   const P=calc();
   if(dir>0&&alive().every(e=>e.d>=3)){toast('Дальше отступать некуда');return;}
+  C.rOpen=true;
   if(dir<0&&alive().every(e=>e.d<=0)){toast('Враги уже вплотную');return;}
   C.busy=true;haptic('light');
   shiftAll(dir);C.moved=true;
@@ -3627,21 +3628,22 @@ function endRound(P){
   if(P.rage&&!P.U.u_rage&&!P.keys.has('k_chief_ramako'))C.rage=Math.max(0,C.rage-2);
   if(typeof onEndRound==='function')onEndRound(P);
   C.hitLast=C.hitThis;C.hitThis=false;C.hitThisPrev=false;C.moved=false;
-  C.turn++;
+  C.turn++;C.rOpen=false;
 }
 
 /* ---- итог волны и боя ---- */
 let pendingReward=null;
 async function waveCleared(){
   if(typeof onBeforeWaveClear==='function'&&onBeforeWaveClear())return;
+  /* ход, в котором герой добил волну, завершается как обычный: идут все счётчики ходов (приспешники, тотемы, баффы, заряды, восстановление) */
+  if(C.rOpen){const P0=calc();if(C.wave<C.waves){endRound(P0);if(C.hp<=0&&!heroSave(P0)){C.busy=false;await death();return;}}else{C.rOpen=false;minionTick();}}
   C.busy=true;save();
   if(C.wave<C.waves){logC(`<b class="gold-t">Волна ${C.wave} зачищена</b>`);render();await sleep(700);if(!C||C.over)return;
     const P=calc();
-    /* ход, в котором добита волна, тоже восстанавливает ману, здоровье и щит, плюс передышка между волнами */
-    regenTick(P);C.mana=Math.min(P.mana,C.mana+P.mana*.15);
+    /* передышка между волнами */
+    C.mana=Math.min(P.mana,C.mana+P.mana*.15);
     if(P.t.ex_waveHeal){C.hp=Math.min(P.life,C.hp+P.life*P.t.ex_waveHeal/100);C.mana=Math.min(P.mana,C.mana+P.mana*P.t.ex_waveHeal/100);}
     if(P.t.ex_flaskWave)C.fl.forEach(f=>{if(!f)return;const st=flaskStats(S.equip[f.slot],P);f.ch=Math.min(st.max,f.ch+P.t.ex_flaskWave);});
-    C.fb.forEach(b=>b.turns--);C.fb=C.fb.filter(b=>b.turns>0);
     if(C.ev&&C.ev.fight){if(evWaveDone())return;}
     if(C.I.mine){if(mineWaveDone())return;}
     else if(C.I.map&&!C.I.pin&&!C.evDone&&roll(EVENT_CH)){C.evDone=1;offerEvent();return;}
