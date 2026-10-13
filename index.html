@@ -5156,7 +5156,7 @@ function onKillHook(e,P){
   if(P.U.u_powFrozen&&e.st&&e.st.frozen)gainCharge('pow',P);
 }
 function onEndRound(P){
-  C.movedPrev=C.moved;
+  C.brActed=false;C.movedPrev=C.moved;
   if(C.flaskFrz>0)C.flaskFrz--;if(C.veil>0)C.veil--;
   const b=C.br;if(!b||!b.on)return;
   if(!b.frozenT){b.turns-=1;b.elapsed++;}
@@ -5182,7 +5182,13 @@ function brClasp(uid){const b=C&&C.br;if(!b||C.busy)return;const h=b.hands.find(
 /* волна не заканчивается, пока Разлом открыт: сразу выходят новые монстры */
 function onBeforeWaveClear(){const b=C&&C.br;if(!b||!b.on)return false;
   if(b.lordOut&&b.frozenT){/* владыка повержен — Разлом закрывается */brClose();return false;}
+  /* поле зачищено действием героя: ход всё равно заканчивается — счёт ходов Разлома, восстановление маны и здоровья, эффекты */
+  if(C.brActed){const P=calc();endRound(P);if(C.hp<=0){C.busy=false;death();return true;}}
+  if(!b.on)return false;
   brSpawn();if(!alive().length)return false;C.busy=false;render();if(C.auto)scheduleAuto();return true;}
+/* герой действовал в этом ходу (умение, атака, шаг) — значит, конец хода ещё не наступил */
+{const _ha=heroActed;heroActed=function(sk,P){if(C)C.brActed=true;return _ha(sk,P);};}
+{const _mv2=move;move=async function(dir){if(C)C.brActed=true;return _mv2(dir);};}
 
 /* ---------- владения владыки ---------- */
 function breachInfo(m){const L=BR_LORDS[m.brD]||{dom:'Ксешт',n:'Ксешт'};
