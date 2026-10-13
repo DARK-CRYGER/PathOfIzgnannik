@@ -2681,8 +2681,8 @@ const shopRefreshCost=()=>R(20+S.lvl*6);
    ОПЫТ
    ========================================================= */
 function gainXp(x){
-  if(S.lvl>=MAXLVL)return;
-  S.xp+=x;
+  /* на максимальном уровне опыт героя не копится, но камни продолжают расти */
+  if(S.lvl<MAXLVL)S.xp+=x;
   while(S.lvl<MAXLVL&&S.xp>=xpNeed(S.lvl)){S.xp-=xpNeed(S.lvl);S.lvl++;notifyH();
     const msgs=[`Уровень ${S.lvl}! +1 очко древа`];
     SKILL_SLOTS.forEach((s,i)=>{if(s[0]===S.lvl)msgs.push(`открыто умение ${i+1}`);else if(s.slice(1).includes(S.lvl))msgs.push(`новое гнездо в умении ${i+1}`);});
