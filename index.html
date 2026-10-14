@@ -578,11 +578,11 @@ const ATTR_GROW=.4, ATTR_NODE=8;
 const CLASSES={
   duelist:{n:'Дуэлянт',attr:[24,24,10],weapon:'sword',dt:'armour',gem:'cleave',sup:'s_leech',
     lore:'Бывший чемпион арены. Клинок, вампиризм и выпады в гущу врагов.',
-    list:['cleave','heavy','leap','flicker','lstrike','viper','cyclone','dstrike','sunder','split','barrage','escape','vuln','warlord','assassin','bloodrage'],
+    list:['cleave','heavy','leap','flicker','lstrike','viper','cyclone','dstrike','sunder','split','barrage','escape','vuln','warlord','assassin','bloodrage','concoct'],
     auras:['pride','determination','grace','precision','hatred','heraldAsh','haste','malevolence']},
   shadow:{n:'Бандит',attr:[10,24,24],weapon:'dagger',off:'dagger',dt:'eva',gem:'viper',sup:'s_poison',
     lore:'Вор и отравитель. Яды, хаос, молнии и смертельные криты.',
-    list:['viper','dstrike','lstrike','leap','caustic','larrow','escape','bloodrage','spark','arc','blight','edrain','ethknives','flamedash','despair','eweak','tchains','assassin','poacher'],
+    list:['viper','dstrike','lstrike','leap','caustic','larrow','escape','bloodrage','spark','arc','blight','edrain','ethknives','flamedash','despair','eweak','tchains','assassin','poacher','concoct','toxrain'],
     auras:['hatred','precision','grace','clarity','discipline','wrath','malevolence','haste','heraldThunder']},
   marauder:{n:'Дикарь',attr:[36,11,11],weapon:'axe2',dt:'armour',gem:'heavy',sup:'s_mpd',
     lore:'Варвар северных племён. Броня, здоровье и сокрушительные удары вплотную.',
@@ -594,7 +594,7 @@ const CLASSES={
     auras:['discipline','clarity','anger','hatred','wrath','zealotry','malevolence','heraldIce','heraldThunder','arctic']},
   ranger:{n:'Охотница',attr:[11,36,11],weapon:'bow',off:'quiver',dt:'eva',gem:'split',sup:'s_vicious',
     lore:'Следопыт пограничных лесов. Лук, уклонение и бой на расстоянии.',
-    list:['split','iceshot','barrage','rain','caustic','larrow','escape','bloodrage','tornado','galvanic','explosive','snipe','shrapnel','tchains','sniper','poacher'],
+    list:['split','iceshot','barrage','rain','caustic','larrow','escape','bloodrage','tornado','galvanic','explosive','snipe','shrapnel','tchains','sniper','poacher','toxrain','concoct'],
     auras:['grace','hatred','precision','purity','clarity','haste','heraldIce','heraldThunder','malevolence']},
   templar:{n:'Жрец',attr:[24,10,24],weapon:'sceptre',off:'shield',dt:'armour',mana:1,gem:'arc',sup:'s_alight',
     lore:'Отступник церкви. Стихии, ауры, стойкость в ближнем бою и молитвы на расстоянии.',
@@ -602,7 +602,7 @@ const CLASSES={
     auras:['anger','wrath','zealotry','purity','determination','vitality','discipline','heraldAsh','heraldThunder','malevolence']},
   scion:{n:'Дворянка',attr:[20,20,20],weapon:'staff',dt:'armour',gem:'spark',sup:'s_insp',
     lore:'Наследница опального рода. Начинает в центре древа и может пойти в любую ветвь.',
-    list:['heavy','cleave','cyclone','leap','flicker','split','bloodrage','sk_warrior','absol','iceshot','tornado','explosive','escape','spark','fireball','pulse','icespear','flamedash','eweak','vuln','tchains','sniper','assassin'],
+    list:['heavy','cleave','cyclone','leap','flicker','split','bloodrage','sk_warrior','absol','iceshot','tornado','explosive','escape','spark','fireball','pulse','icespear','flamedash','eweak','vuln','tchains','sniper','assassin','toxrain','concoct'],
     auras:['anger','hatred','wrath','clarity','grace','determination','haste','malevolence']},
 };
 const CLASS_ORDER=['duelist','shadow','marauder','witch','ranger','templar','scion'];
@@ -5778,8 +5778,8 @@ Object.assign(GEMS,{
 });
 ['toxrain','concoct'].forEach(id=>{if(!ACTIVE_IDS.includes(id))ACTIVE_IDS.push(id);});
 ['s_unbound','s_swift','s_efficacy','s_wither','s_void','s_csa'].forEach(id=>{if(!SUPPORT_IDS.includes(id))SUPPORT_IDS.push(id);});
-[['ranger',['toxrain','concoct']],['shadow',['concoct','toxrain']],['scion',['toxrain','concoct']],['duelist',['concoct']]]
-  .forEach(([c,l])=>l.forEach(id=>{if(!CLASSES[c].list.includes(id))CLASSES[c].list.push(id);}));
+/* умения кампании по классам — в CLASSES (2_data.js): Токсичный дождь — Охотница, Бандит, Дворянка; смесь — они же и Дуэлянт.
+   Поддержки в кампании доступны всем классам (allowed). */
 
 /* ---------- усиление умений хаоса ---------- */
 {const g=GEMS;
