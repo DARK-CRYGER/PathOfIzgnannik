@@ -860,8 +860,8 @@ const AURAS={
     e:(L,f)=>`Регенерация ${((1+L*.08)*f).toFixed(1)}% здоровья за ход`,ap(t,L,f){t.regen=(t.regen||0)+(1+L*.08)*f}},
   clarity:{n:'Ясность',c:'int',res:10,rl:4,d:'Восстановление маны каждый ход.',
     e:(L,f)=>`+${R((3+L*1.5)*f)} маны за ход`,ap(t,L,f){t.mreg=(t.mreg||0)+(3+L*1.5)*f}},
-  precision:{n:'Точность',c:'dex',res:15,rl:4,d:'Повышает шанс критического удара.',
-    e:(L,f)=>`+${R((20+3*L)*f)}% к шансу крит. удара`,ap(t,L,f){t.critP=(t.critP||0)+(20+3*L)*f}},
+  precision:{n:'Точность',c:'dex',res:15,rl:4,d:'Повышает меткость и шанс критического удара.',
+    e:(L,f)=>`+${R((40+20*L)*f)} к меткости, +${R((20+3*L)*f)}% к шансу крит. удара`,ap(t,L,f){t.acc=(t.acc||0)+(40+20*L)*f;t.critP=(t.critP||0)+(20+3*L)*f}},
   purity:{n:'Чистота стихий',c:'int',res:25,rl:16,d:'Повышает сопротивление огню, холоду и молнии.',
     e:(L,f)=>`+${R((12+L*.6)*f)}% ко всем сопротивлениям`,ap(t,L,f){t.resAll=(t.resAll||0)+(12+L*.6)*f}},
   pride:{n:'Гордыня',c:'str',res:30,rl:16,d:'Враги вплотную к вам получают больше урона.',
@@ -1873,7 +1873,7 @@ SKILL_WEAPON.totem=w=>true;SKILL_WEAPON_N.totem='любое оружие';
 /* живые тотемы на поле */
 const totems=()=>(C&&C.totems||[]).filter(t=>t.hp>0);
 /* сколько тотемов умения можно держать одновременно */
-function totemLimit(sk,P){if(sk.ballistaSk)return Math.max(1,3-(sk.focused?1:0));return Math.max(1,P.totemMax+(sk.mtot?2:0));}
+function totemLimit(sk,P){if(sk.ballistaSk)return Math.max(1,3-(sk.focused?1:0)+(sk.mtot?2:0));return Math.max(1,P.totemMax+(sk.mtot?2:0));}
 /* поставить тотем умения sk на dur ходов (лишний самый старый исчезает) */
 function placeTotem(sk,P,dur){
   const L=sk.lvl,G=GEMS[sk.gid];C.totems=C.totems||[];
@@ -1907,6 +1907,8 @@ async function totemPhase(P){
     const H=totemHits(sk,P);
     for(const h of H){if(h.e.hp<=0)continue;const r=dealHit(sk,h.e,h.m,h.proj,P);dealt+=r.total;
       if(P.t.totemLeech&&r.parts&&r.parts.phys&&!P.keys.has('vaal'))C.hp=Math.min(P.life,C.hp+r.parts.phys*P.t.totemLeech/100);}
+    /* после выстрела тотема — те же эффекты, что у героя (споры Токсичного дождя на линии цели) */
+    if(H.length&&typeof skillAfter==='function')skillAfter(sk,P,H[0].e);
   }
   if(dealt)C.log.push(`Тотемы: ${fmt(dealt)} урона`);render();await sleep(150);
 }
@@ -4851,7 +4853,7 @@ function dummySim(i,preset,d,o){
           if(sk.type==='attack'&&x.parts.phys>0&&sk.ail.bleed){const c=clamp(sk.ail.bleed,0,100)/100;dot+=c*x.parts.phys*BLD_R*sk.bleedMore*sk.bleedDur/H.length;}}}
     }
     /* споры Токсичного дождя: каждая стрела оставляет спору на 3 хода */
-    if(sk.fn==='toxrain'&&typeof podDot==='function')dot+=(sk.n+sk.extra)*podDot(sk)*3*N*(1-pr.ch/100);
+    if(sk.fn==='toxrain'&&typeof podDot==='function')dot+=Math.min(POD_MAX,3*(sk.n+sk.extra))*podDot(sk)*N*(1-pr.ch/100);/* при применении каждый ход на поле держится до POD_MAX спор */
     const hc=sk.type==='attack'?hitChance(P,e.eva):1;sum*=hc;dot*=hc;for(const k in parts)parts[k]*=hc;crits*=hc;
     const hx=hexOn(e);dot*=1+(hx.dotT||0)/100;
     const res={name:sk.name,perCast:sum/N,perHit:hits?sum/(hits*hc):0,hitsPerCast:hits/N,critRate:hits?crits/hits:0,dot:dot/N,parts:{},
@@ -5757,7 +5759,7 @@ function brCorpseKeep(e){if(!e.br||!C)return;C.brKept=C.brKept||{};
 /* сколько спор может лежать на поле одновременно */
 const POD_MAX=8;
 /* доля урона стрелы, которую спора наносит хаосом каждый ход */
-const POD_K=.2;
+const POD_K=.3;
 /* урон споры за ход: средний урон стрелы до защиты × доля × множители урона со временем */
 function podDot(sk){let s=0;for(const el in sk.dmg)s+=(sk.dmg[el][0]+sk.dmg[el][1])/2;return s*POD_K*(sk.chaosDotMore||1);}
 /* положить n спор на линию d */
@@ -5806,14 +5808,19 @@ function skillAfter(sk,P,tgt){
 /* ---------- новые активные умения ---------- */
 Object.assign(GEMS,{
   toxrain:{n:'Токсичный дождь',c:'dex',cat:'ranged',rl:12,tags:['attack','proj','area','chaos','duration','bow'],fn:'toxrain',rng:'Линия цели: 3 стрелы и споры',
-    d:'Стрелы взмывают вверх и падают на линию цели: 3 стрелы по 45% урона по врагам на линии (дополнительные снаряды — ещё стрелы). Каждая стрела оставляет спору на 3 хода: каждый ход спора наносит 20% урона стрелы хаосом со временем всем врагам на линии и замедляет их. Урон спор складывается (до 8 спор на поле) и усиливается всем, что усиливает урон хаосом и урон со временем.',
-    make(o,L){o.mult=atkM(.45,L);o.cost=8;o.n=3;}},
+    d:'Стрелы взмывают вверх и падают на линию цели: 3 стрелы по 50% урона по врагам на линии (дополнительные снаряды — ещё стрелы). Каждая стрела оставляет спору на 3 хода: каждый ход спора наносит 30% урона стрелы хаосом со временем всем врагам на линии и замедляет их. Урон спор складывается (до 8 спор на поле) и усиливается всем, что усиливает урон хаосом и урон со временем.',
+    make(o,L){o.mult=atkM(.5,L);o.cost=8;o.n=3;}},
   concoct:{n:'Отскакивающая ядовитая смесь',c:'dex',cat:'ranged',rl:8,noWeapon:1,anyW:1,emptyMain:1,ownBase:[.7,1.35],ownCrit:7,flaskDmg:1,tags:['attack','proj','area','phys','chaos'],fn:'concoct',rng:'Линия цели и 2 линии дальше',
     d:'Атака без оружия: слот основного оружия должен быть пустым, во второй руке — только щит или ничего. Бросает флакон с ядом, урон не зависит от оружия: небольшой физический урон броска и урон хаосом — доля здоровья, которое восстанавливает флакон здоровья (6% на 1 ур. камня, 18% на 20 ур.; берётся флакон, из которого тратятся заряды). Флакон взрывается на линии цели и отскакивает ещё на 2 линии дальше, каждый взрыв — на 20% слабее. +60% к шансу отравить. Тратит 3 заряда флакона здоровья вместо части маны.',
     make(o,L){o.mult=atkM(1,L);o.cost=3;o.ail.poison+=60;o.flaskCh=3;}},
 });
 /* поле flaskCh переносится в умение */
-{const _bs=buildSkill;buildSkill=function(o,A,P,L){const sk=_bs(o,A,P,L);if(o.flaskCh)sk.flaskCh=o.flaskCh;return sk;};}
+{const _bs=buildSkill;buildSkill=function(o,A,P,L){const sk=_bs(o,A,P,L);if(o.flaskCh)sk.flaskCh=o.flaskCh;
+  /* Токсичный дождь: за применение — все стрелы и урон спор за 3 хода (для подсказок и выбора умения автобоем) */
+  if(sk.fn==='toxrain'){const n=(sk.n||1)+(sk.extra||0);sk.avgUse=sk.avg*n+Math.min(POD_MAX,3*n)*podDot(sk);/* споры живут 3 хода, на поле не больше POD_MAX */}
+  return sk;};}
+/* автобой: Токсичный дождь бьёт всеми стрелами и оставляет споры */
+{const _hg=hitsGuess;hitsGuess=function(sk,P){if(sk.fn==='toxrain'){const n=(sk.n||1)+(sk.extra||0);return n*.8+Math.min(POD_MAX,3*n)*POD_K*.6;}return _hg(sk,P);};}
 /* смесь требует пустой слот основного оружия; во второй руке — только щит */
 {const _sc=calcSkill;calcSkill=function(i,P){const sk=_sc(i,P);const g=sk&&S.skills[i]&&gem(S.skills[i].a);if(sk&&g&&GEMS[g.id]&&GEMS[g.id].emptyMain&&!sk.bad){if(S.equip.weapon)sk.bad='Снимите оружие из основной руки';else if(S.equip.offhand&&S.equip.offhand.slot!=='shield')sk.bad='Во второй руке можно держать только щит';}return sk;};}
 SKILL_WEAPON_N.ranged_any='любое оружие';
