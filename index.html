@@ -544,6 +544,15 @@ button.sigil{padding:0;cursor:pointer;color:var(--gold2)}
 .cur-t{color:#c8b98a}.gem-t{color:#7fbf9a}
 .mklot{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;background:var(--panel,#1d1713);border:1px solid var(--line,#3a2f26);color:inherit;padding:8px 10px;font:inherit;cursor:pointer;min-width:0}
 .mklot .mkrow{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}.mklot .mkrow>span{min-width:0;overflow-wrap:anywhere}.mklot .mkrow b{white-space:nowrap;margin-left:auto}
+/* коллекция уникальных в тайнике: ячейка под каждый уникальный; пустая — тусклая */
+.uqbar{height:6px;background:var(--line2);margin-top:6px;position:relative}.uqbar i{position:absolute;inset:0 auto 0 0;background:var(--r-unique)}
+.uqsec{margin:12px 0 6px}
+.uqgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:5px}
+.uqcell{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;background:var(--panel);border:1px dashed var(--line2);padding:6px 8px;min-height:44px;color:var(--muted);opacity:.45;font:inherit;cursor:pointer;min-width:0}
+.uqcell b{font-weight:600;font-size:13px;line-height:1.2;overflow-wrap:anywhere}.uqcell small{font-size:11px;opacity:.8}
+.uqcell.on{opacity:1;border:1px solid var(--r-unique);color:var(--r-unique);background:linear-gradient(#2a1c12,var(--panel))}.uqcell.on small{color:var(--muted)}
+.uqcell:focus-visible{outline:2px solid var(--gold2,#e6c57a)}
+.uqghost{opacity:.55;filter:grayscale(.4)}
 
 </style>
 </head><body>
@@ -933,7 +942,7 @@ const MONS={
 /* свойства монстров: синие (1) и жёлтые (2–3). Каждое свойство увеличивает награды */
 const ELITE_MODS=[{id:'swift',n:'Быстрый'},{id:'stone',n:'Каменнокожий'},{id:'vamp',n:'Вампирический'},{id:'brutal',n:'Свирепый'},{id:'haste',n:'Стремительный'},{id:'regen',n:'Регенерирующий'},{id:'fiery',n:'Огненный'},{id:'shielded',n:'Защищённый'},{id:'frenzy',n:'Неистовый'},{id:'cleave',n:'Размашистый'},{id:'deadly',n:'Смертоносный'},{id:'warded',n:'Зачарованный'},{id:'stunner',n:'Оглушающий'},{id:'cblood',n:'Осквернитель'},{id:'impaler',n:'Пронзающий'},{id:'guard',n:'Со щитом'},{id:'aFury',n:'Аура ярости',aura:1},{id:'aWard',n:'Аура стойкости',aura:1},{id:'aMend',n:'Аура исцеления',aura:1},{id:'hexproof',n:'Неподвластный проклятиям'},{id:'blinding',n:'Ослепляющий'},{id:'silencer',n:'Заглушающий'}];
 /* описания свойств врагов для подсказок */
-const ELITE_D={hexproof:'на него не действуют проклятия и метки',blinding:'атаки с шансом 35% ослепляют героя на 2 хода: на 20% меньше шанс попасть атакой и уклониться',silencer:'удары с шансом 25% накладывают Безмолвие на 2 хода: нельзя применять умения и проклятия, кроме атаки оружием',swift:'бьёт на 1 раз больше',stone:'втрое больше брони',vamp:'лечится от нанесённого урона',brutal:'+25% урона',haste:'быстрее подходит',regen:'регенерирует здоровье',fiery:'добавляет урон огнём',shielded:'+40% здоровья',frenzy:'+15% урона',
+const ELITE_D={hexproof:'на него не действуют проклятия и метки',blinding:'атаки с шансом 35% ослепляют героя на 2 хода: на 20% меньше шанс попасть атакой и уклониться',silencer:'удары с шансом 25% накладывают Безмолвие на 1 ход: нельзя применять умения и проклятия, кроме атаки оружием',swift:'бьёт на 1 раз больше',stone:'втрое больше брони',vamp:'лечится от нанесённого урона',brutal:'+25% урона',haste:'быстрее подходит',regen:'регенерирует здоровье',fiery:'добавляет урон огнём',shielded:'+40% здоровья',frenzy:'+15% урона',
   cleave:'удары задевают героя и приспешников рядом с целью (50% урона)',deadly:'+15% к шансу крита и +50% к множителю крита',warded:'+30% ко всем сопротивлениям стихиям',
   stunner:'удары могут оглушить героя',cblood:'удары накладывают Осквернённую кровь: складывающееся кровотечение',impaler:'удары накладывают Прокол: следующие удары по вам сильнее',guard:'блокирует 30% ваших атак',
   aFury:'союзники на своей и соседних дистанциях наносят на 20% больше урона',aWard:'союзники на своей и соседних дистанциях получают на 20% меньше урона',aMend:'союзники на своей и соседних дистанциях восстанавливают 3% здоровья за ход'};
@@ -2911,7 +2920,7 @@ function mkEnemy(type,lvl,o={}){
   const act=C&&C.I&&!C.I.map&&C.I.lab==null?C.I.act:null;
   const e={uid:'e'+(++EUID),type,n:M.n,lvl,el:M.el,k:M.k,hits:M.hits||1,sp:M.sp||1,mv:0,poison:!!M.poison,res:{...(M.res||{})},
     st:{ign:null,ign2:null,poi:[],bleed:[],imp:[],wither:null,blind:0,frozen:0,stun:0,shock:0,chill:0,maim:0,curse:null,curse2:null,mark:null,ee:null,ward:0,tc:0},touched:false,mods:[],rar:'normal'};
-  e.mix=enemyMix(M,type,act);e.block=BLOCK_MON[type]||0;e.stunner=STUN_MON.has(type)||!!M.boss;
+  e.mix=enemyMix(M,type,act);e.block=BLOCK_MON[type]||0;if(!mt&&e.block===15)e.block=10;/* в актах блок 15% снижен до 10% */e.stunner=STUN_MON.has(type)||!!M.boss;
   let arm=(M.arm||1)*(lvl*4+6);
   if(mt)['fire','cold','light'].forEach(k=>e.res[k]=(e.res[k]||0)+10);
   if(mt>=11){['fire','cold','light'].forEach(k=>e.res[k]=(e.res[k]||0)+10);e.res.chaos=(e.res.chaos||0)+10;}
@@ -6861,7 +6870,7 @@ Object.assign(LBL,{
    0.24: СВОЙСТВА МОНСТРОВ — Неподвластный проклятиям, Ослепляющий, Заглушающий (как в PoE).
    Неподвластный проклятиям: проклятия и метки на него не накладываются (Воля Коспри позволяет).
    Ослепление героя (2 хода): на 20% меньше шанс попасть атакой и на 20% меньше шанс уклониться. Защита — «Взгляд Хинекоры».
-   Безмолвие героя (2 хода): нельзя применять умения и проклятия, кроме атаки оружием; флаконы и шаги доступны.
+   Безмолвие героя (1 ход): нельзя применять умения и проклятия, кроме атаки оружием; флаконы и шаги доступны.
    Защита — «Звезда Рэкласта».
    ========================================================= */
 {const _ac=applyCurse;applyCurse=function(e,h){if(!hexOk(e)){logF(`&nbsp;&nbsp;${e.n}: <span class="dim">неподвластен проклятиям</span>`);return;}return _ac(e,h);};}
@@ -6871,7 +6880,7 @@ Object.assign(LBL,{
 {const _h=hurtPlayer;hurtPlayer=function(e,raw,el,kind,P,crit,mix){const b0=C?C.hp+(C.es||0):0;const r=_h.apply(this,arguments);
   if(!C||!e||C.hp<=0||C.hp+(C.es||0)>=b0)return r;const U=P&&P.U||{};
   if(e.blinding&&kind!=='spell'&&roll(35)){if(U.u_noBlind)logF('&nbsp;&nbsp;Ослепление не действует на вас');else{const was=C.blind>0;C.blind=3;if(!was)logF('&nbsp;&nbsp;<b class="bad-t">Вы ослеплены</b> на 2 хода');}}
-  if(e.silencer&&roll(25)){if(U.u_noSilence)logF('&nbsp;&nbsp;Безмолвие не действует на вас');else{const was=C.silence>0;C.silence=3;if(!was)logC('<b class="bad-t">Безмолвие</b>: 2 хода нельзя применять умения, кроме атаки оружием');}}
+  if(e.silencer&&roll(25)){if(U.u_noSilence)logF('&nbsp;&nbsp;Безмолвие не действует на вас');else{const was=C.silence>0;C.silence=2;if(!was)logC('<b class="bad-t">Безмолвие</b>: на ход нельзя применять умения, кроме атаки оружием');}}
   return r;};}
 /* в начале хода врагов длительность уменьшается: эффект действует на 2 ваших действия */
 {const _ep=enemyPhase;enemyPhase=async function(P,noExtra){if(C){if(C.blind>0)C.blind--;if(C.silence>0)C.silence--;}return _ep(P,noExtra);};}
@@ -9354,7 +9363,7 @@ const GLOSSARY=[
   ['Умение предмета','Предмет даёт пятое умение со своим слотом (Табула раса, Шепчущий лёд, Клык Аракаали и др.). Слот есть, пока предмет надет; само умение заменить нельзя, но в гнёзда можно вставлять поддержки.'],
   ['Скованность','Враг движется на 30% медленнее и не может отступать. Накладывает, например, Иссушение от Аллелопатии.'],
   ['Требования атрибутов','Оружие, броня и щиты требуют силы, ловкости или интеллекта (как в PoE). Без них предмет не надеть, а надетый перестаёт действовать, пока атрибутов не хватает.'],
-  ['Безмолвие','Накладывают Заглушающие монстры: 2 хода нельзя применять умения и проклятия; атака оружием, шаги и флаконы доступны.'],
+  ['Безмолвие','Накладывают Заглушающие монстры: на 1 ход нельзя применять умения и проклятия; атака оружием, шаги и флаконы доступны.'],
   ['Ослепление','Накладывают Ослепляющие монстры: 2 хода у вас на 20% меньше шанс попасть атакой и уклониться.'],
   ['Неподвластный проклятиям','Свойство монстра: проклятия и метки на него не действуют.'],
   ['Урон со временем','Яды, поджоги, кровотечения и споры Токсичного дождя. Усиливается свойствами урона со временем и поддержками «Безграничные состояния», «Стремительный недуг», «Эффективность», «Смертельные недуги».'],
@@ -9788,6 +9797,87 @@ document.addEventListener('change',e=>{const t=e.target;if(t&&t.dataset&&t.datas
     <button class="btn full ${ok?'pri':''}" data-a="uberOpen" ${ok&&!S.mapRun?'':'disabled'}>${ok?'Бросить вызов: Убер Древний':'Не хватает фрагментов'}</button></div></div>`;
   return h+box;};}
 Object.assign(ACT,{uberOpen(){invGate(()=>startUber());}});
+
+/* =========================================================
+   0.24: ВКЛАДКА ТАЙНИКА «УНИКАЛЬНЫЕ» — коллекция, как в PoE. Покупается один раз за 1 божественную сферу
+   (своя у стандарта и у каждой лиги). В ней ячейка под каждый уникальный предмет игры (по одной копии):
+   пустая ячейка тусклая, заполненная — цвета уникального. Сверху — сколько собрано, поиск и фильтр
+   «Все / Собранные / Не собранные». Повторная копия и Legacy-версии лежат в обычном тайнике.
+   ========================================================= */
+const UQTAB_COST=1;
+/* все уникальные предметы игры по разделам: [раздел, [{n, slot, src, mk}]] — mk создаёт образец для просмотра */
+let UQC_CACHE=null;
+/* каталог коллекции (строится один раз) */
+function uqCatalog(){if(UQC_CACHE)return UQC_CACHE;const seen=new Set(),out=[];
+  const sec=(name,list)=>{const l=list.filter(x=>x&&x.n&&!seen.has(x.n));l.forEach(x=>seen.add(x.n));if(l.length)out.push([name,l]);};
+  const slotN=s=>SLOTN[s]||(s==='ring'?'Кольцо':s==='flask'?'Флакон':s);
+  const u4=src=>UQ4.filter(d=>d.src===src).sort((a,b)=>slotN(a.slot).localeCompare(slotN(b.slot),'ru')||a.n.localeCompare(b.n,'ru')).map(d=>({n:d.n,slot:d.slot,src:d.src==='gen'?(UQ_TIER_N[d.t]||''):UQ_SRC_N[d.src]||'',mk:()=>uq4Make(d,Math.max(84,d.minL))}));
+  sec('Общее выпадение',u4('gen'));
+  sec('Уникальные флаконы',UNIQUE_FLASKS.filter(q=>q.u4).map(q=>({n:q.n,slot:'flask',src:UQ_TIER_N[q.t]||'',mk:()=>makeUnique(84,{flaskU:1,n:q.n})})));
+  sec('Лабиринт',u4('lab'));
+  for(const g in PIN_UNIQUES)sec(PIN_GROUPS[g].n,PIN_UNIQUES[g].map(u=>({n:u.n,slot:u.flaskU?'flask':u.slot,src:'Только с босса «'+PIN_GROUPS[g].n+'»',mk:()=>makeUnique(84,u)})));
+  if(typeof UQ_UBER!=='undefined')sec('Убер Древний',UQ_UBER.map(d=>({n:d.n,slot:d.slot,src:'Только с Убер Древнего',mk:()=>uq4Make(d,86)})));
+  if(typeof BR_UNIQ!=='undefined')sec('Разлом',BR_UNIQ.map(u=>({n:u.n,slot:u.slot,src:u.blessed?'Благословение владыки Разлома':'Разлом',mk:()=>typeof brMakeUnique==='function'?brMakeUnique(u,84):makeUnique(84,u)})));
+  if(typeof MINE_UNIQUES!=='undefined')sec('Азуритовая шахта',Object.values(MINE_UNIQUES).flat().map(u=>({n:u.n,slot:u.slot,src:'Боссы шахты',mk:()=>makeUnique(84,u)})));
+  return UQC_CACHE=out;}
+/* все уникальные каталога одним списком */
+const uqcAll=()=>uqCatalog().flatMap(s=>s[1]);
+/* есть ли у уникального ячейка в коллекции */
+const uqcHas=n=>uqcAll().some(x=>x.n===n);
+/* вкладка уникальных текущего мира (null — не куплена) */
+const uqTab=()=>{const st=RLM().stash;if(!st.uqOn)return null;st.uq=st.uq||[];return st.uq;};
+/* предмет можно положить в коллекцию: уникальный (не Legacy), есть в каталоге, ячейка пустая */
+const uqFits=(it,t)=>!!(t&&it&&it.rar==='unique'&&!it.legacy&&uqcHas(it.name)&&!t.some(x=>x.name===it.name));
+/* купить вкладку за божественную сферу */
+function uqTabBuy(){const st=RLM().stash;if(st.uqOn)return;if((S.cur.divine||0)<UQTAB_COST){toast('Нужна божественная сфера');return;}
+  S.cur.divine-=UQTAB_COST;st.uqOn=1;st.uq=st.uq||[];st.t=Date.now();save();toast('Куплена вкладка уникальных предметов');}
+/* уникальный из сумки в ячейку коллекции */
+function uqTabIn(uid){const t=uqTab(),it=S.inv.find(x=>x.uid===uid);if(!t||!it)return false;
+  if(!uqFits(it,t)){toast(it.legacy?'Legacy-версия хранится в обычном тайнике':t.some(x=>x.name===it.name)?'Этот уникальный уже есть в коллекции':'Нет ячейки для этого предмета');return false;}
+  S.inv=S.inv.filter(x=>x!==it);delete it.isNew;t.push(it);RLM().stash.t=Date.now();save();return true;}
+/* из ячейки коллекции в сумку */
+function uqTabOut(name){const t=uqTab(),it=t&&t.find(x=>x.name===name);if(!it)return false;if(S.inv.length>=INV_MAX){toast('Сумка полна');return false;}
+  RLM().stash.uq=t.filter(x=>x!==it);S.inv.push(it);RLM().stash.t=Date.now();save();return true;}
+/* разложить: уникальные из обычного тайника — в пустые ячейки коллекции */
+function uqTabSort(){const t=uqTab();if(!t)return 0;const st=RLM().stash;let n=0;
+  st.items=st.items.filter(it=>{if(uqFits(it,t)){t.push(it);n++;return false;}return true;});if(n){st.t=Date.now();save();}return n;}
+/* уникальный, положенный в тайник, идёт в свою ячейку коллекции (если она пустая) */
+{const _ts=toStash;toStash=function(uid){const it=S.inv.find(x=>x.uid===uid),t=uqTab();if(uqFits(it,t))return uqTabIn(uid);return _ts(uid);};}
+/* конец лиги: коллекция лиги переходит на стандарт (в пустые ячейки, остальное — в обычный тайник) */
+{const _lm=lgMigrate;lgMigrate=function(){if(ACC&&ACC.lg&&ACC.lgInfo)for(const id in ACC.lg){const l=ACC.lgInfo[id],r=ACC.lg[id];if(!l||!l.ended||!r.stash||!(r.stash.uq||[]).length)continue;
+    ACC.stash=ACC.stash||{items:[],tabs:1,gems:[]};const t=ACC.stash.uqOn?(ACC.stash.uq=ACC.stash.uq||[]):null,rest=[];
+    r.stash.uq.forEach(it=>{if(uqFits(it,t))t.push(it);else rest.push(it);});r.stash.items=(r.stash.items||[]).concat(rest);r.stash.uq=[];}
+  return _lm.apply(this,arguments);};}
+/* вкладки тайника — сеткой 2×2, чтобы четыре кнопки помещались на экране телефона */
+const uqSeg=h=>h.replace('<div class="seg">','<div class="seg" style="display:grid;grid-template-columns:1fr 1fr;gap:4px">');
+/* экран коллекции */
+function uqCollectionHtml(){const t=uqTab(),st=RLM().stash;
+  if(!t)return `<div class="panel"><p style="margin:0 0 8px">Коллекция уникальных: ячейка под каждый уникальный предмет игры (${uqcAll().length}). Пустые ячейки тусклые — видно, что ещё не найдено. Не занимает место в обычном тайнике; уникальные, которые вы кладёте в тайник, сами встают в свои ячейки.</p>
+      <button class="btn full pri" data-a="uqTabBuy" ${(S.cur.divine||0)>=UQTAB_COST?'':'disabled'}>Купить вкладку · ${UQTAB_COST} божественная сфера</button>
+      <p class="dim small" style="margin:6px 0 0">У вас божественных сфер: ${S.cur.divine||0}</p></div>`;
+  const have=new Set(t.map(x=>x.name)),all=uqcAll(),n=all.filter(x=>have.has(x.n)).length;
+  const bagFit=S.inv.filter(x=>uqFits(x,t)),stFit=st.items.filter(x=>uqFits(x,t));
+  return `<div class="panel"><div class="row"><span class="sp">Собрано <b class="num">${n}</b> из <b class="num">${all.length}</b></span><span class="dim small num">${R(n/all.length*100)}%</span></div>
+      <div class="uqbar"><i style="width:${n/all.length*100}%"></i></div>
+      ${bagFit.length||stFit.length?`<div class="row" style="margin-top:8px;gap:6px">${bagFit.length?`<button class="btn sm sp" data-a="uqTabBag">Из сумки · ${bagFit.length}</button>`:''}${stFit.length?`<button class="btn sm sp" data-a="uqTabSort">Из тайника · ${stFit.length}</button>`:''}</div>`:''}</div>
+    <div class="row qrow"><input class="input qf sp" type="search" data-k="uqc" data-for="uqcL" placeholder="Поиск: название, слот, источник" autocomplete="off">
+      <select class="input qf" data-k="uqc" style="width:auto"><option value="">Все</option><option value="have">Собранные</option><option value="miss">Не собранные</option></select></div>
+    <div id="uqcL">${uqCatalog().map(([name,list])=>`<div class="eyebrow uqsec">${esc(name)} · ${list.filter(x=>have.has(x.n)).length}/${list.length}</div>
+      <div class="uqgrid">${list.map(x=>{const on=have.has(x.n),sl=SLOTN[x.slot]||(x.slot==='ring'?'Кольцо':x.slot==='flask'?'Флакон':'');
+        return `<button class="uqcell ${on?'on':''}" data-a="uqCell" data-n="${esc(x.n)}" data-qt="${esc((x.n+' '+sl+' '+name+' '+x.src).toLowerCase())}" data-fit="${on?'have':'miss'}"><b>${esc(x.n)}</b><small>${esc(sl)}</small></button>`;}).join('')}</div>`).join('')}</div>`;}
+{const _v=vStash;vStash=function(){const t=uqTab();
+  if(stashTab!=='uq'){const h=uqSeg(_v());return h.replace(/(data-t="gems">[^<]*<\/button>)<\/div>/,`$1<button class="" data-a="stTab" data-t="uq">Уникальные${t?' · '+t.length:''}</button></div>`);}
+  stashTab='stash';let h=uqSeg(_v());stashTab='uq';
+  h=h.replace(/class="on" data-a="stTab" data-t="stash"/,'class="" data-a="stTab" data-t="stash"').replace(/(data-t="gems">[^<]*<\/button>)<\/div>/,`$1<button class="on" data-a="stTab" data-t="uq">Уникальные${t?' · '+t.length:''}</button></div>`);
+  return h.replace(/<div class="bag">[\s\S]*<\/div>\s*<\/div>\s*$/,uqCollectionHtml()+'</div>');};}
+/* ячейка коллекции: собранный — карточка и «Взять в сумку»; не собранный — образец и где выпадает */
+function uqCellOpen(name){const t=uqTab()||[],it=t.find(x=>x.name===name),c=uqcAll().find(x=>x.n===name);if(!c)return;
+  if(it){modal(`<div class="row"><span class="eyebrow sp">Коллекция уникальных</span><button class="btn sm ghost" data-a="close">Закрыть</button></div>${itemCard(it)}<button class="btn full pri" data-a="uqTabOut" data-n="${esc(name)}">Взять в сумку</button>`);return;}
+  let card='';try{const s=c.mk();card=s?itemCard(s):'';}catch(e){}
+  modal(`<div class="row"><span class="eyebrow sp">Не собран · ${esc(c.src)}</span><button class="btn sm ghost" data-a="close">Закрыть</button></div><div class="uqghost">${card}</div><p class="dim small" style="margin:6px 0 0">Образец: значения в найденном предмете могут отличаться.</p>`);}
+Object.assign(ACT,{uqTabBuy(){uqTabBuy();render();},uqTabOut(d){if(uqTabOut(d.n)){closeModal();render();}},uqCell(d){uqCellOpen(d.n);},
+  uqTabSort(){const n=uqTabSort();toast(n?`В коллекцию: ${n}`:'Нечего переносить');render();},
+  uqTabBag(){const t=uqTab();let n=0;S.inv.filter(x=>uqFits(x,t)).forEach(x=>{if(uqTabIn(x.uid))n++;});toast(n?`В коллекцию: ${n}`:'Нечего переносить');render();}});
 
 /* =========================================================
    0.23: верстак — зачарования особых флаконов за Вливающую и Растопляющую сферы (как ремесло PoE)
