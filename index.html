@@ -7032,7 +7032,7 @@ const goodsRoom=g=>!isItemGoods(g)||S.inv.length<INV_MAX;
 
 /* ---------- клиент аукциона ---------- */
 {const req0=AUC.req;AUC.req=async function(path,opt={}){
-  const r=await fetch(AUCTION_URL.replace(/\/$/,'')+path,{method:opt.method||'GET',headers:{'Content-Type':'application/json','X-Tg-Init-Data':tg.initData,'X-League':curLeague()||''},body:opt.body?JSON.stringify(opt.body):undefined});
+  const r=await fetch(AUCTION_URL.replace(/\/$/,'')+path,{method:opt.method||'GET',headers:Object.assign({'Content-Type':'application/json','X-Tg-Init-Data':tg.initData},curLeague()?{'X-League':curLeague()}:{}),body:opt.body?JSON.stringify(opt.body):undefined});
   const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('Ошибка сервера '+r.status));return j;};}
 Object.assign(AUC,{
   async list(){if(this.mode()==='local')return RLM().auc.lots.filter(l=>!l.sold).map(l=>mkLot({...l,mine:l.seller.cid===S.id}));
@@ -9697,6 +9697,10 @@ function raceHtml(lid){const l=lgInfo(lid);if(!l||!l.race)return '';const best=A
 Object.assign(ACT,{lgView(d){LG_VIEW=d.id||null;delAsk=null;render();}});
 /* выбор персонажа запоминает его мир */
 {const _p=ACT.play;ACT.play=function(d){const c=ACC.chars.find(x=>x.id===d.id);if(c)LG_VIEW=c.league||null;return _p.call(this,d);};}
+/* метка сборки (подставляется build.py): по ней видно, загрузилась ли новая версия игры */
+const BUILD_ID='0.24 · 18.10 13:56 UTC';
+{const _vr=vRoster;vRoster=function(){return _vr()+`<p class="dim small" style="text-align:center;margin:10px 0 0">Версия ${BUILD_ID}</p>`;};}
+{const _vs=vSettings;vSettings=function(){return _vs()+`<p class="dim small" style="text-align:center;margin:10px 0 0">Версия ${BUILD_ID}</p>`;};}
 
 /* =========================================================
    0.24: АУКЦИОН — интерфейс: предметы, камни и валюта; цена в золоте или сферах; биржа валюты; кошелёк выручки.
