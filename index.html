@@ -541,6 +541,9 @@ button.sigil{padding:0;cursor:pointer;color:var(--gold2)}
 .fl.ench-i,.fcell.ench-i,.irow.ench-i{border:2px solid #5b2a86;outline:1px solid #2a0f40;outline-offset:-4px}
 .fl.ench-e,.fcell.ench-e,.irow.ench-e{border:2px solid #7a5a12;outline:1px dashed #b58a2a;outline-offset:-4px}
 .ench-t{color:#b07ad9}.enk-t{color:#c9a04a}
+.cur-t{color:#c8b98a}.gem-t{color:#7fbf9a}
+.mklot{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;background:var(--panel,#1d1713);border:1px solid var(--line,#3a2f26);color:inherit;padding:8px 10px;font:inherit;cursor:pointer;min-width:0}
+.mklot .mkrow{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}.mklot .mkrow>span{min-width:0;overflow-wrap:anywhere}.mklot .mkrow b{white-space:nowrap;margin-left:auto}
 
 </style>
 </head><body>
@@ -574,7 +577,7 @@ const ATTR={str:'Сила',dex:'Ловкость',int:'Интеллект'}, ATT
 const EL={phys:'физ.',fire:'огонь',cold:'холод',light:'молния',chaos:'хаос'};
 const ELC={phys:'var(--phys)',fire:'var(--fire)',cold:'var(--cold)',light:'var(--light)',chaos:'var(--chaos)'};
 const DIST=['Вплотную','Рядом','Поодаль','Далеко'];
-const MAXLVL=100, MAX_CHARS=7;
+const MAXLVL=100, MAX_CHARS=10;
 /* все классы получают одинаковый прирост атрибутов за уровень */
 const ATTR_GROW=.4, ATTR_NODE=8;
 
@@ -2022,7 +2025,7 @@ function newAcc(){return {v:4,u:0,t:0,gold:0,chars:[],cur:null,del:{},stash:{ite
 function goldLink(c){if(!c)return c;const d=Object.getOwnPropertyDescriptor(c,'gold');
   if(d&&!d.get){const v=+d.value||0;delete c.gold;if(ACC&&v>0&&!(c.goldIn)){ACC.gold=(ACC.gold||0)+v;}c.goldIn=1;}
   else if(!d)c.goldIn=1;
-  if(!Object.getOwnPropertyDescriptor(c,'gold'))Object.defineProperty(c,'gold',{get(){return ACC?ACC.gold||0:0;},set(v){if(ACC)ACC.gold=v;},enumerable:false,configurable:true});
+  if(!Object.getOwnPropertyDescriptor(c,'gold'))Object.defineProperty(c,'gold',{get(){const r=ACC&&realmOf(c.league);return r?r.gold||0:0;},set(v){const r=ACC&&realmOf(c.league);if(r)r.gold=v;},enumerable:false,configurable:true});
   return c;}
 /* доводит сохранение персонажа до текущей версии: недостающие поля, переименования, миграции предметов */
 function fixChar(c){
@@ -2256,7 +2259,7 @@ function actOfProgC(c){return c.done?4:BATTLES[Math.min(c.prog||0,BATTLES.length
 /* главное умение персонажа (для списка персонажей и лидеров) */
 function charTop(c){return charInfo(c).top;}
 /* карточки персонажей для таблицы лидеров */
-function boardOf(){return ACC.chars.map(c=>{const i=charInfo(c);return {id:c.id,name:c.name,cls:c.cls,asc:c.asc,ascN:c.asc&&ascDef(c.asc)?ascDef(c.asc).n:null,lvl:c.lvl,xp:c.xp,top:i.top,b:i.b,maps:c.mapBest||0,dng:(c.mine&&c.mine.best)||0,pin:Object.keys(c.pinK||{}).filter(k=>c.pinK[k]>0)};});}
+function boardOf(){return ACC.chars.map(c=>{const i=charInfo(c);return {id:c.id,name:c.name,cls:c.cls,asc:c.asc,ascN:c.asc&&ascDef(c.asc)?ascDef(c.asc).n:null,lvl:c.lvl,xp:c.xp,top:i.top,b:i.b,maps:c.mapBest||0,dng:(c.mine&&c.mine.best)||0,pin:Object.keys(c.pinK||{}).filter(k=>c.pinK[k]>0),league:c.league||''};});}
 if(typeof window!=='undefined'){window.addEventListener('pagehide',()=>save(true));document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')save(true);});}
 /* основной атрибут класса */
 function mainAttr(cls){const a=CLASSES[cls].attr;return ATTR_K[a.indexOf(Math.max(...a))];}
@@ -2336,6 +2339,7 @@ function resPenalty(){if(C&&(C.B.type==='map'||C.B.type==='mine'))return 30;if(C
 /* предмет подходит по уровню героя */
 /* предметы, которые не действуют из-за нехватки атрибутов (пересчитывается в calc, модуль 4o) */
 const ATTR_OFF=new Set();
+/* предмет действует: хватает уровня и атрибутов */
 const itemOk=it=>(!it.req||S.lvl>=it.req)&&!ATTR_OFF.has(it);
 /* сумма стата по свойствам предмета (старым и новым) */
 function itStat(it,k){let n=0;it.mods.forEach(m=>modStats(m).forEach(([kk,v])=>{if(kk===k&&!Array.isArray(v))n+=v;}));return n;}
@@ -2673,6 +2677,8 @@ function buildSkill(o,A,P,L){
   [['u_fireConv','fire'],['u_lightConv','light'],['u_chaosConv','chaos']].forEach(([uk,el])=>{if(isAtk&&U[uk])Object.keys(b).forEach(e=>{if(e===el)return;b[el][0]+=b[e][0];b[el][1]+=b[e][1];b[e]=[0,0];});});
   if(o.brutal)['fire','cold','light','chaos'].forEach(e=>{b[e]=[0,0];});
   for(const k in ONLY_EL)if(P.keys.has(k))Object.keys(b).forEach(e=>{if(e!==ONLY_EL[k])b[e]=[0,0];});
+  /* Горн пустоты: физический урон не наносится вовсе (а не «−100%», который можно перебить) */
+  if(U.u_noPhysDealt)b.phys=[0,0];
   if(P.keys.has('k_roil')){b.light=[b.light[0]*.5,b.light[1]*1.25];}
   let inc=g('dmgP')+incW+(o.slotInc||0);
   if(isAtk)inc+=g('atkP')+at.dex/10;else inc+=g('spellP')+at.int/10;
@@ -4849,26 +4855,26 @@ function dummySim(i,preset,d,o){
 
 /* ---------- тайник (общий для всех персонажей аккаунта) ---------- */
 /* вместимость тайника */
-const stashCap=()=>30*ACC.stash.tabs;
+const stashCap=()=>30*RLM().stash.tabs;
 /* цена следующей вкладки тайника */
-const stashCost=()=>[0,2000,10000,40000][ACC.stash.tabs]||null;
+const stashCost=()=>[0,2000,10000,40000][RLM().stash.tabs]||null;
 /* предмет из сумки в общий тайник аккаунта */
 function toStash(uid){const it=S.inv.find(x=>x.uid===uid);if(!it)return false;if(stashUsed()>=stashCap()){toast('Тайник полон');return false;}
-  S.inv=S.inv.filter(x=>x!==it);delete it.isNew;ACC.stash.items.push(it);ACC.stash.t=Date.now();save();return true;}
+  S.inv=S.inv.filter(x=>x!==it);delete it.isNew;RLM().stash.items.push(it);RLM().stash.t=Date.now();save();return true;}
 /* предмет из тайника в сумку */
-function fromStash(uid){const it=ACC.stash.items.find(x=>x.uid===uid);if(!it)return false;if(S.inv.length>=INV_MAX){toast('Сумка полна');return false;}
-  ACC.stash.items=ACC.stash.items.filter(x=>x!==it);S.inv.push(it);ACC.stash.t=Date.now();save();return true;}
+function fromStash(uid){const it=RLM().stash.items.find(x=>x.uid===uid);if(!it)return false;if(S.inv.length>=INV_MAX){toast('Сумка полна');return false;}
+  RLM().stash.items=RLM().stash.items.filter(x=>x!==it);S.inv.push(it);RLM().stash.t=Date.now();save();return true;}
 /* занято мест в тайнике */
-const stashUsed=()=>ACC.stash.items.length+(ACC.stash.gems||[]).length;
+const stashUsed=()=>RLM().stash.items.length+(RLM().stash.gems||[]).length;
 /* камни в тайнике: свободный (не вставленный) камень переходит между персонажами со своим уровнем и опытом */
 function gemToStash(uid){const g=S.gems.find(x=>x.uid===uid);if(!g)return false;if(socketed().has(uid)){toast('Сначала выньте камень из гнезда');return false;}
   if(stashUsed()>=stashCap()){toast('Тайник полон');return false;}
-  S.gems=S.gems.filter(x=>x!==g);ACC.stash.gems.push(g);ACC.stash.t=Date.now();save();return true;}
+  S.gems=S.gems.filter(x=>x!==g);RLM().stash.gems.push(g);RLM().stash.t=Date.now();save();return true;}
 /* камень из тайника персонажу */
-function gemFromStash(uid){const g=ACC.stash.gems.find(x=>x.uid===uid);if(!g)return false;
-  ACC.stash.gems=ACC.stash.gems.filter(x=>x!==g);if(S.gems.some(x=>x.uid===g.uid))g.uid=newUid();S.gems.push(g);ACC.stash.t=Date.now();save();return true;}
+function gemFromStash(uid){const g=RLM().stash.gems.find(x=>x.uid===uid);if(!g)return false;
+  RLM().stash.gems=RLM().stash.gems.filter(x=>x!==g);if(S.gems.some(x=>x.uid===g.uid))g.uid=newUid();S.gems.push(g);RLM().stash.t=Date.now();save();return true;}
 /* купить вкладку тайника */
-function expandStash(){const c=stashCost();if(!c||S.gold<c)return false;S.gold-=c;ACC.stash.tabs++;ACC.stash.t=Date.now();save();return true;}
+function expandStash(){const c=stashCost();if(!c||S.gold<c)return false;S.gold-=c;RLM().stash.tabs++;RLM().stash.t=Date.now();save();return true;}
 
 /* ---------- аукцион ----------
    Без сервера: лоты хранятся в аккаунте и видны всем вашим персонажам (один выставляет, другой покупает).
@@ -4881,27 +4887,27 @@ const AUC={
     const r=await fetch(AUCTION_URL.replace(/\/$/,'')+path,{method:opt.method||'GET',headers:{'Content-Type':'application/json','X-Tg-Init-Data':tg.initData},body:opt.body?JSON.stringify(opt.body):undefined});
     const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('Ошибка сервера '+r.status));return j;},
   async list(){
-    if(this.mode()==='local')return ACC.auc.lots.filter(l=>!l.sold).map(l=>({...l,mine:l.seller.cid===S.id}));
+    if(this.mode()==='local')return RLM().auc.lots.filter(l=>!l.sold).map(l=>({...l,mine:l.seller.cid===S.id}));
     return (await this.req('/lots')).lots;},
   async mine(){
-    if(this.mode()==='local')return {lots:ACC.auc.lots.filter(l=>!l.sold),sold:ACC.auc.lots.filter(l=>l.sold).slice(-15).reverse(),purse:ACC.aucGold||0};
+    if(this.mode()==='local')return {lots:RLM().auc.lots.filter(l=>!l.sold),sold:RLM().auc.lots.filter(l=>l.sold).slice(-15).reverse(),purse:RLM().aucGold||0};
     return await this.req('/me');},
   async post(it,price){
-    if(this.mode()==='local'){ACC.auc.t=Date.now();ACC.auc.lots.push({id:'L'+(++ACC.auc.seq),item:it,price,seller:{cid:S.id,name:S.name},ts:Date.now()});return;}
+    if(this.mode()==='local'){RLM().auc.t=Date.now();RLM().auc.lots.push({id:'L'+(++RLM().auc.seq),item:it,price,seller:{cid:S.id,name:S.name},ts:Date.now()});return;}
     await this.req('/lots',{method:'POST',body:{item:it,price,seller:S.name}});},
   async buy(id){
-    if(this.mode()==='local'){const l=ACC.auc.lots.find(x=>x.id===id&&!x.sold);if(!l)throw new Error('Лот уже продан');
+    if(this.mode()==='local'){const l=RLM().auc.lots.find(x=>x.id===id&&!x.sold);if(!l)throw new Error('Лот уже продан');
       if(l.seller.cid===S.id)throw new Error('Это лот этого же персонажа. Купите его другим персонажем или снимите с продажи');
-      ACC.auc.t=Date.now();l.sold=true;l.buyer=S.name;l.soldAt=Date.now();ACC.aucGold=(ACC.aucGold||0)+R(l.price*(1-AUC_TAX));
+      RLM().auc.t=Date.now();l.sold=true;l.buyer=S.name;l.soldAt=Date.now();RLM().aucGold=(RLM().aucGold||0)+R(l.price*(1-AUC_TAX));
       const it=l.item;l.item={name:it.name,rar:it.rar};
-      const sold=ACC.auc.lots.filter(x=>x.sold);if(sold.length>30){const drop=new Set(sold.slice(0,sold.length-30));ACC.auc.lots=ACC.auc.lots.filter(x=>!drop.has(x));}
+      const sold=RLM().auc.lots.filter(x=>x.sold);if(sold.length>30){const drop=new Set(sold.slice(0,sold.length-30));RLM().auc.lots=RLM().auc.lots.filter(x=>!drop.has(x));}
       return it;}
     return (await this.req('/lots/'+encodeURIComponent(id)+'/buy',{method:'POST',body:{buyer:S.name}})).item;},
   async cancel(id){
-    if(this.mode()==='local'){const l=ACC.auc.lots.find(x=>x.id===id&&!x.sold);if(!l)throw new Error('Лот не найден');ACC.auc.t=Date.now();ACC.auc.lots=ACC.auc.lots.filter(x=>x!==l);return l.item;}
+    if(this.mode()==='local'){const l=RLM().auc.lots.find(x=>x.id===id&&!x.sold);if(!l)throw new Error('Лот не найден');RLM().auc.t=Date.now();RLM().auc.lots=RLM().auc.lots.filter(x=>x!==l);return l.item;}
     return (await this.req('/lots/'+encodeURIComponent(id)+'/cancel',{method:'POST'})).item;},
   async claim(){
-    if(this.mode()==='local'){ACC.auc.t=Date.now();const g=ACC.aucGold||0;ACC.aucGold=0;return g;}
+    if(this.mode()==='local'){RLM().auc.t=Date.now();const g=RLM().aucGold||0;RLM().aucGold=0;return g;}
     return (await this.req('/claim',{method:'POST'})).gold||0;},
 };
 /* выдаём вещи с аукциона новым uid, чтобы не было совпадений между игроками */
@@ -6581,6 +6587,7 @@ function uqVGem(uid,id,L){return {uid,id,lvl:1,vL:clamp(L,1,GEM_CAP),xp:0,q:0,vi
 /* уровень камня в слоте: свойства «+N к уровню камней в умении K» */
 function uqSlotLv(SC,A,i,P){let v=(SC.gemLvlAll||0)+(SC.u_activeLvl||0);if(A.minion)v+=SC.gemLvlMn||0;if(A.cat==='spell'||A.cat==='minion')v+=SC.gemLvlS||0;
   ['fire','cold','light','chaos'].forEach(e=>{if((A.tags||[]).includes(e)||A.el===e)v+=SC['gemLvl'+e[0].toUpperCase()+e.slice(1)]||0;});
+  if(A.cat==='melee'||(A.tags||[]).includes('melee'))v+=SC.gemLvlM||0;if(A.cat==='ranged')v+=SC.gemLvlR||0;
   const U=P.U||{};if(A===GEMS.zombie)v+=U.u_zombieLvl||0;if(A===GEMS.spectre)v+=U.u_spectreLvl||0;
   return v;}
 /* качество поддержек в слоте → урон умения; область умения в слоте */
@@ -6836,6 +6843,20 @@ Object.assign(LBL,{
   u_explodeMinion:v=>`Враги, убитые приспешниками, взрываются: ${v}% их здоровья — урон от огня врагам на той же линии`,
   u_oneRing:()=>'Второе кольцо надеть нельзя'});
 
+/* «размещённые» камни (PoE: Socketed Gems) — прибавка к слоту умения, связанному с предметом.
+   Оружие и вторая рука — умение 1 (как Стержень реверберации, Оруженосец), нагрудник — умение 2, шлем — 3, перчатки — 4.
+   Эти аффиксы выпадают только на оружии и щитах, поэтому относятся к умению 1. Уже выпавшие предметы меняются вместе с описанием. */
+const AFX_SOCK={gemLvl:'slot1:gemLvlAll',gemLvlM:'slot1:gemLvlM',gemLvlR:'slot1:gemLvlR',gemLvlFire:'slot1:gemLvlFire',gemLvlCold:'slot1:gemLvlCold',gemLvlLight:'slot1:gemLvlLight',gemLvlChaos:'slot1:gemLvlChaos'};
+for(const id in AFX_G){const g=AFX_G[id];if(!/размещ/.test(g.n))continue;g.st=g.st.map(s=>s&&AFX_SOCK[s[0]]?[AFX_SOCK[s[0]],s[1]]:s);}
+Object.assign(LBL,{
+  'slot1:gemLvlAll':v=>`Умение 1: +${R(v)} к уровню камней`,
+  'slot1:gemLvlM':v=>`Умение 1: +${R(v)} к уровню камней ближнего боя`,
+  'slot1:gemLvlR':v=>`Умение 1: +${R(v)} к уровню камней лука`,
+  'slot1:gemLvlFire':v=>`Умение 1: +${R(v)} к уровню камней огня`,
+  'slot1:gemLvlCold':v=>`Умение 1: +${R(v)} к уровню камней холода`,
+  'slot1:gemLvlLight':v=>`Умение 1: +${R(v)} к уровню камней молнии`,
+  'slot1:gemLvlChaos':v=>`Умение 1: +${R(v)} к уровню камней хаоса`});
+
 /* =========================================================
    0.24: СВОЙСТВА МОНСТРОВ — Неподвластный проклятиям, Ослепляющий, Заглушающий (как в PoE).
    Неподвластный проклятиям: проклятия и метки на него не накладываются (Воля Коспри позволяет).
@@ -6861,6 +6882,475 @@ Object.assign(LBL,{
 {const _cs=calcSkill;calcSkill=function(i,P){const sk=_cs(i,P);if(sk&&C&&C.silence>1&&!sk.bad&&!(P.U&&P.U.u_noSilence))sk.bad='Безмолвие: умения недоступны';return sk;};}
 {const _uh=useHex;useHex=async function(n){if(C&&C.silence>1){toast('Безмолвие: проклятия недоступны');return;}return _uh(n);};}
 {const _c=calc;calc=function(){const P=_c.apply(this,arguments);if(P&&C&&C.silence>1&&P.hex)P.hex={...P.hex,ok:false};if(P&&C&&C.silence>1&&P.hex2)P.hex2={...P.hex2,ok:false};return P;};}
+
+/* =========================================================
+   0.24: ЛИГИ — сезонные персонажи. Лига — отдельный мир: свои тайник, золото, аукцион и таблица лидеров.
+   Персонажи лиги и стандарта не взаимодействуют. Когда администратор завершает лигу (сервер, /admin/leagues),
+   её персонажи переходят на стандарт со всеми вещами, тайник лиги вливается в тайник стандарта.
+   Хранение: стандарт — поля самого аккаунта (ACC.gold, ACC.stash, ACC.auc, ACC.aucGold), лига L — ACC.lg[L].
+   Список лиг приходит с сервера (GET /leagues) и хранится в ACC.lgInfo.
+   ========================================================= */
+/* лига, выбранная на экране персонажей (null — стандарт) */
+let LG_VIEW=null;
+/* хранилище мира: стандарт — сам аккаунт, лига — ACC.lg[id] */
+function realmOf(lid){if(!ACC)return null;if(!lid)return ACC;ACC.lg=ACC.lg||{};let r=ACC.lg[lid];
+  if(!r)r=ACC.lg[lid]={gold:30,stash:{items:[],tabs:1,gems:[]},auc:{lots:[],seq:0},aucGold:0,t:0};
+  r.stash=r.stash||{items:[],tabs:1};r.stash.gems=r.stash.gems||[];r.auc=r.auc&&r.auc.lots?r.auc:{lots:[],seq:0};return r;}
+/* лига текущего персонажа (или выбранная на экране персонажей) */
+const curLeague=()=>S?(S.league||null):LG_VIEW;
+/* хранилище текущего мира */
+const RLM=()=>realmOf(curLeague());
+/* сведения о лиге и активна ли она */
+const lgInfo=id=>id&&ACC&&ACC.lgInfo?ACC.lgInfo[id]||null:null;
+/* лига идёт (не завершена) */
+const lgActive=id=>{const l=lgInfo(id);return !!(l&&!l.ended);};
+/* время сервера (поправка на часы устройства, чтобы старт лиги нельзя было приблизить, переведя часы) */
+const lgNow=()=>Date.now()+((ACC&&ACC.lgSkew)||0);
+/* лига уже стартовала */
+const lgStarted=id=>{const l=lgInfo(id);return !!(l&&lgNow()>=(l.start||0));};
+/* сколько осталось до старта: «2 д 5 ч», «3 ч 12 мин», «45 мин» */
+function lgLeft(id){const l=lgInfo(id);const ms=Math.max(0,((l&&l.start)||0)-lgNow()),m=Math.ceil(ms/60000),d=Math.floor(m/1440),h=Math.floor(m%1440/60),mi=m%60;
+  return d?`${d} д ${h} ч`:h?`${h} ч ${mi} мин`:`${mi} мин`;}
+/* все известные лиги */
+const lgList=()=>Object.entries((ACC&&ACC.lgInfo)||{}).map(([id,l])=>({id,...l}));
+/* название мира: «Стандарт» или лига */
+const lgName=id=>id?((lgInfo(id)||{}).name||'Лига'):'Стандарт';
+/* условия гонки первой лиги: 100 уровень, все пинакл-боссы, Убер Древний, Ксешт, глубина шахты 240 */
+const RACE_GOALS=[['lvl','Уровень 100',c=>c.lvl>=100],['shaper','Создатель',c=>(c.pinK||{}).shaper>0],['elder','Древний',c=>(c.pinK||{}).elder>0],
+  ['sirus','Сирус',c=>(c.pinK||{}).sirus>0],['uber','Убер Древний',c=>(c.pinK||{}).uber>0],['xesht','Ксешт',c=>((c.br||{}).done||{}).xesht>0],
+  ['mine','Шахта: глубина 240',c=>((c.mine||{}).best||0)>=240]];
+/* герой выполнил все условия гонки */
+const raceDone=c=>RACE_GOALS.every(g=>g[2](c));
+/* загрузить список лиг с сервера (без авторизации) */
+let lgLoading=false;
+/* загрузка списка лиг с сервера */
+function lgLoad(){if(!AUCTION_URL||lgLoading)return;lgLoading=true;
+  fetch(AUCTION_URL.replace(/\/$/,'')+'/leagues').then(r=>r.ok?r.json():null).then(j=>{lgLoading=false;if(!j||!Array.isArray(j.leagues)||!ACC)return;
+    const o={};j.leagues.forEach(l=>{o[l.id]={name:l.name,start:l.start||0,ended:l.ended||0,winner:l.winner||null,race:l.race||null};});
+    ACC.lgInfo=o;ACC.lgT=Date.now();if(j.now)ACC.lgSkew=j.now-Date.now();if(lgMigrate())save();if(screen==='roster'||screen==='select')render();}).catch(()=>{lgLoading=false;});}
+/* персонажи завершённых лиг переходят на стандарт: вещи тайника, камни, золото и непроданные лоты — в стандарт */
+function lgMigrate(){if(!ACC||!ACC.lgInfo)return false;let ch=false;
+  for(const id in (ACC.lg||{})){const l=ACC.lgInfo[id];if(!l||!l.ended)continue;const r=ACC.lg[id];
+    ACC.stash=ACC.stash||{items:[],tabs:1,gems:[]};ACC.stash.gems=ACC.stash.gems||[];
+    const back=[...(r.stash.items||[]),...((r.auc&&r.auc.lots)||[]).filter(x=>!x.sold&&x.item&&x.item.slot).map(x=>x.item)];
+    ACC.stash.items.push(...back);ACC.stash.gems.push(...(r.stash.gems||[]));
+    const used=ACC.stash.items.length+ACC.stash.gems.length;ACC.stash.tabs=Math.max(ACC.stash.tabs||1,Math.min(10,Math.ceil(used/30)));ACC.stash.t=Date.now();
+    ACC.gold=(ACC.gold||0)+(r.gold||0)+(r.aucGold||0);delete ACC.lg[id];ch=true;
+    ACC.lgDone=ACC.lgDone||[];ACC.lgDone.push({id,name:l.name,at:Date.now(),items:back.length});}
+  ACC.chars.forEach(c=>{if(c.league&&lgInfo(c.league)&&lgInfo(c.league).ended){c.lgPast=c.league;c.league=null;c.t=Date.now();ch=true;}});
+  if(ch&&S&&!S.league&&LG_VIEW&&!lgActive(LG_VIEW))LG_VIEW=null;
+  return ch;}
+/* новый персонаж — в выбранном мире (лига только активная) */
+{const _ng=newGame;newGame=function(cls,name){const lid=LG_VIEW&&lgActive(LG_VIEW)&&lgStarted(LG_VIEW)?LG_VIEW:null;const r=_ng(cls,name);if(S&&lid){S.league=lid;realmOf(lid);}return r;};}
+/* слияние копий аккаунта: хранилища лиг — по каждой лиге более свежая копия */
+{const _m=mergeAcc;mergeAcc=function(a,b){const m=_m(a,b);if(!a||!b||!a.chars||!b.chars)return m;
+  const la=a.lg||{},lb=b.lg||{},out={};new Set([...Object.keys(la),...Object.keys(lb)]).forEach(id=>{const x=la[id],y=lb[id];out[id]=!x?y:!y?x:((x.t||0)>=(y.t||0)?x:y);});
+  m.lg=out;m.lgInfo=((a.lgT||0)>=(b.lgT||0)?a.lgInfo:b.lgInfo)||a.lgInfo||b.lgInfo;m.lgT=Math.max(a.lgT||0,b.lgT||0);m.lgDone=a.lgDone||b.lgDone;return m;};}
+/* сохранение: отметка времени хранилища лиги текущего персонажа */
+{const _s=save;save=function(now){if(ACC&&S&&S.league){const r=realmOf(S.league);r.t=Date.now();}return _s.apply(this,arguments);};}
+/* гонка: когда все условия выполнены — сообщить серверу (он проверит по сохранению и запишет победителя) */
+let raceSent={};
+/* сообщить серверу о выполнении условий гонки */
+function raceCheck(){if(!S||!S.league||!srvOn()||raceSent[S.id])return;const l=lgInfo(S.league);if(!l||l.ended||l.winner||!l.race)return;if(!raceDone(S))return;
+  raceSent[S.id]=1;save(true);setTimeout(()=>srvReq('/race',{method:'POST',body:JSON.stringify({league:S.league,char:S.id})}).then(j=>{if(j&&j.winner){l.winner=j.winner;toast(j.winner.char===S.id?'Вы первым выполнили условия гонки лиги!':'Гонку уже выиграл '+j.winner.name);render();}}).catch(()=>{raceSent[S.id]=0;}),2500);}
+{const _wc=waveCleared;waveCleared=async function(){const r=await _wc.apply(this,arguments);try{raceCheck();}catch(e){}return r;};}
+/* запуск: лиги с сервера, переход персонажей завершённых лиг */
+setTimeout(()=>{try{if(ACC&&lgMigrate())save();lgLoad();}catch(e){}},400);
+
+/* до старта лиги экран персонажей обновляет отсчёт; в момент старта открывается создание героя */
+setInterval(()=>{try{if(screen==='roster'&&LG_VIEW&&lgActive(LG_VIEW)){const l=lgInfo(LG_VIEW);if(l&&l.start&&l.start-lgNow()>-90000)render();}}catch(e){}},30000);
+
+/* =========================================================
+   0.24: АУКЦИОН — торговля за сферы. Лот продаёт предмет, камень умения или стопку валюты
+   (сферы, ископаемые, катализаторы, осколки/камни/благословения Разлома, фрагменты, карты).
+   Цена — в золоте или в любой сфере. Из стопки можно купить часть, если продавец разрешил и цена делится на штуки.
+   Выручка копится по видам валюты (кошелёк) и забирается кнопкой «Забрать».
+   Лоты и кошелёк — свои у стандарта и у каждой лиги (заголовок X-League на сервере, хранилище мира без сервера).
+   ========================================================= */
+const MK_MAX=999;
+/* виды валюты, которые можно продавать: список id, название, сколько есть, добавить */
+const MK={
+  cur:{n:'Сферы',ids:()=>ORB_IDS.filter(k=>ORBS[k]),nm:id=>ORBS[id]?ORBS[id].n:id,have:id=>(S.cur||{})[id]||0,add:(id,n)=>{S.cur[id]=(S.cur[id]||0)+n;}},
+  fos:{n:'Ископаемые',ids:()=>typeof FOSSILS!=='undefined'?FOSSILS.map(f=>f.id):[],nm:id=>typeof FOS!=='undefined'&&FOS[id]?FOS[id].n:id,have:id=>((S.mine||{}).fos||{})[id]||0,add:(id,n)=>{const M=MN();M.fos[id]=(M.fos[id]||0)+n;}},
+  cat:{n:'Катализаторы',ids:()=>typeof BR_CAT_ALL!=='undefined'?BR_CAT_ALL:[],nm:id=>BR_CAT[id]?BR_CAT[id].n:id,have:id=>((S.br||{}).cat||{})[id]||0,add:(id,n)=>{const B=BRS();B.cat[id]=(B.cat[id]||0)+n;}},
+  sh:{n:'Осколки Разлома',ids:()=>BR_IDS,nm:id=>`Осколки ${BR_LORDS[id].gen}`,have:id=>((S.br||{}).sh||{})[id]||0,add:(id,n)=>{const B=BRS();B.sh[id]=(B.sh[id]||0)+n;}},
+  st:{n:'Камни Разлома',ids:()=>BR_IDS,nm:id=>`Камень Разлома ${BR_LORDS[id].gen}`,have:id=>((S.br||{}).st||{})[id]||0,add:(id,n)=>{const B=BRS();B.st[id]=(B.st[id]||0)+n;}},
+  bl:{n:'Благословения',ids:()=>BR_IDS,nm:id=>`Благословение ${BR_LORDS[id].gen}`,have:id=>((S.br||{}).bl||{})[id]||0,add:(id,n)=>{const B=BRS();B.bl[id]=(B.bl[id]||0)+n;}},
+  frag:{n:'Фрагменты и Знаки',ids:()=>GUARD_IDS,nm:id=>GUARD[id].frag,have:id=>(S.frag||{})[id]||0,add:(id,n)=>{S.frag[id]=(S.frag[id]||0)+n;}},
+  uber:{n:'Фрагменты Убер Древнего',ids:()=>typeof UBER_FRAGS!=='undefined'?Object.keys(UBER_FRAGS):[],nm:id=>UBER_FRAGS[id]?UBER_FRAGS[id].n:id,have:id=>(S.ufrag||{})[id]||0,add:(id,n)=>{S.ufrag=S.ufrag||{};S.ufrag[id]=(S.ufrag[id]||0)+n;}},
+  map:{n:'Карты',ids:()=>Object.keys(S.maps||{}).filter(t=>S.maps[t]>0),nm:id=>`Карта ${id} тира`,have:id=>(S.maps||{})[id]||0,add:(id,n)=>{S.maps[id]=(S.maps[id]||0)+n;}},
+  gmap:{n:'Карты Хранителей',ids:()=>Object.keys(S.gmaps||{}).filter(k=>S.gmaps[k]>0),nm:id=>{const [g,t]=String(id).split('|');return PIN_GROUPS[g]?`${PIN_GROUPS[g].map}${t?' · тир '+t:''}`:id;},have:id=>(S.gmaps||{})[id]||0,add:(id,n)=>{S.gmaps[id]=(S.gmaps[id]||0)+n;}},
+};
+const MK_KINDS=Object.keys(MK);
+/* валюты для цены: золото и сферы */
+const PRICE_CUR=()=>['gold',...ORB_IDS.filter(k=>ORBS[k])];
+/* название валюты цены */
+const priceName=pc=>!pc||pc==='gold'?'зол.':(ORBS[pc]?ORBS[pc].n.replace(/^Сфера /,'сф. ').replace(/ая сфера$/,'ая сф.').replace(/ий камень$/,'ий кам.').replace(/^./,c=>c.toLowerCase()):pc);
+/* цена текстом */
+const priceTxt=(n,pc)=>`${fmt(n)} ${priceName(pc)}`;
+/* сколько у героя валюты цены */
+const curHave=pc=>!pc||pc==='gold'?S.gold:(S.cur[pc]||0);
+/* списать валюту цены */
+const curPay=(pc,n)=>{if(!pc||pc==='gold')S.gold-=n;else S.cur[pc]=(S.cur[pc]||0)-n;};
+/* начислить валюту цены */
+const curGive=(pc,n)=>{if(!pc||pc==='gold')S.gold+=n;else S.cur[pc]=(S.cur[pc]||0)+n;};
+/* название и описание товара лота */
+function goodsName(g){if(!g)return '?';if(g._g==='gem'){const G=gdef(g.gem.id);return `${G?G.n:g.gem.id} · ур. ${g.gem.lvl}`;}
+  if(g._g==='stack'){const K=MK[g.k];return `${K?K.nm(g.id):g.id} ×${g.n}`;}return g.name||'?';}
+/* товар лота — предмет */
+const isItemGoods=g=>g&&!g._g;
+/* нормализованный лот: товар, цена, валюта цены, часть стопки */
+function mkLot(l){const g=l.item||{};return {...l,goods:g,pc:l.pc||'gold',qty:g._g==='stack'?g.n:1,part:!!l.part};}
+/* выставить можно столько валюты, сколько есть; списать / вернуть */
+function stackTake(k,id,n){const K=MK[k];if(!K||!(n>=1)||K.have(id)<n)return false;K.add(id,-n);return true;}
+/* вернуть стопку валюты герою */
+function stackGive(k,id,n){const K=MK[k];if(K)K.add(id,n);}
+/* получить товар с аукциона: предмет — в сумку, камень — в камни, валюта — в запасы */
+function goodsReceive(g){if(g._g==='gem'){const c={...g.gem,uid:newUid()};delete c.spec0;S.gems.push(c);return goodsName(g);}
+  if(g._g==='stack'){stackGive(g.k,g.id,g.n);return goodsName(g);}S.inv.push(aucReceive(g));return g.name;}
+/* хватает ли места: предмет — сумка */
+const goodsRoom=g=>!isItemGoods(g)||S.inv.length<INV_MAX;
+
+/* ---------- клиент аукциона ---------- */
+{const req0=AUC.req;AUC.req=async function(path,opt={}){
+  const r=await fetch(AUCTION_URL.replace(/\/$/,'')+path,{method:opt.method||'GET',headers:{'Content-Type':'application/json','X-Tg-Init-Data':tg.initData,'X-League':curLeague()||''},body:opt.body?JSON.stringify(opt.body):undefined});
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('Ошибка сервера '+r.status));return j;};}
+Object.assign(AUC,{
+  async list(){if(this.mode()==='local')return RLM().auc.lots.filter(l=>!l.sold).map(l=>mkLot({...l,mine:l.seller.cid===S.id}));
+    return (await this.req('/lots')).lots.map(mkLot);},
+  async mine(){
+    if(this.mode()==='local'){const A=RLM(),w={...(A.aucW||{})};if(A.aucGold)w.gold=(w.gold||0)+A.aucGold;
+      return {lots:A.auc.lots.filter(l=>!l.sold).map(mkLot),sold:A.auc.lots.filter(l=>l.sold).slice(-15).reverse(),wallet:w};}
+    const j=await this.req('/me');const w={...(j.wallet||{})};if(j.purse)w.gold=(w.gold||0)+j.purse;return {...j,lots:(j.lots||[]).map(mkLot),wallet:w};},
+  /* goods: предмет, {_g:'gem',gem} или {_g:'stack',k,id,n}; price — в валюте pc; part — можно купить часть стопки */
+  async post(goods,price,pc='gold',part=false){
+    if(this.mode()==='local'){const A=RLM();A.auc.t=Date.now();A.auc.lots.push({id:'L'+(++A.auc.seq),item:goods,price,pc,part,seller:{cid:S.id,name:S.name},ts:Date.now()});return;}
+    await this.req('/lots',{method:'POST',body:{item:goods,price,pc,part,seller:S.name}});},
+  async buy(id,qty){
+    if(this.mode()==='local'){const A=RLM(),l=A.auc.lots.find(x=>x.id===id&&!x.sold);if(!l)throw new Error('Лот уже продан');
+      if(l.seller.cid===S.id)throw new Error('Это лот этого же персонажа. Купите его другим персонажем или снимите с продажи');
+      const g=l.item,pc=l.pc||'gold';A.auc.t=Date.now();
+      if(g._g==='stack'&&qty&&qty<g.n){if(!l.part||l.price%g.n)throw new Error('Этот лот продаётся только целиком');const unit=l.price/g.n,cost=unit*qty;
+        g.n-=qty;l.price-=cost;A.aucW=A.aucW||{};A.aucW[pc]=(A.aucW[pc]||0)+cost;return {...g,n:qty};}
+      l.sold=true;l.buyer=S.name;l.soldAt=Date.now();A.aucW=A.aucW||{};A.aucW[pc]=(A.aucW[pc]||0)+l.price;
+      l.item={name:goodsName(g),rar:g.rar||'normal'};
+      const sold=A.auc.lots.filter(x=>x.sold);if(sold.length>30){const drop=new Set(sold.slice(0,sold.length-30));A.auc.lots=A.auc.lots.filter(x=>!drop.has(x));}
+      return g;}
+    return (await this.req('/lots/'+encodeURIComponent(id)+'/buy',{method:'POST',body:{buyer:S.name,qty:qty||0}})).item;},
+  async cancel(id){
+    if(this.mode()==='local'){const A=RLM(),l=A.auc.lots.find(x=>x.id===id&&!x.sold);if(!l)throw new Error('Лот не найден');A.auc.t=Date.now();A.auc.lots=A.auc.lots.filter(x=>x!==l);return l.item;}
+    return (await this.req('/lots/'+encodeURIComponent(id)+'/cancel',{method:'POST'})).item;},
+  /* забрать выручку: {gold, chaos, …} */
+  async claim(){
+    if(this.mode()==='local'){const A=RLM(),w={...(A.aucW||{})};if(A.aucGold)w.gold=(w.gold||0)+A.aucGold;A.aucGold=0;A.aucW={};A.auc.t=Date.now();return w;}
+    const j=await this.req('/claim',{method:'POST'});const w={...(j.wallet||{})};if(j.gold)w.gold=(w.gold||0)+j.gold;return w;},
+});
+
+/* =========================================================
+   0.24: ПЕРВЫЕ БОССЫ СИЛЬНЕЕ — Создатель, Древний, Сирус и 12 Хранителей/завоевателей.
+   Здоровье — до уровня владык Разлома; новые приёмы по PoE. Приёмы с пометкой tele объявляются за ход
+   («Готовит: … — сделайте шаг»): шаг в этот ход (вперёд или назад) уводит от удара.
+   ========================================================= */
+/* здоровье в бою (86 ур., карта 16): было Создатель 2,2 млн, Древний 2,4 млн, Сирус 2,5 млн, Хранители 0,83 млн.
+   Стало ×1,7 и ×1,6: 3,8 / 4,1 / 4,2 млн (как первая стадия Ксешта, 4,1 млн) и 1,33 млн (как владыка Разлома, 1,3 млн) */
+['shaper','elder','sirus'].forEach(k=>{MONS[k].boss.hp=R(MONS[k].boss.hp*1.7);});
+GUARD_IDS.forEach(k=>{MONS[k].boss.hp=R(MONS[k].boss.hp*1.6);});
+/* новые приёмы */
+const PN_SPEC={
+  shaper:[{every:4,name:'Луч Создателя',type:'pnBeam',m:2.5,el:'cold',tele:1},{every:5,name:'Сферы Создателя',type:'pnOrbs',m:2.2,tele:1},{every:7,name:'Клоны Создателя',type:'pnClones',n:2}],
+  elder:[{every:4,name:'Кольцо смерти',type:'pnRing',m:3,ring:1},{every:5,name:'Отсасывание',type:'pnSiphon',p:.3},{every:6,name:'Земля Древнего',type:'pnCorrupt',t:3}],
+  sirus:[{every:4,name:'Шторм Сируса',type:'pnStorm'},{every:6,name:'Лабиринт',type:'pnMaze',t:2},{every:8,name:'Умри!',type:'pnDie',m:5,el:'chaos',tele:1}],
+  phoenix:[{every:5,name:'Огненное кольцо',type:'pnFireRing',m:.5}],
+  minotaur:[{every:4,name:'Землетрясение',type:'pnQuake',m:1.6}],
+  hydra:[{every:4,name:'Ядовитые головы',type:'pnVenom',m:.14}],
+  chimera:[{every:5,name:'Дымовая завеса',type:'pnSmoke',t:2}],
+  enslaver:[{every:4,name:'Телепорт',type:'pnTeleport',m:1.4}],
+  eradicator:[],
+  constrictor:[{every:5,name:'Оковы',type:'pnBind',t:2}],
+  purifier:[{every:5,name:'Очищение',type:'pnPurge'}],
+  baran:[{every:5,name:'Святые сферы',type:'pnHoly',n:2}],
+  veritania:[{every:4,name:'Метель',type:'pnBlizzard'}],
+  alhezmin:[{every:4,name:'Ловушки',type:'pnTraps',t:2,m:.8}],
+  drox:[{every:5,name:'Боевое знамя',type:'pnBanner',t:3}],
+};
+for(const k in PN_SPEC){const B=MONS[k].boss;B.spec=[...B.spec.filter(s=>!['Сфера разрушения','Умри!'].includes(s.name)),...PN_SPEC[k]];}
+/* фазы: Создатель на 25% — Стирание, Сирус на 20% — отражения (найдите настоящего), Гидра — новые головы на 66% и 33% */
+MONS.shaper.boss.phases=[...MONS.shaper.boss.phases,{at:.25,name:'Создатель стирает реальность',erase:3}];
+MONS.sirus.boss.phases=MONS.sirus.boss.phases.map(p=>p.at===.2?{...p,mirror:2}:p);
+if(!MONS.sirus.boss.phases.some(p=>p.mirror))MONS.sirus.boss.phases.push({at:.2,name:'Сирус распадается на отражения',mirror:2});
+MONS.hydra.boss.phases=[{at:.66,name:'Вырастает вторая голова',venom:1},{at:.33,name:'Вырастает третья голова',venom:1}];
+/* подсказки боя */
+Object.assign(MONS.shaper,{hint:'Луч и Сферы объявляются за ход: сделайте шаг. Клонов лучше убивать. На 25% — Стирание по всему полю.'});
+Object.assign(MONS.elder,{hint:'Кольцо смерти: будьте вплотную к Древнему (на 1-й линии) — иначе тройной удар. Отсасывание лечит его вашим щитом.'});
+Object.assign(MONS.sirus,{hint:'«Умри!» объявляется за ход — сделайте шаг. Штормы копятся до конца боя. На 20% — отражения: бьют слабо, настоящий — один.'});
+/* дальние/медленные: по кому бьёт и как; штормы и ловушки — на герое */
+function pnHurt(e,m,el,kind,P){hurtPlayer(e,e.dmg*m,el||e.el,kind||'spell',P,false,el?undefined:e.mix);}
+/* приём босса 0.24 */
+function pnAbility(e,sp,P){const t=sp.type;
+  /* объявленные приёмы: шаг в этот ход — уклонение */
+  if(sp.tele&&C.moved){logC(`<span class="good-t">Вы уходите от «${sp.name}»</span>`);return true;}
+  /* герой не может двигаться (Лабиринт, Оковы) — объявленный удар бьёт вдвое слабее */
+  if(sp.tele&&C.root>0){logC('Вы не можете уйти — удар ослаблен вдвое');sp={...sp,m:(sp.m||1)*.5};}
+  if(t==='pnBeam'){pnHurt(e,sp.m*.5,sp.el,'spell',P);e.beam=1;logC('Луч продолжается: сделайте шаг, иначе он ударит снова');return true;}
+  if(t==='pnOrbs'){pnHurt(e,sp.m,'phys','spell',P);return true;}
+  if(t==='pnClones'){const n=Math.min(sp.n,6-alive().length);for(let i=0;i<n;i++){const m=mkEnemy('golem',e.lvl-2,{d:ri(1,3),map:C.I.mt});m.n='Клон Создателя';m.el='cold';m.mix={cold:1};m.maxHp=m.hp=R(e.maxHp*.03);m.dmg=e.dmg*.45;m.summoned=1;C.enemies.push(m);}logC(`Появляются клоны Создателя: ${n}`);return true;}
+  if(t==='pnRing'){if(e.d===0){logC('<span class="good-t">Вы внутри Кольца смерти — взрыв проходит мимо</span>');return true;}const k=e.d/3;pnHurt(e,sp.m*k,'chaos','spell',P);logC(`Кольцо смерти: чем дальше от Древнего, тем сильнее (${R(k*100)}%)`);return true;}
+  if(t==='pnSiphon'){const es=R(C.es*sp.p),m=R(C.mana*sp.p*.5);C.es-=es;C.mana-=m;const h=brBossHeal(e,Math.min(.02,(es*2)/e.maxHp));if(h){e.hp=Math.min(e.maxHp,e.hp+h);fx(e.uid,'+'+fmt(h),'heal');}
+    pnHurt(e,.6,'chaos','spell',P);logC(`Отсасывание: −${fmt(es)} щита, −${fmt(m)} маны${h?`, Древний +${fmt(h)}`:''}`);return true;}
+  if(t==='pnCorrupt'){const ef=hexYou({resAll:-25},P);C.fb=C.fb.filter(b=>b.slot!=='pnC'+e.uid);C.fb.push({slot:'pnC'+e.uid,name:sp.name,eff:ef,turns:sp.t,bad:1});C.noEsRe=sp.t+1;logC(`Порча: −25% к сопротивлениям, щит не восстанавливается ${sp.t} хода`);return true;}
+  if(t==='pnStorm'){C.storm=(C.storm||0)+1;C.stormE=e.uid;logC(`Над полем ещё один шторм (${C.storm}): урон молнией каждый ход до конца боя`);return true;}
+  if(t==='pnMaze'){C.root=Math.max(C.root||0,sp.t+1);logC(`<b class="bad-t">Лабиринт</b>: ${sp.t} хода нельзя двигаться`);return true;}
+  if(t==='pnDie'){pnHurt(e,sp.m,sp.el,'spell',P);return true;}
+  if(t==='pnFireRing'){if(!C.cure){C.burn={d:R(e.dmg*sp.m*(1-(P.res.fire||0)/100)),t:3,t0:C.turn};logC('Огненное кольцо: вы горите 3 хода');}return true;}
+  if(t==='pnQuake'){if(e.d===0){pnHurt(e,sp.m,'phys','melee',P);if(C.hp>0&&!C.stunned&&!C.stunImm){C.stunned=1;C.stunAt=C.turn;logC('<b class="bad-t">Землетрясение: вы оглушены</b>');}}else{pnHurt(e,sp.m*.6,'phys','spell',P);logC('Камни падают с потолка');}return true;}
+  if(t==='pnVenom'){if(!P.keys.has('ci')&&!C.cure){const n=1+(e.venom||0);for(let i=0;i<n;i++)C.poison.push({d:e.dmg*sp.m,t:5,t0:C.turn});logC(`Ядовитые головы: ${n} яд(а) на 5 ходов`);}return true;}
+  if(t==='pnSmoke'){if(!(P.U&&P.U.u_noBlind))C.blind=Math.max(C.blind||0,sp.t+1);e.st.ward=sp.t+1;logC('Дымовая завеса: вы ослеплены, Химера скрыта (вдвое меньше урона по ней)');return true;}
+  if(t==='pnTeleport'){const ds=[0,1,2,3].filter(d=>d!==e.d);e.d=pick(ds);e.moved=true;if(C.target===e.uid)C.target=null;pnHurt(e,sp.m,'light','spell',P);logC(`Поработитель перескакивает: ${DIST[e.d].toLowerCase()}`);return true;}
+  if(t==='pnBind'){C.root=Math.max(C.root||0,sp.t+1);if(!P.keys.has('ci')&&!C.cure)C.poison.push({d:e.dmg*.12,t:3,t0:C.turn});logC(`<b class="bad-t">Оковы</b>: ${sp.t} хода нельзя двигаться, вы отравлены`);return true;}
+  if(t==='pnPurge'){const nb=C.fb.filter(b=>!b.bad).length;C.fb=C.fb.filter(b=>b.bad);(C.fl||[]).forEach(f=>{if(f)f.ch=Math.floor(f.ch/2);});pnHurt(e,.8,'phys','spell',P);logC(`Очищение: сняты эффекты флаконов (${nb}), заряды флаконов уполовинены`);return true;}
+  if(t==='pnHoly'){const n=Math.min(sp.n,6-alive().length);for(let i=0;i<n;i++){const m=mkEnemy('cultist',e.lvl-2,{d:ri(2,3),map:C.I.mt});m.n='Святая сфера';m.holy=e.uid;m.el='light';m.mix={light:1};m.maxHp=m.hp=R(e.maxHp*.04);m.dmg*=.3;m.summoned=1;C.enemies.push(m);}logC('Святые сферы: пока они живы, Баран получает вдвое меньше урона');return true;}
+  if(t==='pnBlizzard'){C.vBliz=(C.vBliz||0)+1;C.chill=Math.max(C.chill||0,3);if(C.vBliz>=3&&!C.stunned&&!(P.U&&P.U.u_kiara)){C.vBliz=0;C.stunned=2;C.stunAt=C.turn;logC('<b class="bad-t">Метель: вы заморожены</b>');}else logC(`Метель: вы охлаждены (${C.vBliz}/3 до заморозки)`);return true;}
+  if(t==='pnTraps'){C.trap=sp.t+1;C.trapD=R(e.dmg*sp.m);e.st.ward=2;logC(`Ловушки: шаг в ближайшие ${sp.t} хода ранит; Аль-Хезмин скрывается`);return true;}
+  if(t==='pnBanner'){C.banner=sp.t+1;logC(`Боевое знамя: враги наносят на 30% больше урона ${sp.t} хода`);return true;}
+  return false;}
+{const _ea=enemyAct;enemyAct=function(e,P){
+  if(e.boss&&(e.pinnacle||e.guardian||MONS[e.type]&&PN_SPEC[e.type])&&!e.st.frozen&&!e.st.stun&&!e.brLord){
+    /* продолжение Луча Создателя: второй удар, если герой не сделал шаг */
+    if(e.beam){e.beam=0;if(C.moved)logC('<span class="good-t">Вы уходите из Луча</span>');else{logC(`<span class="boss-t">${e.n}: Луч Создателя!</span>`);pnHurt(e,1.25,'cold','spell',P);}}
+    const sp=e.boss.spec.slice().reverse().find(s=>(e.turn+1)%s.every===0);
+    if(sp&&sp.type.startsWith('pn')){const ph=e.boss.phases&&e.boss.phases[e.phase||0];if(!(ph&&e.hp<e.maxHp*ph.at)){e.turn++;logC(`<span class="boss-t">${e.n}: ${sp.name}!</span>`);if(pnAbility(e,sp,P))return;}}}
+  /* Искоренитель: вращающиеся клинки бьют каждый ход, пока вы вплотную */
+  const r=_ea(e,P);
+  if(e.guardian==='eradicator'&&e.hp>0&&e.d===0&&C.hp>0){pnHurt(e,.35,'phys','melee',P);logF('&nbsp;&nbsp;Вращающиеся клинки');}
+  /* Феникс: огонь у его подножия — жжёт, пока вы вплотную */
+  if(e.guardian==='phoenix'&&e.hp>0&&e.d===0&&C.hp>0&&!C.cure){C.burn={d:R(e.dmg*.2*(1-(P.res.fire||0)/100)),t:2,t0:C.turn};}
+  return r;};}
+/* фазы: Стирание (Создатель), отражения (Сирус), головы Гидры */
+{const _ea=enemyAct;enemyAct=function(e,P){const ph=e.boss&&e.boss.phases&&e.boss.phases[e.phase||0],trig=ph&&e.hp<e.maxHp*ph.at&&!e.st.frozen&&!e.st.stun;
+  const r=_ea(e,P);
+  if(trig&&(e.phase||0)>0){const done=e.boss.phases[e.phase-1];
+    if(done.erase){pnHurt(e,done.erase,'phys','spell',P);logC('<b class="bad-t">Стирание: удар по всему полю</b>');}
+    if(done.mirror){for(let i=0;i<done.mirror;i++){const m=mkEnemy(e.type,e.lvl,{d:ri(1,3),map:C.I.mt});m.boss=null;m.n=e.n;m.mirrorOf=e.uid;m.maxHp=e.maxHp;m.hp=R(e.maxHp*.06);m.dmg=e.dmg*.35;m.summoned=1;C.enemies.push(m);}logC('Сирус распадается на отражения — найдите настоящего');}
+    if(done.venom)e.venom=(e.venom||0)+1;}
+  return r;};}
+/* получаемый урон: Баран под защитой святых сфер */
+{const _dh=dealHit;dealHit=function(sk,e,m,proj,P){if(e&&e.guardian==='baran'&&alive().some(x=>x.holy===e.uid)){e.st.ward=Math.max(e.st.ward||0,1);}return _dh(sk,e,m,proj,P);};}
+/* Феникс возрождается один раз с 30% здоровья; со смертью Сируса исчезают отражения */
+{const _k=killEnemy;killEnemy=function(e,P,sk,mk){
+  if(e&&!e.dead&&e.guardian==='phoenix'&&!e.reborn){e.reborn=1;e.hp=R(e.maxHp*.3);fx(e.uid,'Возрождение','heal');logC('<span class="boss-t">Феникс возрождается из пепла!</span>');return;}
+  const r=_k.apply(this,arguments);
+  if(e&&e.pinnacle&&C){C.enemies.forEach(x=>{if(x.mirrorOf===e.uid&&x.hp>0){x.hp=0;x.gone=1;}});}
+  return r;};}
+/* знамя: враги сильнее; лабиринт и оковы: нельзя двигаться; ловушки: шаг ранит */
+{const _eo=enemyOut;enemyOut=function(e,P){const m=_eo(e,P);return C&&C.banner>0?m*1.3:m;};}
+{const _mv=move;move=async function(dir){if(C&&!C.over&&!C.busy&&C.root>0){toast('Вы не можете двигаться');return;}
+  const r=await _mv(dir);if(C&&C.trap>0&&C.moved&&C.hp>0){const P=calc(),e=alive().find(x=>x.guardian==='alhezmin')||alive()[0];if(e){hurtPlayer(e,C.trapD||e.dmg*.8,'phys','spell',P);logC('Вы наступаете в ловушку');}}return r;};}
+/* в начале хода врагов: штормы бьют, отсчёт лабиринта, ловушек, знамени, порчи щита */
+{const _ep=enemyPhase;enemyPhase=async function(P,noExtra){
+  if(C&&!C.over){if(C.root>0)C.root--;if(C.trap>0)C.trap--;if(C.banner>0)C.banner--;if(C.noEsRe>0)C.noEsRe--;
+    if(C.storm>0){const e=alive().find(x=>x.uid===C.stormE)||alive().find(x=>x.boss);if(e){hurtPlayer(e,e.dmg*.12*C.storm,'light','spell',P);logF(`&nbsp;&nbsp;Штормы Сируса ×${C.storm}`);}}}
+  return _ep(P,noExtra);};}
+/* порча Древнего: щит не восстанавливается */
+{const _rt=regenTick;regenTick=function(){const es0=C?C.es:0;const r=_rt.apply(this,arguments);if(C&&C.noEsRe>0&&C.es>es0)C.es=es0;return r;};}
+/* намерения: объявленные приёмы и Кольцо смерти с подсказкой */
+{const _in=intent;intent=function(e,P){const r=_in(e,P);if(!e||e.hp<=0||!e.boss||!r||(C&&C.veil>0))return r;const sp=e.boss.spec.slice().reverse().find(s=>(e.turn+1)%s.every===0);
+  if(e.beam)return {t:'Луч продолжается — сделайте шаг',c:'bad'};
+  if(sp&&sp.tele)return {t:`Готовит: ${sp.name} — сделайте шаг, чтобы уклониться`,c:'bad'};
+  if(sp&&sp.ring)return {t:`Готовит: ${sp.name} — подойдите вплотную`,c:'bad'};return r;};}
+/* автобой: уходит от объявленных ударов шагом, встаёт в Кольцо смерти */
+{const _as=autoStep;autoStep=function(){if(!C||!C.auto||C.busy||C.over)return _as();
+  const th=alive().find(e=>e.boss&&!e.st.frozen&&!e.st.stun&&(e.beam||(()=>{const sp=e.boss.spec.slice().reverse().find(s=>(e.turn+1)%s.every===0);return sp&&(sp.tele||sp.ring);})()));
+  if(th&&!(C.root>0)&&!(C.trap>0)){const sp=th.boss.spec.slice().reverse().find(s=>(th.turn+1)%s.every===0);
+    if(sp&&sp.ring&&th.d>0&&alive().some(e=>e.d>0))return move(-1);
+    if(th.beam||(sp&&sp.tele)){if(alive().some(e=>e.d<3))return move(1);if(alive().some(e=>e.d>0))return move(-1);}}
+  return _as();};}
+/* награда: с пинакл-босса всегда 2 уникальных (было 1–2), с Хранителя — 25% шанс второго фрагмента */
+{const _al=addLoot;let pinCnt=null;addLoot=function(it){if(pinCnt&&it&&it.pin)pinCnt.n++;return _al.apply(this,arguments);};
+ const _k=killEnemy;killEnemy=function(e,P,sk,mk){const was=e&&e.dead,pin=e&&!was&&e.pinnacle;if(pin)pinCnt={n:0};let r;try{r=_k.apply(this,arguments);}finally{const c=pinCnt;pinCnt=null;
+    if(pin&&c&&c.n===1&&PIN_UNIQUES[pin]){const have=new Set(C.loot.filter(x=>x&&x.pin===pin).map(x=>x.name)),pool=PIN_UNIQUES[pin].filter(u=>!have.has(u.n)),u=pick(pool.length?pool:PIN_UNIQUES[pin]);const it=makeUnique(84,u);it.pin=pin;addLoot(it);logC(`Уникальный предмет пинакл-босса: <span class="r-unique">${esc(it.name)}</span>`);}}
+  if(e&&!was&&e.guardian&&C&&roll(25)){const G=GUARD[e.guardian];S.frag[e.guardian]=(S.frag[e.guardian]||0)+1;C.loot.push({frag:1,name:G.frag});logC(`Выпал ещё один <span class="r-unique">${G.frag}</span>`);}
+  return r;};}
+
+/* =========================================================
+   0.24: УБЕР ДРЕВНИЙ — Древний и Создатель одновременно (как в PoE 3.x).
+   Доступ: 4 фрагмента. С каждого Создателя — Фрагмент знания или формы, с каждого Древнего — Фрагмент ужаса или пустоты.
+   Бой: сначала бьём Создателя — Древний неуязвим, пока у Создателя больше 75%. На 75%, 50% и 25% здоровья Создателя —
+   передышки: оба неуязвимы, пока живы слуги из порталов. Древний не умирает, пока жив Создатель.
+   Добыча: 2 уникальных из пула (Метка Создателя 34, Метка Древнего 34, Пустострел 20, Индигон 8, Расщепитель 2, Горн пустоты 2).
+   ========================================================= */
+const UBER_FRAGS={know:{n:'Фрагмент знания',from:'shaper'},shape:{n:'Фрагмент формы',from:'shaper'},terror:{n:'Фрагмент ужаса',from:'elder'},empty:{n:'Фрагмент пустоты',from:'elder'}};
+const UBER_IDS=Object.keys(UBER_FRAGS);
+/* собраны все 4 фрагмента Убер Древнего */
+const uberReady=()=>UBER_IDS.every(k=>((S.ufrag||{})[k]||0)>0);
+{const _fc=fixChar;fixChar=function(c){const r=_fc.apply(this,arguments);c.ufrag=c.ufrag||{};return r;};}
+
+/* ---------- боссы ---------- */
+Object.assign(MONS,{
+  uber_shaper:{n:'Создатель',el:'cold',k:'spell',hp:1,dmg:1.25,res:{fire:40,cold:50,light:40,chaos:30},uber:1,boss:{hp:45,spec:[
+    {every:3,name:'Лучи Создателя',type:'nuke',m:2.1,el:'cold'},{every:4,name:'Луч Создателя',type:'pnBeam',m:2.5,el:'cold',tele:1},{every:5,name:'Телепорт с ударом',type:'pull',m:2.2}]}},
+  uber_elder:{n:'Древний',el:'chaos',k:'spell',hp:1,dmg:1.25,res:{fire:40,cold:40,light:40,chaos:60},uber:1,boss:{hp:45,spec:[
+    {every:3,name:'Ледяное копьё',type:'pnOrbs',m:2.2,tele:1},{every:4,name:'Отсасывание',type:'pnSiphon',p:.3},{every:5,name:'Удар щупальцем',type:'nuke',m:2,el:'chaos'},{every:6,name:'Кольцо смерти',type:'pnRing',m:3,ring:1}]}},
+});
+PN_SPEC.uber_shaper=MONS.uber_shaper.boss.spec;PN_SPEC.uber_elder=MONS.uber_elder.boss.spec;
+const UBER_ARENA='Расколотая бездна';
+/* запись для экрана победы и т. п. (не перечисляется: не попадает в списки пинакл-групп) */
+Object.defineProperty(PIN_GROUPS,'uber',{value:{n:'Убер Древний',arena:'Расколотая бездна',guards:[],col:'#e6c57a',d:''},enumerable:false});
+{const _bi=battleInfo;battleInfo=function(B){const m=B.type==='map'&&S.mapRun;if(m&&m.pin==='uber')return {lvl:87,boss:'uber_shaper',pool:[],name:UBER_ARENA,sub:'Убер Древний · Создатель и Древний',act:5,map:1,mt:19,mtier:16,waves:1,pin:1,uber:1};return _bi(B);};}
+/* бой: Создатель вплотную, Древний вдали; фазы по здоровью Создателя */
+{const _sb=startBattle;startBattle=function(B){const r=_sb.apply(this,arguments);
+  if(C&&C.I&&C.I.uber){const s=C.enemies.find(e=>e.type==='uber_shaper');if(s){s.uberS=1;s.d=1;
+      const el=mkEnemy('uber_elder',C.I.lvl+1,{d:3,map:C.I.mt});el.uberE=1;C.enemies.push(el);C.uber={ph:0,int:0};
+      logC('<span class="boss-t">Создатель и Древний — вместе. Пока у Создателя больше 75% здоровья, Древний неуязвим.</span>');}}
+  return r;};}
+/* Создатель в бою с Убер Древним */
+const uberS=()=>C&&C.enemies.find(e=>e.uberS);
+/* Древний в бою с Убер Древним */
+const uberE=()=>C&&C.enemies.find(e=>e.uberE);
+/* неуязвимость: Древний — пока Создатель выше 75%; оба — пока живы слуги передышки */
+const uberImmune=e=>{if(!C||!C.uber||!(e.uberS||e.uberE))return false;if(alive().some(x=>x.uberAdd))return true;const s=uberS();return !!(e.uberE&&s&&s.hp>0&&s.hp>s.maxHp*.75);};
+{const _dh=dealHit;dealHit=function(sk,e,m,proj,P){if(e&&uberImmune(e)){e.touched=true;fx(e.uid,'Неуязвим','');logF(`&nbsp;&nbsp;→ ${e.n}: <span class="dim">неуязвим</span>`);return {total:0,crit:false,parts:{},raw:{}};}
+  const r=_dh(sk,e,m,proj,P);
+  /* Древний не умирает, пока жив Создатель */
+  if(e&&e.uberE&&e.hp<=0&&!e.dead){const s=uberS();if(s&&s.hp>0){e.hp=1;logC('Древний держится, пока жив Создатель');}}
+  uberPhase();return r;};}
+{const _dot=typeof enemyDots==='function'?enemyDots:null;if(_dot)enemyDots=function(e,P){const hp0=e.hp;if(uberImmune(e)){return 0;}const r=_dot.apply(this,arguments);if(e.uberE&&e.hp<=0){const s=uberS();if(s&&s.hp>0)e.hp=1;}return r;};}
+/* передышки на 75%, 50%, 25% здоровья Создателя: слуги из порталов пустоты или монстры с карт */
+function uberPhase(){if(!C||!C.uber||C.over)return;const s=uberS();if(!s)return;const f=s.hp/s.maxHp,th=[.75,.5,.25][C.uber.ph];if(th==null||f>th)return;
+  C.uber.ph++;const elderInt=C.uber.ph!==2,n=Math.min(4,6-alive().length);
+  for(let i=0;i<n;i++){const id=elderInt?pick(['eradicator','constrictor','purifier','enslaver']):pick(ALL_MOBS);const m=mkEnemy(id,C.I.lvl-1,{d:ri(0,3),map:C.I.mt,rar:elderInt?undefined:pick(['magic','rare'])});
+    if(m.boss){m.boss=null;m.maxHp=m.hp=R(s.maxHp*.02);m.dmg*=.6;}m.n=elderInt?'Порождение пустоты':m.n;m.uberAdd=1;m.summoned=1;C.enemies.push(m);}
+  logC(`<span class="boss-t">${elderInt?'Передышка Древнего: из порталов пустоты выходят порождения':'Передышка Создателя: в арену врываются монстры с карт'} — боссы неуязвимы, пока слуги живы</span>`);}
+/* убийство слуг передышки даёт заряды флаконов (как в PoE) */
+{const _k=killEnemy;killEnemy=function(e,P,sk,mk){const r=_k.apply(this,arguments);
+  if(e&&e.uberAdd&&C&&C.fl)C.fl.forEach(f=>{if(f)f.ch+=3;});
+  if(e&&(e.uberS||e.uberE)&&C&&!C.uberDone){const s=uberS(),el=uberE();if(s&&el&&s.hp<=0&&el.hp<=0){C.uberDone=1;uberLoot(P);}
+    else if(e.uberS&&el&&el.hp>0)logC('Создатель повержен — теперь Древний может умереть');}
+  return r;};}
+
+/* ---------- добыча ---------- */
+const UBER_POOL=[['Метка Создателя',34],['Метка Древнего',34],['Пустострел',20],['Индигон',8],['Расщепитель',2],['Горн пустоты',2]];
+/* добыча Убер Древнего по весам */
+function uberPick(n){const pool=UBER_POOL.slice(),out=[];for(let i=0;i<n&&pool.length;i++){const tot=pool.reduce((a,x)=>a+x[1],0);let r=Math.random()*tot,j=0;for(;j<pool.length;j++){r-=pool[j][1];if(r<=0)break;}out.push(pool.splice(Math.min(j,pool.length-1),1)[0][0]);}return out;}
+/* награда за Убер Древнего */
+function uberLoot(P){S.pinK.uber=(S.pinK.uber||0)+1;logC('<span class="boss-t">Убер Древний повержен!</span>');
+  uberPick(2).forEach(nm=>{const d=uq4Def(nm);if(!d)return;const it=uq4Make(d,86);it.pin='uber';addLoot(it);logC(`Уникальный предмет Убер Древнего: <span class="r-unique">${esc(it.name)}</span>`);});
+  for(let i=0;i<6;i++)addOrb(pick(['exalt','divine','divine','chaos','exalt']));addMap(16);}
+/* фрагменты: с каждого Создателя и Древнего — один из двух (чаще тот, которого нет) */
+{const _k=killEnemy;killEnemy=function(e,P,sk,mk){const was=e&&e.dead;const r=_k.apply(this,arguments);
+  if(e&&!was&&(e.pinnacle==='shaper'||e.pinnacle==='elder')&&C){S.ufrag=S.ufrag||{};const ids=UBER_IDS.filter(k=>UBER_FRAGS[k].from===e.pinnacle),miss=ids.filter(k=>!(S.ufrag[k]>0)),id=miss.length?pick(miss):pick(ids);
+    S.ufrag[id]=(S.ufrag[id]||0)+1;C.loot.push({frag:1,name:UBER_FRAGS[id].n});logC(`Выпал <span class="r-unique">${UBER_FRAGS[id].n}</span> — фрагмент Убер Древнего`);}
+  return r;};}
+/* бой с Убер Древним: тратит 4 фрагмента */
+function startUber(){if(!uberReady()||S.mapRun)return false;UBER_IDS.forEach(k=>{S.ufrag[k]--;});S.mapRun={tier:16,step:3,pool:[],pin:'uber',name:UBER_ARENA};save();startBattle({type:'map',step:3});return true;}
+
+/* ---------- уникальные предметы Убер Древнего ---------- */
+UQ_SRC_N.uber='выпадает только с Убер Древнего';UQ_SRC_N.uber2='выпадает с Убер Древнего и Древнего';
+const UQ_UBER=[
+  {n:'Метка Создателя',en:'Mark of the Shaper',slot:'ring',base:'Кольцо с опалом',minL:80,t:'0',src:'uber',rq:{},
+    imp:[{t:'{0}% увеличение урона от стихий',rg:[[15,25]],s:[['elemP','$0']]}],
+    mods:[{t:'20% шанс вызвать срабатывание умения «Призыв нестабильной аномалии» 20 уровня при убийстве',rg:[],s:[['u_trigAnomaly',20]]},
+      {t:'Добавляет от {0} до {1} урона от молнии к чарам',rg:[[13,18],[50,56]],s:[['spLight',['$0','$1']]]},
+      {t:'{0}% увеличение максимума энергетического щита',rg:[[6,10]],s:[['esP','$0']]},{t:'{0}% увеличение максимума здоровья',rg:[[6,10]],s:[['lifeP','$0']]},
+      {t:'Кольцо в левом слоте: {0}% увеличение урона от чар',rg:[[60,80]],s:[['ringL:spellP','$0']]},{t:'Кольцо в правом слоте: вас нельзя оглушить чарами',rg:[],s:[['ringR:u_noStunSpell',1]]}]},
+  {n:'Метка Древнего',en:'Mark of the Elder',slot:'ring',base:'Стальное кольцо',minL:80,t:'0',src:'uber2',rq:{},
+    imp:[{t:'Добавляет от {0} до {1} физического урона к атакам',rg:[[3,4],[10,14]],s:[['addPhys',['$0','$1']]]}],
+    mods:[{t:'20% шанс вызвать срабатывание «Удара щупальцами» 20 уровня при убийстве',rg:[],s:[['u_trigTentacle',20]]},
+      {t:'Добавляет от {0} до {1} урона от холода к атакам',rg:[[26,32],[42,48]],s:[['addCold',['$0','$1']]]},
+      {t:'{0}% увеличение максимума энергетического щита',rg:[[6,10]],s:[['esP','$0']]},{t:'{0}% увеличение максимума здоровья',rg:[[6,10]],s:[['lifeP','$0']]},
+      {t:'Кольцо в левом слоте: {0}% увеличение урона от атак',rg:[[60,80]],s:[['ringL:atkP','$0']]},{t:'Кольцо в правом слоте: вас нельзя оглушить атаками',rg:[],s:[['ringR:u_noStunAtk',1]]}]},
+  {n:'Пустострел',en:'Voidfletcher',slot:'quiver',base:'Витиеватый колчан',minL:64,t:'0',src:'uber',rq:{},imp:[],
+    mods:[{t:'Расходует заряд пустоты, чтобы вызвать срабатывание «Выстрела пустоты» 20 уровня, когда вы сами выпускаете стрелы умением',rg:[],s:[['u_voidShot',1]]},
+      {t:'Добавляет от {0} до {1} урона от холода к атакам',rg:[[30,40],[80,100]],s:[['addCold',['$0','$1']]]},
+      {t:'+{0} к максимуму энергетического щита',rg:[[80,120]],s:[['es','$0']]},{t:'+{0}% к сопротивлению холоду',rg:[[20,30]],s:[['resC','$0']]},
+      {t:'Максимум зарядов пустоты: 5',rg:[],s:[['u_voidMax',5]]},{t:'Дарует заряд пустоты каждый ход',rg:[],s:[]}]},
+  {n:'Индигон',en:'Indigon',slot:'helm',dt:'es',base:'Венец гордыни',minL:69,t:'0',src:'uber',rq:{int:154},imp:[],
+    mods:[{t:'{0}% увеличение энергетического щита',rg:[[150,180]],s:[['esL','$0']]},{t:'{0}% увеличение максимума маны',rg:[[6,10]],s:[['manaP','$0']]},
+      {t:'Восстанавливает {0}% здоровья, когда вы используете флакон маны',rg:[[8,10]],s:[['u_lifeOnManaFlask','$0']]},
+      {t:'Восстановление маны от флаконов дополнительно восстанавливается в виде здоровья',rg:[],s:[['u_manaFlaskLife',1]]},
+      {t:'{0}% повышение стоимости умений за каждые недавно потраченные 200 маны',rg:[[50,60]],s:[['u_indigonCost','$0']]},
+      {t:'{0}% увеличение урона от чар за каждые недавно потраченные 200 маны, вплоть до 2000% (недавно — за последние 4 хода)',rg:[[20,25]],s:[['u_indigonSpell','$0']]}]},
+  {n:'Расщепитель',en:'Disintegrator',slot:'weapon',wk:'staff',base:'Посох вихрей',minL:64,t:'0',src:'uber2',rq:{str:113,int:113},
+    imp:[{k:'block',v:25}],
+    mods:[{k:'addPhysL',rr:[[220,240],[270,300]]},
+      {t:'+3 к максимуму зарядов переливания',rg:[],s:[['u_siphonMax',3]]},{t:'25% шанс получить заряд переливания при использовании умения',rg:[],s:[['u_siphonC',25]]},
+      {t:'Добавляет от {0} до {1} физического урона к атакам и чарам за заряд переливания',rg:[[20,23],[26,30]],s:[['u_siphonMin','$0'],['u_siphonMax2','$1']]},
+      {t:'Наносит 4% от урона не-хаосом в виде дополнительного урона хаосом за заряд переливания',rg:[],s:[]},
+      {t:'2% дополнительного уменьшения получаемого физического урона от ударов за заряд переливания',rg:[],s:[]},
+      {t:'0,2% от урона похищается в виде здоровья за заряд переливания',rg:[],s:[]},
+      {t:'Вы получаете 150 физического урона за ход за заряд переливания, если недавно использовали умение',rg:[],s:[]},
+      {t:'Боевой маг: чары получают добавленный урон, равный урону оружия в правой руке',rg:[],s:[['u_battlemage',1]]}]},
+  {n:'Горн пустоты',en:'Voidforge',slot:'weapon',wk:'sword2',base:'Меч подземного царства',minL:67,t:'0',src:'uber',rq:{str:113,dex:113},
+    imp:[{t:'{0}% увеличение урона от стихий от умений атак',rg:[[30,30]],s:[['elemAtkP','$0']]}],
+    mods:[{t:'{0}% увеличение урона атак (скорость атаки по нашим правилам)',rg:[[5,8]],s:[['atkP','$0']]},
+      {t:'+{0} к максимуму здоровья',rg:[[90,100]],s:[['life','$0']]},
+      {t:'Ваш урон от стихий может накладывать шок',rg:[],s:[['u_allShock',1]]},
+      {t:'Дарует 700% от физического урона оружием в виде дополнительного урона от случайной стихии',rg:[],s:[['u_voidforge',700]]},
+      {t:'20% шанс, что атака по области заденет ещё одну линию',rg:[],s:[['aoeRad',20]]},
+      {t:'Наносит только урон от стихий: физический урон не наносится',rg:[],s:[['u_noPhysDealt',1]]}]},
+];
+UQ_UBER.forEach(d=>{const i=UQ4.findIndex(x=>x.en===d.en);if(i>=0)UQ4.splice(i,1);UQ4.push(d);uq4ByN.set(d.n,d);uq4ByEn.set(d.en,d);});
+/* основа предмета — как в PoE (кольцо с опалом, стальное кольцо, витиеватый колчан, …) */
+{const _m=uq4Make;uq4Make=function(U,ilvl,vi){const it=_m(U,ilvl,vi);if(U.base)it.base=U.base;return it;};}
+/* у Древнего в пуле — новые версии Метки Древнего и Расщепителя (как у Убер Древнего) */
+PIN_UNIQUES.elder.forEach((u,i)=>{if(u.n==='Метка Древнего'||u.n==='Дезинтегратор')PIN_UNIQUES.elder[i]={n:u.n==='Дезинтегратор'?'Расщепитель':'Метка Древнего',slot:u.slot,u4:1};});
+
+/* ---------- умения предметов: аномалия, щупальца, выстрел пустоты ---------- */
+Object.assign(GEMS,{
+  anomaly:{n:'Призыв нестабильной аномалии',c:'int',cat:'spell',rl:1,itemOnly:1,tags:['spell','area','cold','minion'],fn:'band',rng:'Ряд цели',el:'cold',base:[9,14],
+    d:'Умение предмета (Метка Создателя). Аномалия подлетает к врагам и взрывается холодом на их линии, оставляя вихрь: враги на линии охлаждены.',make(o,L){o.cost=0;o.ail.freeze+=10;}},
+  tentacle:{n:'Удар щупальцами',c:'str',cat:'melee',rl:1,itemOnly:1,anyW:1,tags:['attack','area','melee'],fn:'all0',rng:'Вплотную',
+    d:'Умение предмета (Метка Древнего). Три щупальца бьют по всем врагам вплотную: 250% урона атаки.',make(o,L){o.mult=atkM(2.5,20);o.cost=0;}},
+  voidshot:{n:'Выстрел пустоты',c:'dex',cat:'ranged',rl:1,itemOnly:1,tags:['attack','proj','area','cold'],fn:'band',rng:'Ряд цели',
+    d:'Умение предмета (Пустострел). Стрела замедляется и взрывается на линии цели: 65% урона, вдвое больше урона по области, половина физического урона — в холод.',make(o,L){o.mult=atkM(1.3,20);o.conv={cold:.5};o.cost=0;}},
+});
+/* срабатывания при убийстве: аномалия и щупальца (раз в ход каждое) */
+{const _k=killEnemy;killEnemy=function(e,P,sk,mk){const was=e&&e.dead;const r=_k.apply(this,arguments);
+  if(!e||was||!C||C.over||!P||!P.U)return r;const U=P.U,tg=alive().find(x=>x.d===e.d)||alive()[0];if(!tg)return r;
+  if(U.u_trigAnomaly&&C.anoAt!==C.turn&&roll(U.u_trigAnomaly)){const s=uqItemSkill('anomaly',20,P);if(s&&!s.bad){C.anoAt=C.turn;logF('&nbsp;&nbsp;<span class="r-unique">Нестабильная аномалия</span>');uqCastAt(s,tg,P);alive().filter(x=>x.d===tg.d).forEach(x=>{x.st.chill=Math.max(x.st.chill||0,2);});}}
+  if(U.u_trigTentacle&&C.tenAt!==C.turn&&roll(U.u_trigTentacle)&&alive().some(x=>x.d===0)){const s=uqItemSkill('tentacle',20,P);if(s&&!s.bad){C.tenAt=C.turn;logF('&nbsp;&nbsp;<span class="r-unique">Удар щупальцами</span>');uqCastAt(s,alive().find(x=>x.d===0),P);}}
+  return r;};}
+/* Пустострел: заряды пустоты (до 5, +1 за ход); стрелы умения тратят заряд и запускают Выстрел пустоты */
+{const _ep=enemyPhase;enemyPhase=async function(P,noExtra){if(C&&P&&P.U&&P.U.u_voidShot)C.voidC=Math.min(P.U.u_voidMax||5,(C.voidC==null?5:C.voidC)+1);return _ep(P,noExtra);};}
+{const _us=useSkill;useSkill=async function(i){const P0=C?calc():null,sk=P0&&i>=0?P0.skills[i]:null,tg=C&&(C.enemies.find(e=>e.uid===C.target&&e.hp>0)||alive()[0]);
+  const r=await _us(i);
+  if(C&&!C.over&&P0&&sk&&!sk.bad&&sk.type==='attack'&&(sk.tags||[]).includes('proj')&&P0.WT&&P0.WT.has('bow')&&P0.U.u_voidShot){if(C.voidC==null)C.voidC=5;
+    if(C.voidC>0){const s=uqItemSkill('voidshot',20,P0),t=tg&&tg.hp>0?tg:alive()[0];if(s&&t){C.voidC--;logF(`&nbsp;&nbsp;<span class="r-unique">Выстрел пустоты</span> (зарядов: ${C.voidC})`);uqCastAt(s,t,P0);render();}}}
+  /* Расщепитель: заряд переливания при использовании умения */
+  if(C&&!C.over&&P0&&P0.U.u_siphonMax&&i>=0){C.skillAt=C.turn;if(roll(P0.U.u_siphonC||25)&&(C.siph||0)<P0.U.u_siphonMax){C.siph=(C.siph||0)+1;logF(`&nbsp;&nbsp;Заряд переливания (${C.siph})`);}}
+  return r;};}
+/* Расщепитель: эффекты зарядов переливания */
+{const _ch=calcHook;calcHook=function(P,g){const U=P.U,t=P.t,n=C&&U.u_siphonMax?Math.min(C.siph||0,U.u_siphonMax):0;
+  if(n){t.physRed=(t.physRed||0)+2*n;t.leech=(t.leech||0)+.2*n;}P._siph=n;
+  /* Индигон: недавно потраченная мана (за 4 хода) */
+  if(U.u_indigonSpell&&C){const k=Math.floor(uqManaRecent()/200);if(k)t.spellP=(t.spellP||0)+Math.min(2000,k*U.u_indigonSpell);P._indK=k;}
+  return _ch(P,g);};}
+{const _cv=uqConvHook;uqConvHook=function(b,P,isAtk,T){const r=_cv(b,P,isAtk,T);const U=P.U||{},w=P.weapons&&P.weapons[0];
+  if(P._siph){const n=P._siph;b.phys[0]+=n*(U.u_siphonMin||20);b.phys[1]+=n*(U.u_siphonMax2||26);}
+  /* Боевой маг: чары получают урон оружия в правой руке */
+  if(!isAtk&&U.u_battlemage&&w){b.phys[0]+=w.min;b.phys[1]+=w.max;}
+  /* Горн пустоты: 700% физического урона оружия — дополнительной стихией (огонь, холод, молния поровну: случайная в среднем) */
+  if(isAtk&&U.u_voidforge&&w){const f=U.u_voidforge/100/3;['fire','cold','light'].forEach(el=>{b[el][0]+=w.min*f;b[el][1]+=w.max*f;});}
+  return r;};}
+{const _bs=buildSkill;buildSkill=function(o,A,P,L){if(P&&P._siph)o={...o,xas:{...o.xas,chaos:(o.xas.chaos||0)+.04*P._siph}};return _bs(o,A,P,L);};}
+/* заряды переливания: урон по себе, если недавно применяли умение */
+{const _ep=enemyPhase;enemyPhase=async function(P,noExtra){if(C&&!C.over&&C.siph>0&&P&&P.U&&P.U.u_siphonMax&&C.skillAt!=null&&C.turn-C.skillAt<4){const d=150*C.siph;C.hp=Math.max(1,C.hp-d);logF(`&nbsp;&nbsp;Заряды переливания: −${d} здоровья`);}return _ep(P,noExtra);};}
+/* Индигон: учёт маны, стоимость умений, флаконы маны лечат */
+function uqManaRecent(){if(!C||!C.mlog)return 0;return C.mlog.filter(x=>C.turn-x[0]<4).reduce((a,x)=>a+x[1],0);}
+{const _pc=payCost;payCost=function(sk,P,cost){const m0=C?C.mana:0;const r=_pc(sk,P,cost);if(!r&&C&&C.mana<m0){C.mlog=(C.mlog||[]).filter(x=>C.turn-x[0]<4);C.mlog.push([C.turn,m0-C.mana]);}return r;};}
+{const _cs=calcSkill;calcSkill=function(i,P){const sk=_cs(i,P);if(sk&&P.U&&P.U.u_indigonCost&&P._indK&&sk.cost&&!sk.lifeCost)sk.cost=R(sk.cost*(1+P.U.u_indigonCost*P._indK/100));return sk;};}
+{const _uf=useFlask;useFlask=function(k){const f=C&&C.fl&&C.fl[k],it=f&&S.equip[f.slot],P=C?calc():null,st=it&&P?flaskStats(it,P):null,ch0=f?f.ch:0;
+  const r=_uf.apply(this,arguments);
+  if(st&&f.ch<ch0&&(st.type==='mana'||st.type==='hybrid')&&P.U&&!P.keys.has('vaal')){let h=0;if(P.U.u_lifeOnManaFlask)h+=R(P.life*P.U.u_lifeOnManaFlask/100);if(P.U.u_manaFlaskLife)h+=st.mana||0;
+    if(h){C.hp=Math.min(P.life,C.hp+h);fx('me','+'+fmt(h),'heal');logF(`&nbsp;&nbsp;Индигон: +${fmt(h)} здоровья`);}}
+  return r;};}
+/* Метки: нельзя оглушить атаками / чарами */
+{const _h=hurtPlayer;hurtPlayer=function(e,raw,el,kind,P,crit,mix){const s0=C?C.stunned:0;const r=_h.apply(this,arguments);const U=P&&P.U||{};
+  if(C&&C.stunned===1&&s0!==1&&((kind==='spell'&&U.u_noStunSpell)||(kind!=='spell'&&U.u_noStunAtk))){C.stunned=s0;logF('&nbsp;&nbsp;Метка: оглушение не действует');}return r;};}
+/* Горн пустоты: шок от любой стихии */
+{const _dh=dealHit;dealHit=function(sk,e,m,proj,P){const sh0=e&&e.st&&e.st.shock;const r=_dh(sk,e,m,proj,P);
+  if(r&&e&&e.hp>0&&P&&P.U&&P.U.u_allShock&&!sh0&&!e.st.shock&&((r.parts||{}).fire>0||(r.parts||{}).cold>0)&&roll(10+((sk.ail||{}).shock||0))){e.st.shock=sk.shockDur||2;}return r;};}
+/* сброс счётчиков боя */
+{const _sb=startBattle;startBattle=function(){const r=_sb.apply(this,arguments);if(C){C.siph=0;C.mlog=[];C.voidC=5;}return r;};}
 
 /* =========================================================
    ИНТЕРФЕЙС: оболочка, персонажи, карта/убежище, бой, герой, древо, камни
@@ -7020,7 +7510,7 @@ function vRoster(){
       ${bc.map(c=>`<div class="row" style="justify-content:space-between;padding-block:4px"><span>${esc(c.name)} · ${CLASSES[c.cls].n}, ур. ${c.lvl}</span><button class="btn sm" data-a="restoreChar" data-id="${c.id}" ${ACC.chars.length<MAX_CHARS?'':'disabled'}>Вернуть</button></div>`).join('')}</div>`:'';})()}
     <button class="btn full" data-a="leaders">Таблица лидеров</button>
     <div class="row"><button class="btn sp" data-a="help">Как играть</button><button class="btn sp" data-a="settings">Настройки</button></div>
-    <div class="panel"><div class="sheet"><div><span>Золото (общее)</span><span>${fmt(ACC.gold||0)} зол.</span></div><div><span>Тайник</span><span>${ACC.stash.items.length}/${30*ACC.stash.tabs}</span></div><div><span>Выручка аукциона</span><span>${fmt(ACC.aucGold||0)} зол.</span></div></div></div>
+    <div class="panel"><div class="sheet"><div><span>Золото (общее)</span><span>${fmt(RLM().gold||0)} зол.</span></div><div><span>Тайник</span><span>${RLM().stash.items.length}/${30*RLM().stash.tabs}</span></div><div><span>Выручка аукциона</span><span>${fmt(RLM().aucGold||0)} зол.</span></div></div></div>
   </div>`;
 }
 
@@ -7085,7 +7575,7 @@ function vMap(){
   h+=`<div class="seg">${ACTS.map((a,i)=>i<cur?'':`<button class="${i===viewAct?'on':''}" data-a="act" data-i="${i}" ${i<=cur?'':'disabled'}>${a.n}</button>`).join('')}</div>`;
   h+=`<div class="panel framed"><div class="eyebrow">${A.n} · ${A.total} сражений</div><h2 style="font-size:24px;margin:4px 0 6px">${A.t}</h2><p class="muted" style="margin:0 0 12px">${A.d}</p>
       <div class="eyebrow" style="margin-bottom:6px">${A.camp}</div>
-      <div class="hgrid">${station('shop','Торговец','Снаряжение, камни, продажа')}${station('stash','Тайник',`${ACC.stash.items.length}/${stashCap()}`)}${station('auction','Аукцион','Торговля между персонажами')}${anyLabOpen()||S.labRun?station('lab','Лабиринт',S.labRun?'Испытание идёт':'Возвышение'):''}</div>
+      <div class="hgrid">${station('shop','Торговец','Снаряжение, камни, продажа')}${station('stash','Тайник',`${RLM().stash.items.length}/${stashCap()}`)}${station('auction','Аукцион','Торговля между персонажами')}${anyLabOpen()||S.labRun?station('lab','Лабиринт',S.labRun?'Испытание идёт':'Возвышение'):''}</div>
       ${cur>0?'<p class="dim small" style="margin:8px 0 0">Пройденные акты скрыты. Карты 1 тира начинают выпадать в V акте.</p>':''}</div>`;
   A.locs.forEach((l,li)=>{
     const bs=BATTLES.filter(b=>b.act===viewAct&&b.loc===li),open=S.prog>=bs[0].g,done=S.prog>bs[bs.length-1].g;
@@ -7114,7 +7604,7 @@ function vHideout(){
       ${station('shop','Торговец','Снаряжение, камни, продажа')}
       ${station('dummy','Мишень','Проверка урона')}
       ${station('auction','Аукцион','Торговля')}
-      ${station('stash','Тайник',`${ACC.stash.items.length}/${stashCap()}`)}
+      ${station('stash','Тайник',`${RLM().stash.items.length}/${stashCap()}`)}
       ${station('lab','Лабиринт',`Пройдено ${S.labs.filter(Boolean).length}/4`)}
       ${station('mine','Азуритовая шахта',MN().best?`Глубина ${MN().best} · сульфур ${fmt(MN().su)}`:'Сульфур с карт')}
     </div>
@@ -7162,7 +7652,7 @@ function buffRow(P){
   if(C.stunned)b.push(chip(C.stunned===2?'Заморожен: пропуск хода':'Оглушён: пропуск хода','var(--bad)'));else if(C.stunImm)b.push(chip('Защита от оглушения','var(--good)'));
   if(C.poison.length)b.push(chip('Отравлен','var(--chaos)'));
   if(C.burn)b.push(chip('Горит','var(--fire)'));
-  if(C.bleed.length)b.push(chip('Кровотечение','var(--bad)'));if(C.cb)b.push(chip(`Оскв. кровь ×${C.cb.n}`,'var(--bad)'));if(C.silence>1)b.push(chip(`Безмолвие ${C.silence-1} х.`,'var(--bad)'));if(C.blind>1)b.push(chip(`Ослеплён ${C.blind-1} х.`,'var(--bad)'));
+  if(C.bleed.length)b.push(chip('Кровотечение','var(--bad)'));if(C.cb)b.push(chip(`Оскв. кровь ×${C.cb.n}`,'var(--bad)'));if(C.silence>1)b.push(chip(`Безмолвие ${C.silence-1} х.`,'var(--bad)'));if(C.siph>0)b.push(chip(`Переливание ×${C.siph}`,'var(--phys)'));if(C.voidC!=null&&S.equip.offhand&&S.equip.offhand.name==='Пустострел')b.push(chip(`Пустота ×${C.voidC}`,'var(--cold)'));if(C.root>0)b.push(chip('Нельзя двигаться','var(--bad)'));if(C.storm>0)b.push(chip(`Штормы ×${C.storm}`,'var(--light)'));if(C.blind>1)b.push(chip(`Ослеплён ${C.blind-1} х.`,'var(--bad)'));
   if(C.chill)b.push(chip('Охлаждён','var(--cold)'));if(C.shock)b.push(chip('Шок','var(--light)'));if(C.impH.length)b.push(chip(`Прокол ×${C.impH.length}`,'var(--phys)'));
   return `<div class="buffs">${b.join('')||'<span class="dim small">Нет активных эффектов</span>'}</div>`;
 }
@@ -7976,19 +8466,19 @@ function gemInfo(id,uid){
 /* ---------- тайник ---------- */
 /* камни в тайнике */
 function stashGemsView(){
-  const used=socketed(),mine=S.gems.filter(g=>!used.has(g.uid)),st=ACC.stash.gems;
+  const used=socketed(),mine=S.gems.filter(g=>!used.has(g.uid)),st=RLM().stash.gems;
   const row=(g,a,t)=>`<div class="gemb">${gemLine(g)}<button class="btn sm" data-a="${a}" data-u="${g.uid}">${t}</button></div>`;
   return `<div class="panel"><div class="eyebrow" style="margin-bottom:8px">В тайнике</div><div class="list">${st.map(g=>row(g,'stGemOut','← взять')).join('')||'<span class="dim">Камней нет</span>'}</div></div>
     <div class="panel"><div class="eyebrow" style="margin-bottom:8px">Свободные камни героя</div><p class="dim small" style="margin:0 0 8px">Вставленные камни сначала выньте из гнезда. Камень другого класса работает сразу, если хватает атрибутов.</p><div class="list">${mine.map(g=>row(g,'stGemIn','→ в тайник')).join('')||'<span class="dim">Свободных камней нет</span>'}</div></div>`;}
 /* экран общего тайника */
 function vStash(){
   const cap=stashCap(),c=stashCost();
-  const st=sortInv(ACC.stash.items),inv=sortInv(S.inv);
+  const st=sortInv(RLM().stash.items),inv=sortInv(S.inv);
   return `<div class="stack">${subHead('Тайник','Общий для всех персонажей')}
-    <div class="panel"><div class="row"><span class="sp">Занято <b class="num">${stashUsed()}/${cap}</b> · вкладок ${ACC.stash.tabs}/4</span>
+    <div class="panel"><div class="row"><span class="sp">Занято <b class="num">${stashUsed()}/${cap}</b> · вкладок ${RLM().stash.tabs}/4</span>
       ${c?`<button class="btn sm" data-a="stExp" ${S.gold>=c?'':'disabled'}>+30 мест · ${fmt(c)} зол.</button>`:'<span class="tag ok">Максимум</span>'}</div>
       <p class="dim small" style="margin:6px 0 0">Положите вещь или камень одним персонажем и заберите другим. Удаление персонажа не трогает тайник.</p></div>
-    <div class="seg"><button class="${stashTab==='stash'?'on':''}" data-a="stTab" data-t="stash">Тайник · ${ACC.stash.items.length}</button><button class="${stashTab==='inv'?'on':''}" data-a="stTab" data-t="inv">Сумка · ${S.inv.length}/${INV_MAX}</button><button class="${stashTab==='gems'?'on':''}" data-a="stTab" data-t="gems">Камни · ${ACC.stash.gems.length}</button></div>
+    <div class="seg"><button class="${stashTab==='stash'?'on':''}" data-a="stTab" data-t="stash">Тайник · ${RLM().stash.items.length}</button><button class="${stashTab==='inv'?'on':''}" data-a="stTab" data-t="inv">Сумка · ${S.inv.length}/${INV_MAX}</button><button class="${stashTab==='gems'?'on':''}" data-a="stTab" data-t="gems">Камни · ${RLM().stash.gems.length}</button></div>
     ${stashTab==='gems'?stashGemsView():`<div class="bag">${stashTab==='stash'?(st.map(x=>irow(x,'stOut',' · ← взять')).join('')||'<span class="dim">Тайник пуст</span>'):(inv.map(x=>irow(x,'stIn',' · → в тайник')).join('')||'<span class="dim">Сумка пуста</span>')}</div>`}
   </div>`;
 }
@@ -8062,7 +8552,7 @@ let ldr={list:null,err:null,local:false};
 /* загрузить таблицу лидеров */
 function openLeaders(){
   if(srvOn()){modal(`<h2>Таблица лидеров</h2><p class="dim">Загрузка…</p>`);
-    srvReq('/leaders').then(r=>{ldr={list:r.list||[],err:null,local:false};showLeaders();}).catch(e=>{ldr={list:localBoard(),err:'Сервер недоступен — показаны ваши персонажи. '+srvWhy(e),local:true};showLeaders();});}
+    srvReq('/leaders?league='+encodeURIComponent((typeof curLeague==='function'&&curLeague())||'')).then(r=>{ldr={list:r.list||[],err:null,local:false};showLeaders();}).catch(e=>{ldr={list:localBoard(),err:'Сервер недоступен — показаны ваши персонажи. '+srvWhy(e),local:true};showLeaders();});}
   else{ldr={list:localBoard(),err:'Общая таблица работает, когда подключён сервер игры. Сейчас — ваши персонажи.',local:true};showLeaders();}
 }
 /* понятная причина ошибки сервера */
@@ -8073,7 +8563,7 @@ function srvWhy(e){const u=String(AUCTION_URL||'');
   if(typeof e==='number')return 'Причина: ответ сервера '+e+'.';
   return 'Причина: нет связи с '+u+(u.startsWith('https://')?'':' (адрес должен начинаться с https://)')+'. Проверьте адрес или блокировку сайта в вашей сети.';}
 /* таблица лидеров из своих персонажей (без сервера) */
-function localBoard(){return boardOf().map(b=>({...b,uid:'me'})).sort((a,b)=>b.lvl-a.lvl||b.xp-a.xp);}
+function localBoard(){return boardOf().filter(b=>(b.league||'')===((typeof curLeague==='function'&&curLeague())||'')).map(b=>({...b,uid:'me'})).sort((a,b)=>b.lvl-a.lvl||b.xp-a.xp);}
 /* окно таблицы лидеров */
 function showLeaders(){const L=ldr.list||[];
   modal(`<div class="row"><h2 class="sp" style="font-size:20px">Таблица лидеров</h2><button class="btn sm ghost" data-a="close">Закрыть</button></div>
@@ -8274,7 +8764,7 @@ const ACT={
   restoreChar(d){if(restoreChar(d.id)){toast('Персонаж возвращён');render();}},
   delAsk(d){delAsk=d.id;render();},delNo(){delAsk=null;render();},
   delYes(d){deleteChar(d.id);delAsk=null;screen=ACC.chars.length?'roster':'select';render();toast('Персонаж удалён');},
-  newChar(){if(ACC.chars.length>=MAX_CHARS){toast('Не больше 7 персонажей');return;}screen='select';render();},
+  newChar(){if(ACC.chars.length>=MAX_CHARS){toast(`Не больше ${MAX_CHARS} персонажей`);return;}screen='select';render();},
   pickCls(d){pendingCls=d.c;render();},
   begin(){if(ACC.chars.length>=MAX_CHARS)return;const n=(document.getElementById('hname').value||'').trim()||'Изгнанник';newGame(pendingCls,n);screen='main';tab='map';viewAct=0;TV.init=false;selNode=null;render();toast('Путь начинается на Солёном берегу');},
   tab(d){if(d.t==='fight'){ACT.backFight();return;}tab=d.t;screen='main';sub=null;render();window.scrollTo(0,0);},
@@ -8526,7 +9016,7 @@ function corpsePicker(i){const cs=C.corpses||[];
     <p class="dim small" style="margin:0">Выбранный монстр привяжется к камню. Сбросить привязку можно только сферой очищения. Боссов поднять нельзя.</p>
     <div class="list">${rows}</div>`);}
 /* сфера очищения на камне призрака: снять привязку к монстру */
-function gemScour(uid){const g=gem(uid)||(ACC.stash.gems||[]).find(x=>x.uid===uid);if(!g||!g.spec)return false;if(!craftOnline())return false;if(!(S.cur.scour>0)){toast('Нет сферы очищения');return false;}
+function gemScour(uid){const g=gem(uid)||(RLM().stash.gems||[]).find(x=>x.uid===uid);if(!g||!g.spec)return false;if(!craftOnline())return false;if(!(S.cur.scour>0)){toast('Нет сферы очищения');return false;}
   S.cur.scour--;const n=MONS[g.spec.type]?MONS[g.spec.type].n:'';delete g.spec;
   if(C&&C.minions)C.minions.forEach(m=>{const sl=S.skills[m.slot];if(m.spec&&sl&&sl.a===uid){m.hp=0;m.gone=1;}});
   save();toast(`Привязка снята${n?': '+n:''}`);return true;}
@@ -9147,6 +9637,154 @@ function uq4Line(it,m,dm){
   return h;};}
 /* текст для поиска по предмету: свойства уникальных 0.23 — текстом */
 if(typeof itemQText==='function'){const _q=itemQText;itemQText=function(it){const s=_q(it);return it&&it.u4?s+' '+it.mods.map(m=>m.t||'').join(' ').toLowerCase():s;};}
+
+/* =========================================================
+   0.24: ЛИГИ — экран персонажей: стандарт и активные лиги, гонка лиги.
+   ========================================================= */
+/* миры на экране персонажей: стандарт, активные лиги и лиги, где ещё есть персонажи */
+function lgTabs(){const ids=new Set(lgList().filter(l=>!l.ended).map(l=>l.id));ACC.chars.forEach(c=>{if(c.league)ids.add(c.league);});return [null,...ids];}
+/* отсчёт до старта лиги вместо кнопки «Новый персонаж» */
+function lgCountdown(lid){const l=lgInfo(lid),when=new Date(l.start).toLocaleString('ru-RU',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
+  return `<div class="panel" style="text-align:center"><div class="eyebrow">Старт лиги</div><div style="font:700 22px var(--ff-d);color:var(--gold2);margin:4px 0">через ${lgLeft(lid)}</div>
+    <p class="dim small" style="margin:0">${esc(when)} по вашему времени. Создать героя в лиге можно будет в момент старта — все начинают одновременно.</p></div>`;}
+/* панель гонки лиги */
+function raceHtml(lid){const l=lgInfo(lid);if(!l||!l.race)return '';const best=ACC.chars.filter(c=>c.league===lid).sort((a,b)=>RACE_GOALS.filter(g=>g[2](b)).length-RACE_GOALS.filter(g=>g[2](a)).length)[0];
+  return `<div class="panel"><div class="eyebrow" style="margin-bottom:6px">Гонка лиги</div>
+    <p class="small" style="margin:0 0 6px">${esc(l.race.prize||'Первый, кто выполнит все условия, получает награду.')}</p>
+    ${l.winner?`<p class="good-t" style="margin:0 0 6px">Победитель: <b>${esc(l.winner.name)}</b>${l.winner.at?` · ${new Date(l.winner.at).toLocaleDateString('ru-RU')}`:''}</p>`:''}
+    <div class="list small">${RACE_GOALS.map(g=>`<div class="row" style="justify-content:space-between"><span>${g[1]}</span><span class="${best&&g[2](best)?'good-t':'dim'}">${best&&g[2](best)?'✓':'—'}</span></div>`).join('')}</div>
+    ${best?`<p class="dim small" style="margin:6px 0 0">Прогресс вашего лучшего героя лиги: ${esc(best.name)}</p>`:''}</div>`;}
+{const _vr=vRoster;vRoster=function(){
+  const tabs=lgTabs();if(tabs.length<2&&!ACC.chars.some(c=>c.league)){LG_VIEW=null;return _vr();}
+  if(LG_VIEW&&!tabs.includes(LG_VIEW))LG_VIEW=null;
+  const lid=LG_VIEW,list=ACC.chars.filter(c=>(c.league||null)===lid),R0=realmOf(lid),act=!lid||lgActive(lid);
+  return `<div class="hero"><h1>Path of Izgnannik</h1>
+    <p>${lid?`Лига «${esc(lgName(lid))}» — отдельный мир: свои тайник, золото, аукцион и таблица лидеров. Когда лига закончится, её герои перейдут на стандарт со всеми вещами.`:'Стандарт — постоянный мир. Золото, тайник и выручка аукциона общие для героев стандарта.'}</p></div>
+  <div class="stack">
+    <div class="seg">${tabs.map(t=>`<button class="${t===lid?'on':''}" data-a="lgView" data-id="${t||''}">${esc(lgName(t))}${t&&!lgActive(t)?' (завершена)':''}${t&&lgActive(t)&&!lgStarted(t)?' · скоро':''}</button>`).join('')}</div>
+    ${list.map(c=>{const K=CLASSES[c.cls],a=c.asc&&ascDef(c.asc);
+      return `<div class="charrow ${c.id===ACC.cur?'on':''}"><div class="sigil">${clsIcon(c.cls)}</div>
+        <div class="sp"><b>${esc(c.name)}</b><div class="muted small">${a?a.n:K.n} · уровень ${c.lvl}${c.done?' · убежище':` · ${ACTS[Math.min(BATTLES[Math.min(c.prog,BATTLES.length-1)].act,4)].n}`}${c.lgPast?` · <span class="dim">из лиги «${esc(lgName(c.lgPast))}»</span>`:''}</div></div>
+        ${delAsk===c.id?`<button class="btn sm danger" data-a="delYes" data-id="${c.id}">Удалить</button><button class="btn sm ghost" data-a="delNo">Нет</button>`
+          :`<button class="btn sm ghost" data-a="delAsk" data-id="${c.id}" aria-label="Удалить персонажа">✕</button><button class="btn sm pri" data-a="play" data-id="${c.id}">Играть</button>`}</div>`;}).join('')||`<p class="dim">${lid?'В этой лиге у вас ещё нет героев.':'На стандарте нет героев.'}</p>`}
+    ${delAsk?'<p class="notice">Персонаж, его сумка и надетые вещи будут удалены. Тайник и лоты на аукционе останутся.</p>':''}
+    ${!act?'<p class="dim small">Лига завершена: новых героев в ней создать нельзя.</p>':lid&&!lgStarted(lid)?lgCountdown(lid):ACC.chars.length<MAX_CHARS?`<button class="btn full" data-a="newChar">Новый персонаж${lid?' в лиге':''} · ${ACC.chars.length}/${MAX_CHARS}</button>`:`<p class="dim small">Достигнут предел: ${MAX_CHARS} персонажей на аккаунте (стандарт и лиги вместе).</p>`}
+    ${lid?raceHtml(lid):''}
+    <button class="btn full" data-a="leaders">Таблица лидеров${lid?' лиги':''}</button>
+    <div class="row"><button class="btn sp" data-a="help">Как играть</button><button class="btn sp" data-a="settings">Настройки</button></div>
+    <div class="panel"><div class="sheet"><div><span>Золото (${lid?'лига':'стандарт'})</span><span>${fmt(R0.gold||0)} зол.</span></div><div><span>Тайник</span><span>${R0.stash.items.length}/${30*R0.stash.tabs}</span></div><div><span>Выручка аукциона</span><span>${fmt(R0.aucGold||0)} зол.</span></div></div></div>
+    ${(ACC.lgDone||[]).length?`<p class="dim small">Завершённые лиги: ${ACC.lgDone.map(x=>esc(x.name)).join(', ')} — их герои и вещи перенесены на стандарт.</p>`:''}
+  </div>`;};}
+Object.assign(ACT,{lgView(d){LG_VIEW=d.id||null;delAsk=null;render();}});
+/* выбор персонажа запоминает его мир */
+{const _p=ACT.play;ACT.play=function(d){const c=ACC.chars.find(x=>x.id===d.id);if(c)LG_VIEW=c.league||null;return _p.call(this,d);};}
+
+/* =========================================================
+   0.24: АУКЦИОН — интерфейс: предметы, камни и валюта; цена в золоте или сферах; биржа валюты; кошелёк выручки.
+   ========================================================= */
+let aucF={what:'all',kind:'',pc:''},aucSell={mode:'item',k:'cur',id:'chaos'};
+/* строка лота в списке */
+function lotRow(l){const g=l.goods,unit=g._g==='stack'&&l.price%g.n===0?` · ${priceTxt(l.price/g.n,l.pc)} за шт.`:'';
+  const left=isItemGoods(g)?`${SLOTN[g.slot]||''} · ${g.ilvl}`:g._g==='gem'?'Камень умения':(MK[g.k]||{}).n||'Валюта';
+  const cls=isItemGoods(g)?'r-'+g.rar:g._g==='gem'?'gem-t':'cur-t';
+  return `<button class="mklot" data-a="aucLot" data-id="${l.id}"><span class="dim small">${left} · ${esc(l.seller.name)}</span><span class="mkrow"><span class="${cls}">${esc(goodsName(g))}</span><b class="num gold-t">${priceTxt(l.price,l.pc)}</b></span>${unit?`<span class="dim small">${unit.slice(3)}${l.part?' · можно частью':''}</span>`:''}</button>`;}
+/* фильтр покупок */
+function aucFilterOk(l){const g=l.goods;if(aucF.pc&&l.pc!==aucF.pc)return false;
+  if(aucF.what==='item')return isItemGoods(g);if(aucF.what==='gem')return g._g==='gem';
+  if(aucF.what==='cur')return g._g==='stack'&&(!aucF.kind||g.k===aucF.kind);return true;}
+/* цена лота за штуку (для сортировки биржи) */
+const aucUnit=l=>l.goods._g==='stack'?l.price/l.goods.n:l.price;
+vAuction=function(){
+  const mode=AUC.mode();
+  if(!aucData.buy&&!aucData.loading&&!aucData.err)setTimeout(aucLoad,0);
+  const lg=curLeague();
+  let h=`<div class="stack">${subHead('Аукцион',(mode==='server'?'Общий для всех игроков':'Торговля между вашими персонажами')+(lg?` · лига «${esc(lgName(lg))}»`:''))}
+    <div class="seg">${[['buy','Купить'],['sell','Выставить'],['mine','Мои лоты']].map(([k,n])=>`<button class="${aucTab===k?'on':''}" data-a="aucTab" data-t="${k}">${n}</button>`).join('')}</div>`;
+  if(aucData.err)h+=`<p class="notice" style="border-color:var(--bad)">${esc(aucData.err)}</p>`;
+  if(aucTab==='buy'){
+    const all=(aucData.buy||[]).filter(l=>!l.mine),lots=all.filter(aucFilterOk);
+    if(aucF.what==='cur')lots.sort((a,b)=>a.pc===b.pc?aucUnit(a)-aucUnit(b):String(a.pc).localeCompare(b.pc));else lots.sort((a,b)=>b.ts-a.ts);
+    h+=`<div class="seg">${[['all','Всё'],['item','Предметы'],['gem','Камни'],['cur','Валюта']].map(([k,n])=>`<button class="${aucF.what===k?'on':''}" data-a="aucF" data-k="what" data-v="${k}">${n}</button>`).join('')}</div>
+      <div class="row" style="gap:6px;flex-wrap:wrap">${aucF.what==='cur'?`<select class="input" id="aucKind" data-a="aucFsel" data-k="kind" style="flex:1 1 140px"><option value="">Любая валюта</option>${MK_KINDS.map(k=>`<option value="${k}" ${aucF.kind===k?'selected':''}>${MK[k].n}</option>`).join('')}</select>`:''}
+        <select class="input" id="aucPc" data-a="aucFsel" data-k="pc" style="flex:1 1 140px"><option value="">Цена в любой валюте</option>${PRICE_CUR().map(c=>`<option value="${c}" ${aucF.pc===c?'selected':''}>Цена: ${c==='gold'?'золото':ORBS[c].n}</option>`).join('')}</select></div>
+      ${aucF.what==='cur'?'<p class="dim small" style="margin:0">Биржа: лоты одной валюты цены — от самого выгодного курса.</p>':''}`;
+    h+=aucData.loading&&!aucData.buy?'<p class="dim">Загрузка…</p>':`<div class="list">${lots.map(lotRow).join('')||'<span class="dim">Лотов нет</span>'}</div>`;
+  }else if(aucTab==='sell'){
+    h+=`<div class="seg">${[['item','Предмет'],['gem','Камень'],['cur','Валюта']].map(([k,n])=>`<button class="${aucSell.mode===k?'on':''}" data-a="aucSellMode" data-v="${k}">${n}</button>`).join('')}</div>
+      <p class="muted small" style="margin:0">Цена — в золоте или в любой сфере. Комиссии нет. Выручка копится в «Моих лотах».</p>`;
+    if(aucSell.mode==='item')h+=`<div class="bag">${sortInv(S.inv).map(x=>irow(x,'aucSellPick')).join('')||'<span class="dim">Сумка пуста</span>'}</div>`;
+    else if(aucSell.mode==='gem'){const used=socketed(),free=S.gems.filter(g=>!used.has(g.uid));
+      h+=`<div class="list">${free.map(g=>`<button class="gemb" data-a="aucGemPick" data-u="${g.uid}">${gemLine(g)}</button>`).join('')||'<span class="dim">Нет свободных камней: выньте камень из гнезда</span>'}</div>`;}
+    else{h+=MK_KINDS.map(k=>{const K=MK[k],ids=K.ids().filter(id=>K.have(id)>0);if(!ids.length)return '';
+        return `<div class="eyebrow">${K.n}</div><div class="list">${ids.map(id=>`<button class="mklot" data-a="aucCurPick" data-k="${k}" data-id="${esc(id)}"><span class="mkrow"><span class="cur-t">${esc(K.nm(id))}</span><b class="num">×${fmt(K.have(id))}</b></span></button>`).join('')}</div>`;}).join('')||'<span class="dim">Нечего выставить</span>';}
+  }else{
+    const m=aucData.mine||{lots:[],sold:[],wallet:{}},w=m.wallet||{},wk=Object.keys(w).filter(k=>w[k]>0);
+    h+=`<div class="panel"><div class="row"><span class="sp">Выручка: ${wk.length?wk.map(k=>`<b class="num gold-t">${priceTxt(w[k],k)}</b>`).join(' · '):'<span class="dim">пусто</span>'}</span><button class="btn sm pri" data-a="aucClaim" ${wk.length?'':'disabled'}>Забрать</button></div></div>
+      <div class="eyebrow">На продаже</div><div class="list">${(m.lots||[]).map(l=>`<div class="sellrow"><div class="irow"><span class="sl">${priceTxt(l.price,l.pc)}${l.part?' · можно частью':''}</span><span class="in">${esc(goodsName(l.goods))}</span></div><button class="btn sm" data-a="aucCancel" data-id="${l.id}">Снять</button></div>`).join('')||'<span class="dim">Нет лотов</span>'}</div>
+      <div class="eyebrow">Продано недавно</div><div class="list small">${(m.sold||[]).map(l=>`<div class="row" style="justify-content:space-between"><span>${esc((l.item&&l.item.name)||'?')}</span><span class="dim">${priceTxt(l.price,l.pc)}${l.buyer?' · '+esc(l.buyer):''}</span></div>`).join('')||'<span class="dim">Пока ничего</span>'}</div>`;
+  }
+  return h+'</div>';
+};
+/* окно цены: число + валюта цены (+ «можно частью» для стопок) */
+function priceForm(base,stack){return `<label class="stack" style="gap:6px"><span class="eyebrow">Цена${stack?' за всю стопку':''}</span>
+  <div class="row" style="gap:6px"><input class="input num sp" id="aucPrice" type="number" min="1" inputmode="numeric" value="${base}">
+  <select class="input" id="aucPc">${PRICE_CUR().map(c=>`<option value="${c}">${c==='gold'?'золото':ORBS[c].n}</option>`).join('')}</select></div></label>
+  <div class="row">${[.5,1,2,5].map(m=>`<button class="btn sm sp" data-a="aucQuick" data-v="${Math.max(1,R(base*m))}">${fmt(Math.max(1,R(base*m)))}</button>`).join('')}</div>
+  ${stack?'<label class="cbchk"><input type="checkbox" id="aucPart" checked>Можно купить часть стопки (если цена делится на число штук)</label>':''}`;}
+/* цена из формы выставления: число и валюта */
+const readPrice=()=>({p:Math.floor(+(document.getElementById('aucPrice')||{}).value||0),pc:(document.getElementById('aucPc')||{}).value||'gold',part:!!(document.getElementById('aucPart')||{}).checked});
+Object.assign(ACT,{
+  aucF(d){aucF[d.k]=d.v;if(d.k==='what'&&d.v!=='cur')aucF.kind='';render();},
+  aucSellMode(d){aucSell.mode=d.v;render();},
+  aucLot(d){const l=(aucData.buy||[]).find(x=>x.id===d.id);if(!l)return;const g=l.goods,st=g._g==='stack',canPart=st&&l.part&&l.price%g.n===0;
+    const body=isItemGoods(g)?`${itemCard(g)}${g.slot!=='flask'&&slotsFor(g)[0]?`<div class="panel"><div class="eyebrow" style="margin-bottom:6px">Если надеть</div>${compareWith(g,g.slot==='ring'?'ring1':slotsFor(g)[0])}</div>`:''}`
+      :g._g==='gem'?`<div class="panel">${gemLine({...g.gem,uid:'x'})}</div>`:`<div class="panel"><b class="cur-t">${esc(goodsName(g))}</b><div class="dim small">${(MK[g.k]||{}).n||''} · у вас ${fmt((MK[g.k]&&MK[g.k].have(g.id))||0)}</div></div>`;
+    modal(`<div class="row"><span class="eyebrow sp">Лот · ${esc(l.seller.name)}</span><button class="btn sm ghost" data-a="close">Закрыть</button></div>${body}
+      <p class="small" style="margin:0">Цена: <b class="gold-t">${priceTxt(l.price,l.pc)}</b>${st&&l.price%g.n===0?` (${priceTxt(l.price/g.n,l.pc)} за шт.)`:''} · у вас ${priceTxt(curHave(l.pc),l.pc)}</p>
+      ${canPart?`<label class="stack" style="gap:6px"><span class="eyebrow">Сколько купить (из ${g.n})</span><input class="input num" id="aucQty" type="number" min="1" max="${g.n}" value="${g.n}"></label>`:''}
+      <button class="btn pri full" data-a="aucBuy" data-id="${l.id}" ${goodsRoom(g)?'':'disabled'}>Купить</button>`);},
+  async aucBuy(d){const l=(aucData.buy||[]).find(x=>x.id===d.id);if(!l)return;const g=l.goods,st=g._g==='stack';
+    let q=st?Math.floor(+(document.getElementById('aucQty')||{}).value||g.n):1;q=clamp(q,1,st?g.n:1);
+    const cost=st&&q<g.n?l.price/g.n*q:l.price;if(!Number.isInteger(cost)){toast('Этот лот продаётся только целиком');return;}
+    if(curHave(l.pc)<cost){toast(`Не хватает: нужно ${priceTxt(cost,l.pc)}`);return;}if(!goodsRoom(g)){toast('Сумка полна');return;}
+    curPay(l.pc,cost);try{const got=await AUC.buy(l.id,st&&q<g.n?q:0);const nm=goodsReceive(got);save();closeModal();toast('Куплено: '+nm);}catch(e){curGive(l.pc,cost);save();toast(e.message);}
+    aucData.buy=null;aucLoad();render();},
+  aucSellPick(d){const it=S.inv.find(x=>x.uid===d.u);if(!it)return;window._aucG={t:'item',uid:it.uid};
+    modal(`<div class="row"><span class="eyebrow sp">Выставить на аукцион</span><button class="btn sm ghost" data-a="close">Закрыть</button></div>${itemCard(it)}${priceForm(Math.max(10,buyPrice(it)),false)}<button class="btn pri full" data-a="aucPost">Выставить</button>`);},
+  aucGemPick(d){const g=S.gems.find(x=>x.uid===d.u);if(!g)return;window._aucG={t:'gem',uid:g.uid};
+    modal(`<div class="row"><span class="eyebrow sp">Выставить камень</span><button class="btn sm ghost" data-a="close">Закрыть</button></div><div class="panel">${gemLine(g)}</div>${priceForm(R(50+g.lvl*g.lvl*8),false)}<button class="btn pri full" data-a="aucPost">Выставить</button>`);},
+  aucCurPick(d){const K=MK[d.k];if(!K)return;const have=K.have(d.id);window._aucG={t:'stack',k:d.k,id:d.id};
+    modal(`<div class="row"><span class="eyebrow sp">Выставить валюту</span><button class="btn sm ghost" data-a="close">Закрыть</button></div>
+      <div class="panel"><b class="cur-t">${esc(K.nm(d.id))}</b><div class="dim small">У вас ${fmt(have)}</div></div>
+      <label class="stack" style="gap:6px"><span class="eyebrow">Сколько выставить</span><input class="input num" id="aucN" type="number" min="1" max="${Math.min(have,MK_MAX)}" value="${Math.min(have,MK_MAX)}"></label>
+      ${priceForm(10,true)}<button class="btn pri full" data-a="aucPost">Выставить</button>`);},
+  async aucPost(){const G=window._aucG;if(!G)return;const {p,pc,part}=readPrice();if(p<1){toast('Укажите цену');return;}
+    let goods,undo;
+    if(G.t==='item'){const it=S.inv.find(x=>x.uid===G.uid);if(!it)return;S.inv=S.inv.filter(x=>x!==it);delete it.isNew;goods=it;undo=()=>S.inv.push(it);}
+    else if(G.t==='gem'){const g=S.gems.find(x=>x.uid===G.uid);if(!g||socketed().has(g.uid)){toast('Камень вставлен в гнездо');return;}S.gems=S.gems.filter(x=>x!==g);const c={...g};delete c.uid;goods={_g:'gem',gem:c};undo=()=>S.gems.push(g);}
+    else{const n=Math.floor(+(document.getElementById('aucN')||{}).value||0);if(!(n>=1&&n<=MK_MAX)){toast(`От 1 до ${MK_MAX} штук`);return;}if(!stackTake(G.k,G.id,n)){toast('Столько нет');return;}
+      goods={_g:'stack',k:G.k,id:G.id,n};undo=()=>stackGive(G.k,G.id,n);}
+    const pt=G.t==='stack'&&part&&p%goods.n===0;
+    try{await AUC.post(goods,p,pc,pt);save();closeModal();toast('Лот выставлен'+(G.t==='stack'&&part&&!pt?' (только целиком: цена не делится на число штук)':''));}catch(e){undo();save();toast(e.message);}
+    aucData.buy=null;aucLoad();render();},
+  async aucCancel(d){const l=((aucData.mine||{}).lots||[]).find(x=>x.id===d.id);if(l&&!goodsRoom(l.goods)){toast('Сумка полна');return;}
+    try{const g=await AUC.cancel(d.id);goodsReceive(g);save();toast('Лот снят');}catch(e){toast(e.message);}aucData.buy=null;aucLoad();render();},
+  async aucClaim(){try{const w=await AUC.claim();const got=Object.keys(w).filter(k=>w[k]>0);got.forEach(k=>curGive(k,w[k]));save();toast(got.length?'Получено: '+got.map(k=>priceTxt(w[k],k)).join(', '):'Выручки нет');}catch(e){toast(e.message);}aucData.mine=null;aucLoad();render();},
+});
+/* выпадающие фильтры: изменение значения */
+document.addEventListener('change',e=>{const t=e.target;if(t&&t.dataset&&t.dataset.a==='aucFsel'){aucF[t.dataset.k]=t.value;render();}});
+
+/* =========================================================
+   0.24: УБЕР ДРЕВНИЙ — карточка во вкладке «Пинакл» устройства картографа.
+   ========================================================= */
+{const _pp=pinPanel;pinPanel=function(){const h=_pp();const uf=S.ufrag||{},ok=uberReady();
+  const box=`<div class="panel"><div class="pinbox" style="border-color:#c9a24a"><div class="row"><b class="sp" style="color:#e6c57a;font-family:var(--ff-d);font-size:16px">Убер Древний</b>${S.pinK&&S.pinK.uber?`<span class="dim small">повержен ×${S.pinK.uber}</span>`:''}</div>
+    <p class="dim small" style="margin:2px 0 6px">Создатель и Древний вместе, в Расколотой бездне. Сначала бейте Создателя: Древний неуязвим, пока у Создателя больше 75% здоровья. На 75%, 50% и 25% — передышки: оба неуязвимы, пока живы слуги. Древний не умирает раньше Создателя. Фрагменты: знания и формы — с Создателя, ужаса и пустоты — с Древнего.</p>
+    <div class="frags">${UBER_IDS.map(k=>`<span class="${(uf[k]||0)>0?'on':''}">${UBER_FRAGS[k].n}<b class="num">×${uf[k]||0}</b></span>`).join('')}</div>
+    <div class="dim small" style="margin:6px 0">Добыча (2 предмета): ${UBER_POOL.map(([n,w])=>`<span class="r-unique">${n}</span> ${w}%`).join(', ')}</div>
+    <button class="btn full ${ok?'pri':''}" data-a="uberOpen" ${ok&&!S.mapRun?'':'disabled'}>${ok?'Бросить вызов: Убер Древний':'Не хватает фрагментов'}</button></div></div>`;
+  return h+box;};}
+Object.assign(ACT,{uberOpen(){invGate(()=>startUber());}});
 
 /* =========================================================
    0.23: верстак — зачарования особых флаконов за Вливающую и Растопляющую сферы (как ремесло PoE)
