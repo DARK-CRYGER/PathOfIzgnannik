@@ -566,6 +566,7 @@ button.sigil{padding:0;cursor:pointer;color:var(--gold2)}
 .cmp-top{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:8px;padding:8px;border:1px solid var(--line2);border-radius:8px}
 .cmp-top>div{display:flex;flex-direction:column;gap:2px}.cmp-top .num{font-size:18px;font-weight:700}.cmp-top .cmp-v{grid-column:1/-1}
 .sheet.one{grid-template-columns:1fr}.sheet.one>div{display:flex;justify-content:space-between;gap:10px}.sheet.one>div>span:last-child{text-align:right}
+.seg.seg2r{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));overflow:visible}.seg.seg2r button{padding:8px 4px;font-size:13.5px}
 
 </style>
 </head><body>
@@ -9928,7 +9929,7 @@ Object.assign(ACT,{lgView(d){LG_VIEW=d.id||null;delAsk=null;render();}});
 /* выбор персонажа запоминает его мир */
 {const _p=ACT.play;ACT.play=function(d){const c=ACC.chars.find(x=>x.id===d.id);if(c)LG_VIEW=c.league||null;return _p.call(this,d);};}
 /* метка сборки (подставляется build.py): по ней видно, загрузилась ли новая версия игры */
-const BUILD_ID='0.25 · 20.10 20:41 UTC';
+const BUILD_ID='0.25 · 20.10 21:19 UTC';
 {const _vr=vRoster;vRoster=function(){return _vr()+`<p class="dim small" style="text-align:center;margin:10px 0 0">Версия ${BUILD_ID}</p>`;};}
 {const _vs=vSettings;vSettings=function(){return _vs()+`<p class="dim small" style="text-align:center;margin:10px 0 0">Версия ${BUILD_ID}</p>`;};}
 
@@ -10132,45 +10133,49 @@ function weaponOffNote(P){const off=(P.attrOff||[]).filter(it=>it.slot==='weapon
 {const _t=vTree;vTree=function(){const h=_t.apply(this,arguments);const n=weaponOffNote(calc());return n?h.replace(/^(<div class="stack">)?/,m=>m+n):h;};}
 Object.assign(FSHORT,{quartz:'Кварц',gold:'Золото'});
 
-/* ---------- ставка у торговца (аналог азартной торговли Гвеннен) ---------- */
+/* ---------- чёрный рынок у торговца (аналог азартной торговли Гвеннен) ---------- */
 const GAMBLE_SLOTS=[['weapon','Оружие'],['shield','Щит'],['quiver','Колчан'],['helm','Шлем'],['body','Доспех'],['gloves','Перчатки'],['boots','Сапоги'],['amulet','Амулет'],['ring','Кольцо'],['belt','Пояс']];
 let gambleSel={slot:'weapon',wk:'',dt:''},gambleLast=null;
-/* цена ставки: 200 + 40 × уровень героя */
+/* цена покупки на чёрном рынке: 200 + 40 × уровень героя */
 const gamblePrice=()=>200+40*S.lvl;
-/* уровень предмета ставки: уровень героя, до 84 */
+/* уровень предмета чёрного рынка: уровень героя, до 84 */
 const gambleIlvl=()=>Math.min(84,S.lvl);
-/* уникальный для ставки: общего выпадения, подходящий по слоту, виду оружия и типу защиты */
+/* уникальный для чёрного рынка: общего выпадения, подходящий по слоту, виду оружия и типу защиты */
 function gambleUnique(sl,wk,dt,il){const ok=UQ4.filter(u=>u.src==='gen'&&u.slot===sl&&u.minL<=il&&(!wk||!u.wk||u.wk===wk)&&(!dt||!u.dt||u.dt===dt));if(!ok.length)return null;
   const by={};ok.forEach(u=>(by[u.t]=by[u.t]||[]).push(u));const ts=Object.keys(by).filter(t=>UQ_TIER_W[t]!=null);if(!ts.length)return pick(ok);
   const tot=ts.reduce((a,t)=>a+UQ_TIER_W[t],0);let r=Math.random()*tot;for(const t of ts){r-=UQ_TIER_W[t];if(r<=0)return pick(by[t]);}return pick(by[ts[0]]);}
-/* сделать ставку: волшебный 70%, редкий 29%, уникальный 1% */
+/* купить на чёрном рынке: волшебный 70%, редкий 29%, уникальный 1% */
 function gambleRoll(){const il=gambleIlvl(),{slot,wk,dt}=gambleSel,r=Math.random()*100;
   const o={};if(slot==='weapon')o.wk=wk||pick(Object.keys(WEAP));if(ARMB[slot]&&dt)o.dt=dt;
   if(r<1){const u=gambleUnique(slot,o.wk,o.dt,il);if(u)return uq4Make(u,il);}
   return makeItem(slot,il,r<30?'rare':'magic',o);}
-/* вкладка «Ставка» */
+/* вкладка «Чёрный рынок» */
 function gambleView(){const p=gamblePrice(),sl=gambleSel.slot,chip=(a,k,v,n)=>`<button class="${gambleSel[k]===v?'on':''}" data-a="${a}" data-k="${k}" data-t="${v}">${n}</button>`;
-  let h=`<div class="panel"><p class="muted small" style="margin:0 0 8px">Выберите тип предмета и заплатите золото — получите случайный предмет ${gambleIlvl()} уровня: волшебный (70%), редкий (29%) или уникальный (1%). Свойства видны после вскрытия.</p>
+  let h=`<div class="panel"><p class="muted small" style="margin:0 0 8px">Торговец достаёт товар из-под прилавка. Выберите тип предмета и заплатите золото — получите случайный предмет ${gambleIlvl()} уровня: волшебный (70%), редкий (29%) или уникальный (1%). Свойства видны после вскрытия.</p>
     <div class="eyebrow" style="margin-bottom:6px">Слот</div><div class="seg2">${GAMBLE_SLOTS.map(([k,n])=>chip('gmSel','slot',k,n)).join('')}</div>`;
   if(sl==='weapon')h+=`<div class="eyebrow" style="margin:8px 0 6px">Вид оружия</div><div class="seg2">${chip('gmSel','wk','','Любое')}${Object.entries(WEAP).map(([k,w])=>chip('gmSel','wk',k,w.n)).join('')}</div>`;
   if(ARMB[sl])h+=`<div class="eyebrow" style="margin:8px 0 6px">Защита</div><div class="seg2">${chip('gmSel','dt','','Любая')}${Object.entries(DT_N).map(([k,n])=>chip('gmSel','dt',k,n.charAt(0).toUpperCase()+n.slice(1))).join('')}</div>`;
-  h+=`<button class="btn pri full" style="margin-top:10px" data-a="gmBuy" ${S.gold>=p&&S.inv.length<INV_MAX?'':'disabled'}>Сделать ставку · ${fmt(p)} зол.</button>
+  h+=`<button class="btn pri full" style="margin-top:10px" data-a="gmBuy" ${S.gold>=p&&S.inv.length<INV_MAX?'':'disabled'}>Купить наугад · ${fmt(p)} зол.</button>
     ${S.inv.length>=INV_MAX?'<p class="bad-t small">Сумка полна</p>':''}</div>`;
   return h;}
 {const _s=vShop;vShop=function(){const gm=shopTab==='gamble';if(gm)shopTab='tree';let h=_s.apply(this,arguments);if(gm){shopTab='gamble';
-    /* заменить содержимое вкладки «Сброс» на ставку: всё после переключателя вкладок */
+    /* заменить содержимое вкладки «Сброс» на чёрный рынок: всё после переключателя вкладок */
     const i=h.indexOf('</div>',h.indexOf('data-t="tree"'));h=h.slice(0,i+6).replace(/class="on" data-a="stab" data-t="tree"/,'class="" data-a="stab" data-t="tree"')+gambleView()+'</div>';}
-  return h.replace(/(<button class="[^"]*" data-a="stab" data-t="tree">Сброс<\/button>)/,`$1<button class="${shopTab==='gamble'?'on':''}" data-a="stab" data-t="gamble">Ставка</button>`);};}
+  /* вкладки торговца в два ряда: Купить, Чёрный рынок, Продать / Камни, Рецепты, Сброс */
+  const i0=h.indexOf('<div class="seg fit">'),i1=i0<0?-1:h.indexOf('</div>',i0);if(i1<0)return h;
+  const tb=(k,n)=>`<button class="${shopTab===k?'on':''}" data-a="stab" data-t="${k}">${n}</button>`;
+  const seg=`<div class="seg fit seg2r">${[['items','Купить'],['gamble','Чёрный рынок'],['sell','Продать'],['gems','Камни'],['recipes','Рецепты'],['tree','Сброс']].map(([k,n])=>tb(k,n)).join('')}</div>`;
+  return h.slice(0,i0)+seg+h.slice(i1+6);};}
 Object.assign(ACT,{
   gmSel(d){gambleSel[d.k]=d.t;if(d.k==='slot'){gambleSel.wk='';gambleSel.dt='';}render();},
   gmBuy(){const p=gamblePrice();if(S.gold<p||S.inv.length>=INV_MAX)return;S.gold-=p;const it=gambleRoll();it.isNew=1;S.inv.push(it);gambleLast=it;save();render();
-    modal(`<div class="row"><span class="eyebrow sp">Ставка · ${slotLabel(it)}</span></div>
+    modal(`<div class="row"><span class="eyebrow sp">Чёрный рынок · ${slotLabel(it)}</span></div>
       <div class="gamble-box" id="gmBox"><div class="gamble-veil">?</div><p class="muted small">Предмет ${it.ilvl} уровня уже в сумке</p></div>
       <button class="btn pri full" data-a="gmOpen">Вскрыть</button>`);},
   gmOpen(){const it=gambleLast;if(!it)return closeModal();const tone=it.rar==='unique'?'uniq':it.rar==='rare'?'rare':'magic';
-    modal(`<div class="row"><span class="eyebrow sp">Ставка · ${slotLabel(it)}</span><button class="btn sm ghost" data-a="close">Закрыть</button></div>
+    modal(`<div class="row"><span class="eyebrow sp">Чёрный рынок · ${slotLabel(it)}</span><button class="btn sm ghost" data-a="close">Закрыть</button></div>
       <div class="gamble-reveal gr-${tone}">${itemCard(it)}</div>
-      <div class="row" style="gap:8px"><button class="btn sp" data-a="close">В сумку</button><button class="btn sp pri" data-a="gmBuy" ${S.gold>=gamblePrice()&&S.inv.length<INV_MAX?'':'disabled'}>Ещё ставка · ${fmt(gamblePrice())}</button></div>`);},
+      <div class="row" style="gap:8px"><button class="btn sp" data-a="close">В сумку</button><button class="btn sp pri" data-a="gmBuy" ${S.gold>=gamblePrice()&&S.inv.length<INV_MAX?'':'disabled'}>Ещё раз · ${fmt(gamblePrice())}</button></div>`);},
 });
 
 /* ---------- новое сравнение предметов: урон за ход (с уроном со временем) и приведённое здоровье ---------- */
