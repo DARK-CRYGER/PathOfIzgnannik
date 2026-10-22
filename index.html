@@ -562,9 +562,9 @@ button.sigil{padding:0;cursor:pointer;color:var(--gold2)}
 @keyframes gmReveal{from{opacity:0;transform:scale(.92) rotateX(30deg)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.gamble-veil,.gamble-reveal{animation:none}}
 /* 0.25: сравнение предметов */
-.irow.mix{box-shadow:inset 3px 0 0 var(--gold2,#e6c57a)}
-.cmp-top{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:8px;padding:8px;border:1px solid var(--line2);border-radius:8px}
-.cmp-top>div{display:flex;flex-direction:column;gap:2px}.cmp-top .num{font-size:18px;font-weight:700}.cmp-top .cmp-v{grid-column:1/-1}
+
+.cmp-top{display:grid;grid-template-columns:1fr;gap:6px 12px;margin-bottom:8px;padding:8px;border:1px solid var(--line2);border-radius:8px}
+.cmp-top>div{display:flex;flex-direction:column;gap:2px}.cmp-top .num{font-weight:700}.cmp-top>.btn{justify-self:start}.cmp-top .cmp-v{grid-column:1/-1}
 .sheet.one{grid-template-columns:1fr}.sheet.one>div{display:flex;justify-content:space-between;gap:10px}.sheet.one>div>span:last-child{text-align:right}
 .seg.seg2r{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));overflow:visible}.seg.seg2r button{padding:8px 4px;font-size:13.5px}
 
@@ -9929,7 +9929,7 @@ Object.assign(ACT,{lgView(d){LG_VIEW=d.id||null;delAsk=null;render();}});
 /* выбор персонажа запоминает его мир */
 {const _p=ACT.play;ACT.play=function(d){const c=ACC.chars.find(x=>x.id===d.id);if(c)LG_VIEW=c.league||null;return _p.call(this,d);};}
 /* метка сборки (подставляется build.py): по ней видно, загрузилась ли новая версия игры */
-const BUILD_ID='0.25 · 20.10 21:19 UTC';
+const BUILD_ID='0.25 · 22.10 21:41 UTC';
 {const _vr=vRoster;vRoster=function(){return _vr()+`<p class="dim small" style="text-align:center;margin:10px 0 0">Версия ${BUILD_ID}</p>`;};}
 {const _vs=vSettings;vSettings=function(){return _vs()+`<p class="dim small" style="text-align:center;margin:10px 0 0">Версия ${BUILD_ID}</p>`;};}
 
@@ -10197,35 +10197,63 @@ function heroEhp(P){const L=S.lvl,hit=mDMG(L)*1.3,saved=C;let taken;
     const atk=(.5*ph+.3*el+.1*ch)/.9*(1-evadeChance(P,L,'attack')/100)*(1-(P.block||0)/100),sp=el*(1-(P.spellBlock||0)/100)*(1-(P.suppress||0)/200);
     taken=Math.max(.02,.75*atk+.25*sp);}finally{C=saved;}
   return (P.life+(P.es||0))/taken;}
-/* сравнение двух состояний героя: up — лучше, mix — что-то лучше, что-то хуже, '' — хуже или без изменений */
-function cmpVerdict(a,b){const d=(b.d-a.d)/Math.max(1,a.d),e=(b.e-a.e)/Math.max(1,a.e);
-  if((d>.03&&e>-.02)||(e>.03&&d>-.02))return 'up';if((d>.03&&e<=-.02)||(e>.03&&d<=-.02))return 'mix';return '';}
 /* герой с предметом в слоте (без сохранения) */
 function withItem(it,slot,fn){const old=S.equip[slot],oo=S.equip.offhand;S.equip[slot]=it;
   if(slot==='weapon'&&oo&&WEAP[it.wk]&&WEAP[it.wk].h===2&&!(it.wk==='bow'&&oo.slot==='quiver'))delete S.equip.offhand;
   try{return fn(calc());}finally{S.equip[slot]=old;if(oo)S.equip.offhand=oo;if(!old)delete S.equip[slot];}}
-/* два итога героя для сравнения: урон за ход и приведённое здоровье */
-const heroSc=P=>({d:heroDmg(P),e:heroEhp(P)});
+/* ---------- зелёная подсветка: игрок сам выбирает, что считать улучшением ---------- */
+/* показатели для подсветки: ключ, подпись, значение по расчёту героя P */
+const UP_DMG=i=>P=>i<0?skillTurnDmg(P.basic,P):skillTurnDmg(P.skills[i],P);
+const UP_METRICS=[
+  ['sk0','Урон умения в слоте 1',UP_DMG(0),'dmg'],['sk1','Урон умения в слоте 2',UP_DMG(1),'dmg'],['sk2','Урон умения в слоте 3',UP_DMG(2),'dmg'],['sk3','Урон умения в слоте 4',UP_DMG(3),'dmg'],
+  ['basic','Урон атаки оружием',UP_DMG(-1),'dmg'],['best','Урон сильнейшего умения',P=>heroDmg(P),'dmg'],
+  ['life','Здоровье',P=>P.life,'def'],['es','Энергетический щит',P=>P.es||0,'def'],['mana','Мана',P=>P.mana,'def'],['ehp','Приведённое здоровье (вся защита вместе)',P=>heroEhp(P),'def'],
+  ['armour','Броня',P=>P.armour,'def'],['eva','Уклонение',P=>P.eva,'def'],['block','Блок',P=>P.block||0,'def'],
+  ['resF','Сопротивление огню',P=>P.res.fire,'res'],['resC','Сопротивление холоду',P=>P.res.cold,'res'],['resL','Сопротивление молнии',P=>P.res.light,'res'],['resCh','Сопротивление хаосу',P=>P.res.chaos,'res']];
+const UP_DEF=['sk0','life','resF','resC','resL'];
+/* выбранные показатели героя (хранятся у героя: у каждого свои умения) */
+const upCfg=()=>Array.isArray(S.upCfg)?S.upCfg:UP_DEF;
+/* значения отмеченных показателей у героя P */
+const upVals=P=>{const o={};upCfg().forEach(k=>{const m=UP_METRICS.find(x=>x[0]===k);if(m)try{o[k]=m[2](P)||0;}catch(e){o[k]=0;}});return o;};
+/* изменение показателя: +1 — лучше, −1 — хуже, 0 — без изменений (сопротивления — от 1%, остальное — от 1% значения) */
+function upDir(k,x,y){const m=UP_METRICS.find(z=>z[0]===k);const d=y-x;if(m&&m[3]==='res')return d>=1?1:d<=-1?-1:0;
+  const r=d/Math.max(1,Math.abs(x));return r>.01?1:r<-.01?-1:0;}
+/* зелёная — хотя бы один выбранный показатель вырос и ни один выбранный не упал */
+function upVerdict(a,b){let up=0;for(const k in a){const v=upDir(k,a[k],b[k]);if(v<0)return '';if(v>0)up=1;}return up?'up':'';}
 let upMemo={t:0,base:null,m:new Map()};
 /* оценка предмета для полосы в списке (кэш на время одной отрисовки) */
 function upInfo(it){try{if(!it||it.slot==='flask'||!itemOk(it))return '';const sl=slotsFor(it)[0];if(equipBlock(it,sl))return '';
-  const now=Date.now();if(now-upMemo.t>400){upMemo={t:now,base:heroSc(calc()),m:new Map()};}
+  const now=Date.now();if(now-upMemo.t>400){upMemo={t:now,base:upVals(calc()),m:new Map()};}
   if(upMemo.m.has(it.uid))return upMemo.m.get(it.uid);
-  const v=cmpVerdict(upMemo.base,withItem(it,sl,heroSc));upMemo.m.set(it.uid,v);return v;}catch(e){return '';}}
+  const v=upVerdict(upMemo.base,withItem(it,sl,upVals));upMemo.m.set(it.uid,v);return v;}catch(e){return '';}}
 isUpgrade=function(it){return upInfo(it)==='up';};
-{const _ir=irow;irow=function(x){const h=_ir.apply(this,arguments);return upInfo(x)==='mix'?h.replace('class="irow','class="irow mix'):h;};}
-/* окно сравнения: сверху два итога, ниже подробные строки */
+/* окно выбора показателей для зелёной подсветки */
+function upCfgModal(){const P=calc(),on=new Set(upCfg());
+  const lab=(k,n)=>{const i=k.startsWith('sk')?+k[2]:-1;if(i<0)return n;const sk=P.skills[i];return `${n}: ${sk?esc(sk.name):'<span class="dim">пусто</span>'}`;};
+  const grp=(t,g)=>`<div class="eyebrow" style="margin:10px 0 4px">${t}</div>`+UP_METRICS.filter(m=>m[3]===g).map(([k,n])=>`<label class="row" style="min-height:38px;flex-wrap:nowrap"><input type="checkbox" data-a="upTog" data-k="${k}" ${on.has(k)?'checked':''} style="width:22px;height:22px;flex:none"> <span>${lab(k,n)}</span></label>`).join('');
+  modal(`<div class="row"><span class="eyebrow sp">Зелёная подсветка</span><button class="btn sm ghost" data-a="close">Готово</button></div>
+    <p class="muted small" style="margin:0">Предмет подсвечивается зелёным, если хотя бы один отмеченный показатель вырастет и ни один отмеченный не упадёт. Настройка своя у каждого героя.</p>
+    ${grp('Урон','dmg')}${grp('Защита','def')}${grp('Сопротивления','res')}
+    <button class="btn sm" data-a="upDef" style="margin-top:10px">По умолчанию: урон умения в слоте 1, здоровье, сопротивления стихиям</button>`);}
+Object.assign(ACT,{
+  upCfg(){upCfgModal();},
+  upTog(d,el){const c=new Set(upCfg());if(el.checked)c.add(d.k);else c.delete(d.k);S.upCfg=UP_METRICS.map(m=>m[0]).filter(k=>c.has(k));upMemo.t=0;save();render();},
+  upDef(){S.upCfg=UP_DEF.slice();upMemo.t=0;save();upCfgModal();render();}});
+/* окно сравнения: отмеченные показатели и вердикт, ниже подробные строки */
 {const _cw=compareWith;compareWith=function(it,slot){const base=_cw.apply(this,arguments);let top='';
-  try{const P0=calc(),a=heroSc(P0),r=withItem(it,slot,P1=>({sc:heroSc(P1),P1})),b=r.sc,P1=r.P1;
-    const pc=(x,y)=>{const v=(y-x)/Math.max(1,x)*100;return `<span class="num ${v>0.5?'up':v<-0.5?'dn':''}">${v>0?'+':''}${v.toFixed(1)}%</span>`;};
-    const ver=cmpVerdict(a,b),vt=ver==='up'?'<b class="good-t">Лучше</b>':ver==='mix'?'<b class="gold-t">Что-то лучше, что-то хуже</b>':'<span class="dim">Не лучше</span>';
+  try{const P0=calc(),r=withItem(it,slot,P1=>({v:upVals(P1),P1})),a=upVals(P0),b=r.v,P1=r.P1;
+    const ver=upVerdict(a,b),vt=ver==='up'?'<b class="good-t">Лучше по отмеченным показателям</b>':'<span class="dim">Не лучше по отмеченным показателям</span>';
+    const sel=upCfg().map(k=>{const m=UP_METRICS.find(z=>z[0]===k);if(!m)return '';const d=upDir(k,a[k],b[k]),x=a[k],y=b[k];
+      const n=k.startsWith('sk')?`${m[1]}${P0.skills[+k[2]]?': '+esc(P0.skills[+k[2]].name):''}`:m[1];
+      const ch=m[3]==='res'?`${R(x)}% → ${R(y)}%`:`${fmt(R(x))} → ${fmt(R(y))}`;
+      return `<div class="row" style="justify-content:space-between;flex-wrap:nowrap"><span class="muted">${n}</span><span class="num ${d>0?'up':d<0?'dn':''}" style="white-space:nowrap">${ch}</span></div>`;}).join('');
     const rows=[];const add=(n,x,y,suf='')=>{if(R(x*10)!==R(y*10))rows.push(`<div class="row" style="justify-content:space-between"><span class="muted">${n}</span><span class="num ${y>x?'up':'dn'}">${y>x?'+':''}${fmt(R((y-x)*10)/10)}${suf}</span></div>`);};
-    P0.skills.forEach((s,i)=>{const s1=P1.skills[i];if(!s&&!s1)return;const n=(s||s1).name;add(`${n}: урон за ход`,skillTurnDmg(s,P0),skillTurnDmg(s1,P1));});
-    add('Шанс уклонения',evadeChance(P0,S.lvl,'attack'),evadeChance(P1,S.lvl,'attack'),'%');add('Блок',P0.block||0,P1.block||0,'%');
-    const pr=P=>{const h=mDMG(S.lvl)*1.3,arm=P.armour;return Math.min(75,arm/(arm+10*h)*100);};add('Снижение физ. урона бронёй',pr(P0),pr(P1),'%');
+    add('Шанс уклонения',evadeChance(P0,S.lvl,'attack'),evadeChance(P1,S.lvl,'attack'),'%');
     ['fire','cold','light'].forEach(k=>add(`Макс. сопр. (${EL[k]})`,P0.resCap[k],P1.resCap[k],'%'));add('Регенерация здоровья',P0.regen,P1.regen,'%/ход');
-    top=`<div class="cmp-top"><div><small class="dim">Урон за ход</small>${pc(a.d,b.d)}</div><div><small class="dim">Живучесть</small>${pc(a.e,b.e)}</div><div class="cmp-v">${vt}</div></div>${rows.length?`<div class="cmp">${rows.join('')}</div>`:''}`;}catch(e){top='';}
+    top=`<div class="cmp-top"><div class="cmp-v">${vt}</div><div class="cmp">${sel||'<span class="dim small">Показатели не выбраны</span>'}</div><button class="btn sm ghost" data-a="upCfg">Что подсвечивать зелёным</button></div>${rows.length?`<div class="cmp">${rows.join('')}</div>`:''}`;}catch(e){top='';}
   return top+base;};}
+/* кнопка настройки подсветки на вкладке «Снаряжение» */
+{const _v=vItems;vItems=function(){const h=_v.apply(this,arguments);return h.replace('зелёная полоска — улучшение</span>','зелёная полоска — улучшение</span><button class="btn sm ghost" data-a="upCfg">Что подсвечивать</button>');};}
 
 /* ---------- калькулятор урона: копия героя, которую можно менять, не трогая сохранение ---------- */
 let CX={eq:null,x:{},preset:'normal',hex:1,fl:0,shock:0,q:'',res:null};
