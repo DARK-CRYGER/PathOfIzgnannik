@@ -629,6 +629,9 @@ button.sigil{padding:0;cursor:pointer;color:var(--gold2)}
 .un-l{color:var(--unity);opacity:.8;font:500 10.5px var(--ff-d);letter-spacing:.1em;text-transform:uppercase}
 .un-m{color:var(--unity)}
 .xd-jl{border:1px solid var(--line);background:var(--panel2);padding:8px 10px;display:flex;flex-direction:column;gap:4px}
+.wardb i{background:linear-gradient(#f3d98c,#b8913a)}
+.wardb .t{color:#2a1c06;text-shadow:none}
+.wardb.br{border:1px dashed var(--ward);background:#1a1408}.wardb.br .t{color:var(--ward)}
 
 </style>
 </head><body>
@@ -7726,8 +7729,9 @@ const exVendorL=()=>clamp(67+Math.max(1,S.mapBest||1),68,84);
 const EX_PRE=[
   {id:'noEva',L:1,n:'Удары монстров нельзя избежать',bad:1},{id:'crit',L:1,n:'Удары монстров всегда критические',bad:1},
   {id:'avoid',L:1,n:'30% шанс избежать урона каждого типа'},
-  {id:'immF',L:1,n:'Иммунитет к огню',el:'fire'},{id:'immC',L:1,n:'Иммунитет к холоду',el:'cold'},{id:'immL',L:1,n:'Иммунитет к молнии',el:'light'},
-  {id:'immP',L:1,n:'Иммунитет к физическому урону',el:'phys'},{id:'immX',L:1,n:'Иммунитет к хаосу',el:'chaos'},
+  {id:'immF',L:1,n:'Иммунитет к огню',el:'fire',imm:1},{id:'immC',L:1,n:'Иммунитет к холоду',el:'cold',imm:1},{id:'immL',L:1,n:'Иммунитет к молнии',el:'light',imm:1},
+  {id:'immP',L:1,n:'Иммунитет к физическому урону',el:'phys',imm:1},{id:'immX',L:1,n:'Иммунитет к хаосу',el:'chaos',imm:1},
+  {id:'ward',L:1,n:'Монстры с Оберегом: 25% здоровья, гасит удар и восстанавливается через 2 хода'},
   {id:'immAil',L:1,n:'Иммунитет к охлаждению, заморозке, поджогу и шоку'},{id:'hex',L:24,n:'Монстров нельзя проклясть'},
   {id:'noCrit',L:35,n:'По монстрам нельзя нанести критический удар'},{id:'noLeech',L:35,n:'Нельзя похищать здоровье и ману у монстров'},
   {id:'less',L:1,n:'Монстры получают на 30% меньше урона',bad:1},{id:'p15',L:1,n:'+15% к здоровью, урону и скорости монстров'},
@@ -7808,7 +7812,7 @@ function exRelGive(o,mult){mult=mult||1;const got=[];
 
 /* ---------- уникальные: общий пул по слоту, тиры у Гвеннен ---------- */
 /* шансы тиров у Гвеннен: т5–т3 реже, т2–т0 чаще, чем на картах; порядок прежний */
-const GW_TIER_W={5:35,4:30,3:20,2:10,1:4,0:1};
+const GW_TIER_W={5:35,4:30,3:20,2:10,1:4,0:.75};
 /* уники слота из общего выпадения (без уников боссов) */
 const exUqPool=slot=>UQ4.filter(u=>u.src==='gen'&&u.slot===slot&&u.t!=null&&UQ_TIER_W[u.t]!=null);
 /* случайный уник слота: тир по весам (только тиры, что есть в слоте), затем предмет */
@@ -7833,7 +7837,7 @@ function exGen(o){
   const nRem=(lg?ri(9,11):ri(7,9))+(lair?2:0)+(jm.includes('rem')?2:0)-(cave?3:0);
   const nB=R((lg?ri(5,7):ri(3,5))*(lair?1.5:1)*(jm.includes('runic')?1.5:1)*(cave?.5:1)),nS=R((lg?ri(16,20):ri(12,16))*(cave?.4:1));
   const nCh=(lg?ri(7,9):ri(5,8))+(jm.includes('chest')?2:0);
-  put('relic',Math.max(0,nRel),c=>{c.rw=exRelRewards();c.sel=0;c.l='Р'+(++rl);});
+  put('relic',Math.max(0,nRel),c=>{c.rw=exRelRewards();c.sel=0;c.l='Р'+(++rl);c.em=shuffle(ELITE_MODS.map(m=>m.id)).slice(0,4);});
   const pp=EX_PRE.filter(p=>p.L<=L),ss=EX_SUF.filter(s=>s.L<=L&&(!s.rare||roll(15)));
   let imm=null;/* иммунитет к одному виду урона — не больше одного на поле */
   const pre1=()=>{let p;let g=0;do{p=pick(pp);}while(p.el&&imm&&p.el!==imm&&g++<20);if(p.el)imm=p.el;return p.id;};
@@ -7893,23 +7897,32 @@ function exApply(e,M){const s=new Set(M.pre);e.exS=M.sf;e.exPre=[...s];
   if(s.has('res'))['fire','cold','light','chaos'].forEach(k=>e.res[k]=(e.res[k]||0)+30);
   if(s.has('bleed'))e.exBleed=1;if(s.has('poi'))e.poison=true;if(s.has('ign'))e.exIgn=1;if(s.has('shock'))e.exShock=1;if(s.has('imp'))e.impaler=1;
   if(s.has('pen'))e.exPen=M.pel||'fire';if(s.has('chaos')){const m={...e.mix};m.chaos=(m.chaos||0)+(m.phys||0)*.5;e.mix=m;}
-  if(s.has('ignArm'))e.exIgnArm=1;if(s.has('cull'))e.exCull=1;if(s.has('noFl'))e.exNoFl=1;
+  if(s.has('ignArm'))e.exIgnArm=1;if(s.has('ward')){e.exWard=R(e.maxHp*.25);e.exWardBr=0;}if(s.has('cull'))e.exCull=1;if(s.has('noFl'))e.exNoFl=1;
   if(e.exRun){if(s.has('rStun'))e.stunner=true;if(s.has('rRegen'))e.exRegen=1;}
   e.exTag=s.size;}
 /* монстр раскопок: вид, уровень, линия, редкость; свойства реликвий взрыва k */
 function exMon(type,G,d,rar,k,M,o){o=o||{};const e=mkEnemy(type,G.L+(roll(25)?1:0),{d,rar,map:G.tier,xm:o.xm||0});e.exK=k;e.exMon=1;
-  if(o.run)e.exRun=1;if(o.guard){e.exGuard=o.guard;e.rar='rare';e.maxHp=e.hp=R(e.hp*2.5);e.dmg*=1.34;e.n=e.n+'-хранитель';}
+  if(o.run)e.exRun=1;if(o.guard){e.exGuard=o.guard;e.rar='rare';e.maxHp=e.hp=R(e.hp*4);e.dmg*=1.5;e.n=e.n+'-хранитель';exElite(e,o.em||[]);}
   if(G.jm.includes('hard')){e.maxHp=e.hp=R(e.hp*1.25);e.dmg*=1.25;}
   if(o.beast){e.sp+=1;e.n='Зверь стаи';}
   exApply(e,M);return e;}
+/* свойства стража реликта: заранее брошенные, число — по редкости выбранной награды (видны до взрыва) */
+const exGuardMods=c=>(c.em||[]).slice(0,EX_RAR[c.rw[c.sel].r].m);
+/* наложить на монстра заданные свойства редких (как у mkEnemy) */
+function exElite(e,ids){let hpM=1;ids.forEach(id=>{const em=ELITE_MODS.find(x=>x.id===id);if(!em)return;e.mods.push(em.n);
+  if(id==='swift')e.hits++;if(id==='stone')e.arm*=3;if(id==='vamp')e.vamp=.25;if(id==='brutal')e.dmg*=1.25;if(id==='haste')e.sp+=1;if(id==='regen')e.regen=.015;if(id==='fiery')e.fiery=.4;
+  if(id==='shielded')hpM*=1.4;if(id==='frenzy')e.dmg*=1.15;if(id==='cleave')e.splash=.5;if(id==='deadly'){e.crit+=15;e.critMult+=.5;}if(id==='warded')['fire','cold','light'].forEach(k=>e.res[k]=(e.res[k]||0)+30);
+  if(id==='aFury')e.aura={fury:20};if(id==='aWard')e.aura={ward:20};if(id==='aMend')e.aura={mend:3};if(id==='stunner')e.stunner=true;if(id==='cblood')e.cblood=1;if(id==='impaler')e.impaler=1;
+  if(id==='guard')e.block=Math.max(e.block,30);if(id==='hexproof')e.hexproof=1;if(id==='blinding')e.blinding=1;if(id==='silencer')e.silencer=1;});
+  if(hpM!==1)e.maxHp=e.hp=R(e.hp*hpM);}
 /* взрыв: монстры по порядку взрывов (волнами до 6), сундуки, реликты; итог хранится в C.ex */
 function exDetonate(G){const cov=exCover(G),act=exActive(G,cov),F=EX_FAC[G.f]||EX_FAC.scythe,list=[];
   G.cells.forEach(c=>{if(!cov.has(c.i))return;const d=exDist(c.y),k=cov.get(c.i),M=exModsAt(act,k),pre=new Set(M.pre);
     const rarU=()=>{const r=Math.random()*100,rc=8*(pre.has('rare')?1.5:1),mc=30*(pre.has('magic')?1.5:1);return r<rc?'rare':r<rc+mc?'magic':'normal';};
     if(c.t==='sk'){const n=1+(roll(50)?1:0)+(pre.has('magic')&&roll(25)?1:0);for(let j=0;j<n;j++)list.push(exMon(pick(EX_UNDEAD),G,d,rarU(),k,M));}
     if(c.t==='bsk'){const n=pre.has('rDbl')?2:1,tp=pick(F.run);for(let j=0;j<n;j++)list.push(exMon(tp,G,d,'rare',k,M,{run:1}));}
-    if(c.t==='relic'){const o=c.rw[c.sel],xm=Math.max(0,EX_RAR[o.r].m-1);for(let j=0;j<3;j++)list.push(exMon(pick(EX_UNDEAD),G,d,'normal',k,M));
-      const g=exMon(F.run[0],G,d,'magic',k,M,{run:1,guard:{l:c.l,o},xm});list.push(g);}
+    if(c.t==='relic'){const o=c.rw[c.sel];for(let j=0;j<3;j++)list.push(exMon(pick(EX_UNDEAD),G,d,'normal',k,M));
+      const g=exMon(F.run[0],G,d,'normal',k,M,{run:1,guard:{l:c.l,o},em:exGuardMods(c)});list.push(g);}
     if(c.t==='den'){for(let j=0;j<ri(3,4);j++)list.push(exMon('ex_ci_w',G,d,'normal',k,M,{beast:1}));}});
   list.sort((a,b)=>a.exK-b.exK);const waves=[];while(list.length)waves.push(list.splice(0,6));
   const chests=G.cells.filter(c=>(c.t==='chest'||c.t==='den'||(c.t==='rock'&&c.hid))&&cov.has(c.i)).map(c=>({lt:c.t==='rock'?c.hid:c.lt,v:c.v,k:cov.get(c.i),dbl:c.t==='den'?2:1,rock:c.t==='rock'}));
@@ -7951,11 +7964,14 @@ function exGo(){const X=C.ex;if(!X||X.stage!=='field'||!X.G.ch.length)return;con
   if(X.totems)logC(`<span class="bad-t">Не взорвано тотемов-щитов: ${X.totems} — рунные монстры получают вдвое меньше урона</span>`);
   if(X.G.j&&S.mapRun&&S.mapRun.exJ)S.mapRun.exJ.rel=(S.mapRun.exJ.rel||0)+X.act.length;
   EXS().n++;EXS().cyc++;C.ev={kind:'exped',fight:1,left:X.waves.length||1};closeModal();
+  /* журнал: волны раскопок — настоящие волны боя (передышка, конец хода, свойства «за волну», Чайка) */
+  if(X.G.j){C.waves=Math.max(1,X.waves.length);C.wave=0;C.evDone=1;}
   if(!X.waves.length){logC('Монстров не выкопано');if(!exFinish()){battleWon();}return;}
   exWave();C.busy=false;render();if(C.auto)scheduleAuto();}
 /* следующая волна выкопанных */
-function exWave(){const X=C.ex,w=X.waves[X.wi++]||[];C.enemies=w;C.waveActs=0;
-  logC(`<b>Раскопки: волна ${X.wi}/${X.waves.length}</b>: ${w.map(e=>e.n).join(', ')}`);C.target=null;autoTarget();}
+function exWave(){const X=C.ex,w=X.waves[X.wi++]||[];C.enemies=w;C.waveActs=0;if(X.G.j)C.wave=X.wi;
+  logC(`<b>Раскопки: волна ${X.wi}/${X.waves.length}</b>: ${w.map(e=>e.n).join(', ')}`);
+  if(typeof onSpawnWave==='function')onSpawnWave();C.target=null;autoTarget();}
 /* конец экспедиции: сундуки, итог монет; бой карты продолжается (в журнале — бой окончен) */
 function exFinish(){const X=C.ex;if(!X)return false;X.stage='done';
   X.chests.forEach(ch=>exChestOpen(ch,X));
@@ -7976,11 +7992,17 @@ function exFinish(){const X=C.ex;if(!X)return false;X.stage='done';
   if(e&&e.exNoCrit||P&&P.U&&P.U.u_noCrit){sk={...sk,crit:0};force=false;}
   const r=_rh.call(this,sk,P,e,m,proj,force);if(!e||!r||!r.parts)return r;
   let ch=false;const cut=(el,f)=>{if(r.parts[el]>0){const v=r.parts[el]*f;r.parts[el]-=v;r.total-=v;ch=true;}};
-  if(e.exImm)cut(e.exImm,1);
+  let immV=0;if(e.exImm&&((r.raw&&r.raw[e.exImm]>0)||r.parts[e.exImm]>0)){immV=1;cut(e.exImm,1);}
   if(e.exAvoid)Object.keys(r.parts).forEach(el=>{if(roll(30))cut(el,1);});
   if(e.exLess)Object.keys(r.parts).forEach(el=>cut(el,1-e.exLess));
   if(e.exRun&&C&&C.ex&&C.ex.totems>0)Object.keys(r.parts).forEach(el=>cut(el,.5));
-  if(ch)r.total=Math.max(r.total>0?1:0,R(r.total));return r;};}
+  if(ch)r.total=Math.max(r.total>0?1:0,R(r.total));
+  if(immV){r.exImmEl=e.exImm;if(r.total<=1&&Object.values(r.parts).every(v=>v<1)){r.total=0;r.exImmAll=1;}}
+  if(e.exWard>0&&!(e.exWardBr>0)&&C&&C._exWE===e&&r.total>0){const a=Math.min(r.total,e.exWard),f=(r.total-a)/r.total;Object.keys(r.parts).forEach(k=>r.parts[k]*=f);r.total=R(r.total-a);e.exWardBr=2;r.exWardA=a;}
+  return r;};}
+/* Оберег монстров (реликвия): гасит только настоящие удары героя */
+{const _dh=dealHit;dealHit=function(sk,e,m,proj,P){if(!e||!(e.exWard>0))return _dh.apply(this,arguments);C._exWE=e;let r;try{r=_dh.apply(this,arguments);}finally{C._exWE=null;}
+  if(r&&r.exWardA){fx(e.uid,'Оберег '+fmt(r.exWardA),'');logF(`&nbsp;&nbsp;<span class="ward-t">Оберег ${esc(e.n)} принял ${fmt(r.exWardA)} и сломан на 2 хода</span>`);}return r;};}
 /* иммунитет к стихии и хаосу (и урону со временем); «Звёздная чаша» — уязвимость к стихиям */
 {const _er=enemyRes;enemyRes=function(e,el,hx,pen){if(e&&e.exImm===el)return 100;let r=_er.apply(this,arguments);if(e&&e.st&&e.st.exExpo>0&&el!=='chaos')r=clamp(r-10,-100,90);return r;};}
 /* иммунитет к состояниям и «нельзя похищать» */
@@ -8045,7 +8067,7 @@ function exWardBreak(P){C.wardBr=exWardTurns(P);logF(`&nbsp;&nbsp;<span class="w
     if(C.turn%3===0)alive().forEach(e=>{if(e.exRegen&&!e.noHeal&&e.hp<e.maxHp){const h=R(e.maxHp*.3);e.hp=Math.min(e.maxHp,e.hp+h);fx(e.uid,'+'+fmt(h),'heal');logF(`${e.n} восстанавливает ${fmt(h)} здоровья (реликвия)`);}});}
   if(P&&P.U&&P.U.u_flaskBoss&&C.exBossHit&&C.fl)C.fl.forEach(f=>{if(!f)return;const st=flaskStats(S.equip[f.slot],P);if(!st.noCh)f.ch=Math.min(st.max,f.ch+1);});
   if(C.fb&&C.fb.some(b=>b.eff&&b.eff.u_elixir))gainCharge('end',P);
-  alive().forEach(e=>{if(e.st.exExpo>0)e.st.exExpo--;if(e.st.exWeak>0)e.st.exWeak--;});
+  alive().forEach(e=>{if(e.st.exExpo>0)e.st.exExpo--;if(e.st.exWeak>0)e.st.exWeak--;if(e.exWardBr>0)e.exWardBr--;});
   return r;};}
 /* Испытание Медведа: в этом бою вы били босса */
 {const _oh=onHeroHit;onHeroHit=function(sk,e,P,r){if(e&&e.boss&&C)C.exBossHit=1;return _oh.apply(this,arguments);};}
@@ -8263,6 +8285,26 @@ const exUnText=m=>m?(m.t!=null?m.t:modText(m)):'';
   if(m.step>=4){note=`Журнал пройден: ${MONS[F.boss].n} повержен${J.f==='scythe'?'а':''}!`;S.mapRun=null;}
   else{note=`Шаг ${m.step}/4 пройден. Выберите следующую точку маршрута.`;cont={type:'exroute'};}
   save();showVictory(note,cont);};}
+
+/* ---------- Чайка и Охотник за головами: эффекты переходят в следующие бои карты (шахты) ---------- */
+/* текущий забег: карта, журнал или спуск в шахту */
+const exRunNow=()=>S?(S.mapRun||S.mineRun||null):null;
+/* сохранить эффекты Чайки и Охотника за головами и счётчик волн Чайки в забег */
+function exFbSave(){const run=exRunNow();if(!run||!C||!C.fb)return;
+  run.fbKeep=C.fb.filter(b=>/^(gull|hh_)/.test(b.slot)&&b.turns>0).map(b=>b.slot==='gull'?{...b,bt:(b.bt||3)-1,turns:999}:{...b}).filter(b=>b.slot!=='gull'||b.bt>0);run.gullW=C.gullW||0;}
+{const _bw=battleWon;battleWon=async function(){try{exFbSave();}catch(e){}return _bw.apply(this,arguments);};}
+{const _sb=startBattle;startBattle=function(B){const r=_sb.apply(this,arguments);const run=exRunNow();
+  if(C&&run&&(B.type==='map'||B.type==='mine')){C.gullW=run.gullW||0;if(run.fbKeep&&run.fbKeep.length){C.fb.push(...run.fbKeep.map(b=>({...b})));logC(`Действуют эффекты с прошлого боя: ${run.fbKeep.map(b=>b.name).join(', ')}`);render();}}
+  return r;};}
+/* эффект алтаря Чайки держится весь текущий бой и 2 следующих (не по ходам) */
+{const _wc=waveCleared;waveCleared=function(){const p=_wc.apply(this,arguments);if(C&&C.fb)C.fb.forEach(b=>{if(b.slot==='gull'&&!b.bt){b.bt=3;b.turns=999;}});return p;};}
+
+/* удар по монстру с иммунитетом: вместо «1» — «Иммунитет» над монстром и в журнале */
+{const _dh=dealHit;dealHit=function(sk,e,m,proj,P){if(!e||!e.exImm)return _dh.apply(this,arguments);const n0=C.fx.length;const r=_dh.apply(this,arguments);
+  if(r&&r.exImmEl){const t=`Иммунитет: ${EL[r.exImmEl].toLowerCase()}`;
+    if(r.exImmAll)for(let i=n0;i<C.fx.length;i++){if(C.fx[i].target===e.uid&&/^(✦ )?0$/.test(C.fx[i].text)){C.fx[i].text=t;C.fx[i].cls='';}}
+    else fx(e.uid,t,'');logF(`&nbsp;&nbsp;<span class="bad-t">${esc(e.n)}: иммунитет к урону «${EL[r.exImmEl].toLowerCase()}»${r.exImmAll?' — урон не прошёл':''}</span>`);}
+  return r;};}
 
 /* =========================================================
    0.26: ЛАГЕРЬ ЭКСПЕДИЦИИ — четыре торговца за Рунические монеты (цены ×5 от наброска плана).
@@ -8644,7 +8686,7 @@ function statusChips(e){
   if(e.st.frozen)c.push(['Лёд','var(--cold)']);else if(e.st.chill)c.push(['Холод','var(--cold)']);if(e.st.shock)c.push(['Шок','var(--light)']);if(e.st.stun)c.push(['Оглушён','var(--phys)']);if(e.st.maim)c.push(['Увечье','var(--phys)']);
   if(e.st.blind)c.push(['Ослеплён','var(--muted)']);
   [e.st.curse,e.st.curse2].forEach(cu=>{if(cu)c.push([HEXES[cu.id].n+(cu.t<50?' '+cu.t:''),'var(--chaos)']);});if(e.st.mark)c.push(['◎ '+HEXES[e.st.mark.id].n.replace('Метка ',''),'var(--dex)']);
-  if(e.st.ward)c.push(['Щит','var(--gold2)']);if(e.block)c.push(['Блок '+e.block+'%','var(--muted)']);
+  if(e.st.ward)c.push(['Вдвое меньше урона · '+e.st.ward+' х.',e.rar==='rare'?'var(--r-rare)':'var(--r-magic)']);if(e.block)c.push(['Блок '+e.block+'%','var(--muted)']);
   e.mods.forEach(m=>c.push([m,e.rar==='rare'?'var(--r-rare)':'var(--r-magic)']));
   return c.length?`<div class="chips">${c.map(([t,col])=>chip(t,col)).join('')}</div>`:'';
 }
@@ -10650,7 +10692,7 @@ function uq4Line(it,m,dm){
   return `<div class="${showRolls?'afxblk':''}"><div class="umod${off?' dim':''}">${txt}${off?' <span class="small dim">(не действует в этом слоте)</span>':''}</div>${sub}</div>`;}
 {const _il=itemLines;itemLines=function(it){
   if(!it||!it.u4)return _il(it);
-  const d=uq4Def(it.name);let h=_il({...it,mods:[],imp:{},legacy:0,u4:0,rar:'unique'});
+  const d=uq4Def(it.name);let h=_il({...it,mods:[],imp:{},legacy:0,u4:0,rar:'unique',_defSrc:it});
   const dm=d?[...(d.imp||[]).map(x=>({...x,imp:1})),...uq4ModsOf(d,it.vi)]:[];
   const imp=it.mods.map((m,i)=>[m,dm[i]]).filter(([m])=>m.imp),own=it.mods.map((m,i)=>[m,dm[i]]).filter(([m])=>!m.imp&&!m.cr);
   if(imp.length)h+=`<div class="sep"></div>${showRolls?'<div class="capt">Собственное свойство</div>':''}`+imp.map(([m,x])=>uq4Line(it,m,x)).join('');
@@ -10702,7 +10744,7 @@ Object.assign(ACT,{lgView(d){LG_VIEW=d.id||null;delAsk=null;render();}});
 /* выбор персонажа запоминает его мир */
 {const _p=ACT.play;ACT.play=function(d){const c=ACC.chars.find(x=>x.id===d.id);if(c)LG_VIEW=c.league||null;return _p.call(this,d);};}
 /* метка сборки (подставляется build.py): по ней видно, загрузилась ли новая версия игры */
-const BUILD_ID='0.26 · 25.10 22:04 UTC';
+const BUILD_ID='0.26 · 26.10 07:44 UTC';
 {const _vr=vRoster;vRoster=function(){return _vr()+`<p class="dim small" style="text-align:center;margin:10px 0 0">Версия ${BUILD_ID}</p>`;};}
 {const _vs=vSettings;vSettings=function(){return _vs()+`<p class="dim small" style="text-align:center;margin:10px 0 0">Версия ${BUILD_ID}</p>`;};}
 
@@ -11200,7 +11242,8 @@ function exFieldModal(boom){if(!C||!C.ex)return;const X=C.ex,G=X.G,F=EX_FAC[G.f]
     +'<span class="dim" style="grid-column:1/-1">Рамка сундука — ценность: серая простой, жёлтая хороший, красная богатый.</span>';
   const rel=G.cells.filter(c=>c.t==='relic').sort((a,c)=>a.l.localeCompare(c.l)).map(c=>{const bb=cov.get(c.i),r=EX_RAR[c.rw[c.sel].r];
     return `<div class="xd-item"><span class="xd-tag" style="color:${r.col};border-color:${r.col}">${c.l}</span><div><div>Страж: <b class="r-rare">${MONS[F.run[0]].n}-хранитель</b> <span class="dim">+ 3 выкопанных</span></div>
-      <div class="small muted">Свойств у стража: ${r.m} · здоровье ×4, урон ×1,5</div>
+      <div class="small muted">Здоровье ×4, урон ×1,5 · свойства (${r.m}): <span class="r-rare">${exGuardMods(c).map(id=>(ELITE_MODS.find(m=>m.id===id)||{}).n).join(', ')}</span></div>
+      ${bb?(()=>{const pre=[...new Set(exModsAt(p.act,bb).pre)];return pre.length?`<div class="small">От реликвий (взрыв ${bb}): ${pre.map(x=>`<span class="${EX_PREM[x].imm?'bad-t':'xd-pre'}">${EX_PREM[x].n}${EX_PREM[x].imm?' ⚠':''}</span>`).join(' · ')}</div>`:'<div class="small dim">Реликвии на стража не действуют</div>';})():''}
       <div class="xd-opts">${c.rw.map((o,j)=>`<button class="xd-opt${c.sel===j?' on':''}" data-a="exRel" data-i="${c.i}" data-j="${j}"${boom?' disabled':''}><span><b>${exRelName(o)}</b><br><span class="dim small">${exRelDesc(o)}</span></span>${exRarB(o.r)}</button>`).join('')}</div></div>
       <span class="xd-st${bb?' on':''}">${bb?`взрыв ${bb}`:'не задет'}</span></div>`;}).join('')||'<span class="dim small">На этом поле реликтов нет.</span>';
   const rems=G.cells.filter(c=>c.t==='rem').sort((a,c)=>a.l.localeCompare(c.l)).map(c=>{const bb=cov.get(c.i);
@@ -11229,7 +11272,14 @@ function exBoomRun(){const X=C&&C.ex;if(!X||X.stage!=='field'||!X.G.ch.length)re
   return h;};}
 {const _sc=statusChips;statusChips=function(e){let h=_sc.apply(this,arguments);if(!e||!e.exTag)return h;const t=e.exPre.map(p=>EX_PREM[p].n).join('; ');
   const c=`<span class="chip" style="color:#e48a78;border-color:#e48a78" title="${esc(t)}">Реликвии ×${e.exTag}</span>`;return h?h.replace('<div class="chips">','<div class="chips">'+c):`<div class="chips">${c}</div>`;};}
-{const _vc=vCombat;vCombat=function(){let h=_vc.apply(this,arguments);const P=calc();if(P.ward>0)h=h.replace('<div class="me" id="mebox">',`<div class="me" id="mebox"><div class="wardrow ${C.wardBr>0?'br':''}">Оберег ${fmt(P.ward)}${C.wardBr>0?` — сломан, ${C.wardBr} х.`:''}</div>`);return h;};}
+{const _vc=vCombat;vCombat=function(){let h=_vc.apply(this,arguments);const P=calc();
+  /* Оберег героя — отдельная полоска под энергощитом */
+  if(P.ward>0){const br=C.wardBr>0,wb=`<div class="bar wardb${br?' br':''}"><i style="width:${br?0:100}%"></i><span class="t num">Оберег ${fmt(P.ward)}${br?` — сломан, ${C.wardBr} х.`:''}</span></div>`;
+    const m=h.indexOf('id="mebox"'),k=m<0?-1:h.indexOf('<div class="bar hpb">',m);if(k>0)h=h.slice(0,k)+wb+h.slice(k);}
+  /* Оберег монстра (реликвия экспедиции) — такая же полоска под здоровьем */
+  C.enemies.forEach(e=>{if(!(e.hp>0)||!(e.exWard>0))return;const a=h.indexOf(`data-en="${e.uid}"`);if(a<0)return;const b=h.indexOf('<div class="bar hpb">',a);if(b<0)return;const c=h.indexOf('</div>',b)+6;const br=e.exWardBr>0;
+    h=h.slice(0,c)+`<div class="bar wardb${br?' br':''}"><i style="width:${br?0:100}%"></i><span class="t num">Оберег ${fmt(e.exWard)}${br?` — сломан, ${e.exWardBr} х.`:''}</span></div>`+h.slice(c);});
+  return h;};}
 {const _vh=vChar;vChar=function(){let h=_vh.apply(this,arguments);const P=calc();if(P.ward>0)h=h.replace('<div><span>Энерг. щит</span>',`<div><span class="ward-t">Оберег</span><span>${fmt(P.ward)} · ${exWardTurns(P)} х.</span></div><div><span>Энерг. щит</span>`);return h;};}
 
 /* ---------- Единённое свойство и Сферы уникального единения ---------- */
@@ -11308,7 +11358,7 @@ function exDnPanel(){const X=EXS(),D=X.st.dn||[];
     <div class="row">${exRefBtn('dn')}</div>`;}
 /* шансы тиров у Гвеннен: все шесть тиров, отсутствующие в слоте — отмечены */
 function exGwOddsTxt(slot){const od=new Map(exGwOdds(slot));
-  return `Шансы тиров у Гвеннен: ${[5,4,3,2,1,0].map(t=>`<b style="color:${GW_TIER_C[t]}">т${t}</b> ${GW_TIER_W[t]}%`).join(' · ')}.<br>В этом слоте: ${[5,4,3,2,1,0].map(t=>`<b style="color:${GW_TIER_C[t]}">т${t}</b> ${od.has(t)?od.get(t).toFixed(1).replace('.',',')+'%':'нет'}`).join(' · ')}`;}
+  return `Шансы тиров у Гвеннен: ${[5,4,3,2,1,0].map(t=>`<b style="color:${GW_TIER_C[t]}">т${t}</b> ${String(GW_TIER_W[t]).replace('.',',')}%`).join(' · ')}.<br>В этом слоте: ${[5,4,3,2,1,0].map(t=>`<b style="color:${GW_TIER_C[t]}">т${t}</b> ${od.has(t)?od.get(t).toFixed(1).replace('.',',')+'%':'нет'}`).join(' · ')}`;}
 /* вкладка Гвеннен: уник для слота */
 function exGwPanel(){const X=EXS(),p=exGwPrice(),pool=exUqPool(exGwSlot);
   return `<div class="panel"><p class="dim small" style="margin:0 0 8px">Выберите слот и заплатите монетами: выпадет случайный уник этого слота из общего выпадения (уники боссов не выпадают). Полоса — тир: белая т5, синяя т4, фиолетовая т3, фиолетово-розовая т2, красная т1, золотая т0.</p>
@@ -11394,6 +11444,19 @@ Object.assign(ACT,{
   exUnGo(d){const w=window._item,it=curItem(),src=S.inv.find(x=>x.uid===d.u);if(!it||!src)return;closeModal();if(exUnApply(it,src))openItem(w.where,w.key);},
   exT(d){exTestAct(d.k);},
 });
+/* эффекты Чайки и Охотника за головами видны всегда (даже если эффекты флаконов скрыты в настройках) */
+{const _br=buffRow;buffRow=function(P){let h=_br.apply(this,arguments);const ui=ACC.ui||{};if(ui.flask||!C||!C.fb)return h;
+  const ch=C.fb.filter(b=>/^(gull|hh_)/.test(b.slot)).map(b=>chip(`${b.name}${b.turns<500?' '+b.turns:b.bt?' · боёв '+b.bt:''}`,'var(--r-unique)')).join('');if(!ch)return h;
+  return h.includes('Нет активных эффектов')?`<div class="buffs">${ch}</div>`:h.replace(/<\/div>$/,ch+'</div>');};}
+/* вкладка тайника «Уникальные»: раздел экспедиции (уники рунных монстров, боссов и Железные флаконы) */
+{const _uc=uqCatalog;uqCatalog=function(){const out=_uc.apply(this,arguments);if(out.some(s=>s[0]==='Экспедиция'))return out;
+  const fl=out.find(s=>s[0]==='Уникальные флаконы');if(fl)fl[1]=fl[1].filter(x=>!UNIQUE_FLASKS.some(q=>q.exU&&q.n===x.n));
+  const list=EX_UNIQ_D.map(d=>d.flask?{n:d.n,slot:'flask',src:'Только с босса экспедиции · '+MONS[EX_FAC[d.boss].boss].n.split(',')[0],mk:()=>makeUnique(84,{flaskU:1,n:d.n})}
+    :{n:d.n,slot:d.slot,src:d.src==='exRun'?'Рунные монстры экспедиции':'Только с босса экспедиции · '+MONS[EX_FAC[d.boss].boss].n.split(',')[0],mk:()=>uq4Make(d,Math.max(84,d.minL))});
+  const i=out.findIndex(s=>s[0]==='Разлом');out.splice(i>=0?i+1:out.length,0,['Экспедиция',list]);return out;};}
+/* карточка уникального 0.23: защита и урон основы показываются с локальными свойствами предмета (Оберег, броня, урон оружия) */
+{const _id=itemDef;itemDef=function(it){if(it&&it._defSrc)return _id.call(this,it._defSrc);return _id.apply(this,arguments);};}
+{const _wi=wInfo;wInfo=function(it){if(it&&it._defSrc)return _wi.call(this,it._defSrc);return _wi.apply(this,arguments);};}
 
 /* =========================================================
    0.23: верстак — зачарования особых флаконов за Вливающую и Растопляющую сферы (как ремесло PoE)
