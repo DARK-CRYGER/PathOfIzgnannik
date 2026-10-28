@@ -8305,6 +8305,11 @@ function exFbSave(){const run=exRunNow();if(!run||!C||!C.fb)return;
     if(r.exImmAll)for(let i=n0;i<C.fx.length;i++){if(C.fx[i].target===e.uid&&/^(✦ )?0$/.test(C.fx[i].text)){C.fx[i].text=t;C.fx[i].cls='';}}
     else fx(e.uid,t,'');logF(`&nbsp;&nbsp;<span class="bad-t">${esc(e.n)}: иммунитет к урону «${EL[r.exImmEl].toLowerCase()}»${r.exImmAll?' — урон не прошёл':''}</span>`);}
   return r;};}
+/* божественная сфера и благословение пересоздают уникальный предмет: Единённое свойство переносится на новый как есть (значения не перебрасываются) */
+{const _ud=uniqDivine;uniqDivine=function(it){const un=it&&it.un?JSON.parse(JSON.stringify(it.un)):null;const r=_ud.apply(this,arguments);
+  if(un&&r&&typeof r==='object'){r.un=un;save();}return r;};}
+{const _bb=brBless;brBless=function(it){const un=it&&it.un?JSON.parse(JSON.stringify(it.un)):null;const r=_bb.apply(this,arguments);
+  if(un&&r&&typeof r==='object'){r.un=un;save();}return r;};}
 
 /* =========================================================
    0.26: ЛАГЕРЬ ЭКСПЕДИЦИИ — четыре торговца за Рунические монеты (цены ×5 от наброска плана).
@@ -10744,7 +10749,7 @@ Object.assign(ACT,{lgView(d){LG_VIEW=d.id||null;delAsk=null;render();}});
 /* выбор персонажа запоминает его мир */
 {const _p=ACT.play;ACT.play=function(d){const c=ACC.chars.find(x=>x.id===d.id);if(c)LG_VIEW=c.league||null;return _p.call(this,d);};}
 /* метка сборки (подставляется build.py): по ней видно, загрузилась ли новая версия игры */
-const BUILD_ID='0.26 · 26.10 07:44 UTC';
+const BUILD_ID='0.26 · 28.10 13:13 UTC';
 {const _vr=vRoster;vRoster=function(){return _vr()+`<p class="dim small" style="text-align:center;margin:10px 0 0">Версия ${BUILD_ID}</p>`;};}
 {const _vs=vSettings;vSettings=function(){return _vs()+`<p class="dim small" style="text-align:center;margin:10px 0 0">Версия ${BUILD_ID}</p>`;};}
 
